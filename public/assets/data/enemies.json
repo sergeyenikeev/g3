@@ -1,0 +1,24 @@
+{
+  "chaser": {
+    "hp": 26,
+    "speed": 185,
+    "contactDamage": 12,
+    "knockback": 220,
+    "ai": { "type": "chase", "zigzag": 0.18 }
+  },
+  "shooter": {
+    "hp": 20,
+    "speed": 135,
+    "keepDistance": 220,
+    "fireCooldownSec": 1.55,
+    "projectile": { "speed": 320, "damage": 10, "lifetimeSec": 2.2 },
+    "ai": { "type": "kite" }
+  },
+  "cutter": {
+    "hp": 18,
+    "speed": 210,
+    "tailCut": 3,
+    "cooldownAfterCutSec": 1.2,
+    "ai": { "type": "tail_hunt", "preferTail": true }
+  }
+}

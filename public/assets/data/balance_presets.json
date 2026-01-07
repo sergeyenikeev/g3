@@ -1,0 +1,82 @@
+{
+  "presets": [
+    {
+      "id": "casual",
+      "name": "Казуальный",
+      "overrides": {
+        "player": {
+          "speedBase": 270,
+          "hpMax": 110,
+          "invulnOnHitSec": 0.7,
+          "tailSpeedPenaltyPerSegment": 0.005
+        },
+        "flip": {
+          "cooldownBaseSec": 5.2,
+          "radius": 170,
+          "postFlipInvulnSec": 0.45
+        },
+        "tail": {
+          "lossOnCutter": 2,
+          "lossOnProjectile": 1,
+          "lossOnObstacle": 1,
+          "maxLenBase": 16
+        },
+        "recycler": {
+          "healOnBank": 14,
+          "bankTimeSec": 0.7
+        },
+        "waves": {
+          "enemyHpMultPerWave": 0.05,
+          "enemySpeedMultPerWave": 0.015,
+          "budgetPerWave": 1.45
+        },
+        "enemies": {
+          "chaser": { "speedMult": 0.92, "hpMult": 0.95 },
+          "shooter": { "fireCooldownMult": 1.12, "projectileSpeedMult": 0.95 },
+          "cutter": { "speedMult": 0.95 }
+        }
+      }
+    },
+    {
+      "id": "normal",
+      "name": "Нормальный",
+      "overrides": {}
+    },
+    {
+      "id": "hardcore",
+      "name": "Хардкор",
+      "overrides": {
+        "player": {
+          "speedBase": 250,
+          "hpMax": 90,
+          "invulnOnHitSec": 0.45,
+          "tailSpeedPenaltyPerSegment": 0.007
+        },
+        "flip": {
+          "cooldownBaseSec": 6.5,
+          "postFlipInvulnSec": 0.25
+        },
+        "tail": {
+          "lossOnCutter": 4,
+          "lossOnProjectile": 3,
+          "lossOnObstacle": 3,
+          "maxLenBase": 12
+        },
+        "recycler": {
+          "bankTimeSec": 0.85,
+          "healOnBank": 8
+        },
+        "waves": {
+          "enemyHpMultPerWave": 0.07,
+          "enemySpeedMultPerWave": 0.025,
+          "budgetPerWave": 1.8
+        },
+        "enemies": {
+          "chaser": { "speedMult": 1.08, "hpMult": 1.05 },
+          "shooter": { "fireCooldownMult": 0.9, "projectileSpeedMult": 1.08 },
+          "cutter": { "speedMult": 1.06 }
+        }
+      }
+    }
+  ]
+}

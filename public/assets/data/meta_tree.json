@@ -1,0 +1,39 @@
+{
+  "currencies": ["bolts", "cores"],
+  "costFormula": {
+    "type": "exponential",
+    "base": 120,
+    "growth": 1.32
+  },
+  "nodes": [
+    {
+      "id": "meta_core_1",
+      "name": "Magnet Core I",
+      "maxLevel": 8,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "add", "path": "magnet.radiusBase", "value": 6 },
+        { "op": "mul", "path": "magnet.pullAccelBase", "value": 1.03 }
+      ]
+    },
+    {
+      "id": "meta_coil_1",
+      "name": "Polarity Coil I",
+      "maxLevel": 6,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "mul", "path": "flip.cooldownBaseSec", "value": 0.96 },
+        { "op": "add", "path": "flip.pushForce", "value": 18 }
+      ]
+    },
+    {
+      "id": "meta_dash_unlock",
+      "name": "Dash Module (Unlock)",
+      "maxLevel": 1,
+      "cost": { "currency": "cores", "amount": 2 },
+      "effects": [
+        { "op": "set", "path": "dash.enabledByDefault", "value": true }
+      ]
+    }
+  ]
+}

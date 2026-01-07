@@ -1,0 +1,400 @@
+[
+  {
+    "id": "wide_field",
+    "name": "Wide Field",
+    "rarity": "common",
+    "weight": 110,
+    "maxStacks": 3,
+    "tags": ["core", "collection"],
+    "ui": {
+      "title": "Широкое поле",
+      "desc": "+12% радиус притяжения за стак."
+    },
+    "effects": [
+      { "op": "mul", "path": "magnet.radiusBase", "value": 1.12 }
+    ],
+    "synergy": { "worksWith": ["strong_pull", "heavy_haul", "recycler_bonus"] }
+  },
+  {
+    "id": "strong_pull",
+    "name": "Strong Pull",
+    "rarity": "common",
+    "weight": 110,
+    "maxStacks": 3,
+    "tags": ["core", "collection"],
+    "ui": {
+      "title": "Сильная тяга",
+      "desc": "+12% ускорение притяжения за стак."
+    },
+    "effects": [
+      { "op": "mul", "path": "magnet.pullAccelBase", "value": 1.12 }
+    ],
+    "synergy": { "worksWith": ["wide_field", "vacuum_burst", "long_frame"] }
+  },
+  {
+    "id": "vacuum_burst",
+    "name": "Vacuum Burst",
+    "rarity": "uncommon",
+    "weight": 70,
+    "maxStacks": 1,
+    "tags": ["core", "utility"],
+    "ui": {
+      "title": "Вакуумный всплеск",
+      "desc": "Каждые 8с: +30% притяжение на 1с."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "vacuum_burst",
+        "params": { "periodSec": 8.0, "durationSec": 1.0, "pullMult": 1.3 }
+      }
+    ],
+    "synergy": { "worksWith": ["strong_pull", "chain_clamp"] }
+  },
+  {
+    "id": "heavy_haul",
+    "name": "Heavy Haul",
+    "rarity": "uncommon",
+    "weight": 65,
+    "maxStacks": 2,
+    "tags": ["economy", "collection"],
+    "ui": {
+      "title": "Тяжёлый улов",
+      "desc": "Больше heavy scrap и +1 болт за heavy."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "heavy_haul",
+        "params": { "heavySpawnMult": 1.12, "heavyBonusBolts": 1 }
+      }
+    ],
+    "synergy": { "worksWith": ["recycler_bonus", "x2_results_hook"] }
+  },
+
+  {
+    "id": "fast_flip",
+    "name": "Fast Flip",
+    "rarity": "common",
+    "weight": 110,
+    "maxStacks": 3,
+    "tags": ["flip"],
+    "ui": {
+      "title": "Быстрый Flip",
+      "desc": "−12% перезарядка Flip за стак."
+    },
+    "effects": [
+      { "op": "mul", "path": "flip.cooldownBaseSec", "value": 0.88 }
+    ],
+    "synergy": { "worksWith": ["hard_push", "polarity_echo", "shrapnel_coil"] }
+  },
+  {
+    "id": "hard_push",
+    "name": "Hard Push",
+    "rarity": "uncommon",
+    "weight": 75,
+    "maxStacks": 2,
+    "tags": ["flip", "combat"],
+    "ui": {
+      "title": "Жёсткий толчок",
+      "desc": "+18% сила импульса Flip за стак."
+    },
+    "effects": [
+      { "op": "mul", "path": "flip.pushForce", "value": 1.18 }
+    ],
+    "synergy": { "worksWith": ["fast_flip", "shrapnel_coil", "polarity_echo"] }
+  },
+  {
+    "id": "flip_shield",
+    "name": "Flip Shield",
+    "rarity": "rare",
+    "weight": 35,
+    "maxStacks": 1,
+    "tags": ["flip", "survival"],
+    "ui": {
+      "title": "Щит после Flip",
+      "desc": "После Flip: щит 15 на 3с."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "flip_shield",
+        "params": { "shieldAmount": 15, "durationSec": 3.0 }
+      }
+    ],
+    "synergy": { "worksWith": ["fast_flip", "overclock", "scrap_mine"] }
+  },
+  {
+    "id": "shrapnel_coil",
+    "name": "Shrapnel Coil",
+    "rarity": "rare",
+    "weight": 35,
+    "maxStacks": 1,
+    "tags": ["flip", "combat"],
+    "ui": {
+      "title": "Осколочная катушка",
+      "desc": "Flip выпускает 6 осколков (урон/отталкивание)."
+    },
+    "effects": [
+      { "op": "set", "path": "flip.shrapnel.enabled", "value": true }
+    ],
+    "synergy": { "worksWith": ["hard_push", "polarity_echo", "wide_field"] }
+  },
+  {
+    "id": "polarity_echo",
+    "name": "Polarity Echo",
+    "rarity": "epic",
+    "weight": 15,
+    "maxStacks": 1,
+    "tags": ["flip", "combat"],
+    "ui": {
+      "title": "Эхо полярности",
+      "desc": "Каждый 3-й Flip создаёт вторую волну через 0.15с."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "polarity_echo",
+        "params": { "everyN": 3, "delaySec": 0.15, "forceMult": 0.65, "radiusMult": 0.9 }
+      }
+    ],
+    "synergy": { "worksWith": ["fast_flip", "hard_push", "shrapnel_coil"] }
+  },
+
+  {
+    "id": "long_frame",
+    "name": "Long Frame",
+    "rarity": "common",
+    "weight": 105,
+    "maxStacks": 2,
+    "tags": ["tail"],
+    "ui": {
+      "title": "Длинная рама",
+      "desc": "+5 лимит хвоста за стак."
+    },
+    "effects": [
+      { "op": "add", "path": "tail.maxLenBase", "value": 5 }
+    ],
+    "synergy": { "worksWith": ["stabilizer_fins", "tail_armor", "scrap_mine"] }
+  },
+  {
+    "id": "chain_clamp",
+    "name": "Chain Clamp",
+    "rarity": "uncommon",
+    "weight": 70,
+    "maxStacks": 1,
+    "tags": ["tail", "survival"],
+    "ui": {
+      "title": "Зажим цепи",
+      "desc": "1 раз за волну: потеря сегмента игнорируется."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "chain_clamp",
+        "params": { "negateLossPerWave": 1 }
+      }
+    ],
+    "synergy": { "worksWith": ["tail_armor", "stabilizer_fins", "vacuum_burst"] }
+  },
+  {
+    "id": "tail_armor",
+    "name": "Tail Armor",
+    "rarity": "uncommon",
+    "weight": 75,
+    "maxStacks": 1,
+    "tags": ["tail", "survival"],
+    "ui": {
+      "title": "Броня хвоста",
+      "desc": "−1 к потерям сегментов (мин. 1)."
+    },
+    "effects": [
+      { "op": "add", "path": "tail.lossOnCutter", "value": -1 },
+      { "op": "add", "path": "tail.lossOnProjectile", "value": -1 },
+      { "op": "add", "path": "tail.lossOnObstacle", "value": -1 }
+    ],
+    "clamp": [
+      { "path": "tail.lossOnCutter", "min": 1 },
+      { "path": "tail.lossOnProjectile", "min": 1 },
+      { "path": "tail.lossOnObstacle", "min": 1 }
+    ],
+    "synergy": { "worksWith": ["scrap_mine", "long_frame", "magnet_anchor"] }
+  },
+  {
+    "id": "stabilizer_fins",
+    "name": "Stabilizer Fins",
+    "rarity": "rare",
+    "weight": 35,
+    "maxStacks": 1,
+    "tags": ["tail", "mobility"],
+    "ui": {
+      "title": "Стабилизаторы",
+      "desc": "Хвост меньше виляет, штраф скорости за сегмент −25%."
+    },
+    "effects": [
+      { "op": "mul", "path": "tail.damping", "value": 1.4 },
+      { "op": "mul", "path": "tail.followStiffness", "value": 1.15 },
+      { "op": "mul", "path": "player.tailSpeedPenaltyPerSegment", "value": 0.75 }
+    ],
+    "synergy": { "worksWith": ["long_frame", "overclock", "recycler_bonus"] }
+  },
+  {
+    "id": "magnet_anchor",
+    "name": "Magnet Anchor",
+    "rarity": "rare",
+    "weight": 30,
+    "maxStacks": 1,
+    "tags": ["tail", "utility"],
+    "ui": {
+      "title": "Магнитный якорь",
+      "desc": "Раз в 10с: якорь на 0.6с (хвост не рвётся)."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "magnet_anchor",
+        "params": { "cooldownSec": 10.0, "durationSec": 0.6 }
+      }
+    ],
+    "synergy": { "worksWith": ["recycler_bonus", "chain_clamp", "long_frame"] }
+  },
+
+  {
+    "id": "emergency_patch",
+    "name": "Emergency Patch",
+    "rarity": "common",
+    "weight": 105,
+    "maxStacks": 2,
+    "tags": ["survival"],
+    "ui": {
+      "title": "Экстренный ремонт",
+      "desc": "+20 к макс HP и мгновенно лечит на 20."
+    },
+    "effects": [
+      { "op": "add", "path": "player.hpMax", "value": 20 },
+      { "op": "heal", "value": 20 }
+    ],
+    "synergy": { "worksWith": ["overclock", "dash_module"] }
+  },
+  {
+    "id": "recycler_bonus",
+    "name": "Recycler Bonus",
+    "rarity": "uncommon",
+    "weight": 70,
+    "maxStacks": 1,
+    "tags": ["economy", "survival"],
+    "ui": {
+      "title": "Бонус переработчика",
+      "desc": "Сдача лечит больше и даёт +10% болтов."
+    },
+    "effects": [
+      { "op": "add", "path": "recycler.healOnBank", "value": 18 },
+      {
+        "op": "grant_perk",
+        "perkId": "recycler_bolts_mult",
+        "params": { "mult": 1.1 }
+      }
+    ],
+    "synergy": { "worksWith": ["heavy_haul", "magnet_anchor", "stabilizer_fins"] }
+  },
+  {
+    "id": "overclock",
+    "name": "Overclock",
+    "rarity": "rare",
+    "weight": 35,
+    "maxStacks": 1,
+    "tags": ["mobility", "risk_reward"],
+    "ui": {
+      "title": "Разгон",
+      "desc": "+12% скорость, но +10% получаемого урона."
+    },
+    "effects": [
+      { "op": "mul", "path": "player.speedBase", "value": 1.12 },
+      {
+        "op": "grant_perk",
+        "perkId": "damage_taken_mult",
+        "params": { "mult": 1.1 }
+      }
+    ],
+    "synergy": { "worksWith": ["flip_shield", "stabilizer_fins"] }
+  },
+  {
+    "id": "dash_module",
+    "name": "Dash Module",
+    "rarity": "rare",
+    "weight": 35,
+    "maxStacks": 1,
+    "tags": ["mobility"],
+    "ui": {
+      "title": "Модуль рывка",
+      "desc": "Открывает Dash в ранe и −15% кд Dash."
+    },
+    "effects": [
+      { "op": "set", "path": "dash.enabledByDefault", "value": true },
+      { "op": "mul", "path": "dash.cooldownSec", "value": 0.85 }
+    ],
+    "synergy": { "worksWith": ["emergency_patch", "overclock"] }
+  },
+
+  {
+    "id": "drone_buddy",
+    "name": "Drone Buddy",
+    "rarity": "uncommon",
+    "weight": 65,
+    "maxStacks": 1,
+    "tags": ["combat"],
+    "ui": {
+      "title": "Дрон-напарник",
+      "desc": "Дрон стреляет раз в 1.4с (урон 6)."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "drone_buddy",
+        "params": { "fireCooldownSec": 1.4, "damage": 6, "projectileSpeed": 420 }
+      }
+    ],
+    "synergy": { "worksWith": ["vacuum_burst", "long_frame"] }
+  },
+  {
+    "id": "scrap_mine",
+    "name": "Scrap Mine",
+    "rarity": "epic",
+    "weight": 15,
+    "maxStacks": 1,
+    "tags": ["combat", "tail"],
+    "ui": {
+      "title": "Мины из хлама",
+      "desc": "Потерянные сегменты становятся минами на 3с."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "scrap_mine",
+        "params": { "durationSec": 3.0, "damage": 14, "pushForce": 520, "triggerRadius": 28 }
+      }
+    ],
+    "synergy": { "worksWith": ["tail_armor", "chain_clamp", "flip_shield"] }
+  },
+
+  {
+    "id": "x2_results_hook",
+    "name": "Double Results Hook",
+    "rarity": "common",
+    "weight": 90,
+    "maxStacks": 1,
+    "tags": ["economy"],
+    "ui": {
+      "title": "Крюк двойной выгоды",
+      "desc": "Увеличивает ценность экрана награды (под x2 рекламу)."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "results_bonus",
+        "params": { "baseMult": 1.15 }
+      }
+    ],
+    "synergy": { "worksWith": ["heavy_haul", "recycler_bonus"] }
+  }
+]

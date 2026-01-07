@@ -1,0 +1,39 @@
+{
+  "patterns": [
+    {
+      "id": "pincer_chasers",
+      "weight": 30,
+      "minWave": 1,
+      "spawns": [
+        { "t": 0.0, "type": "chaser", "count": 3, "formation": "arc", "arcDeg": 140 },
+        { "t": 6.0, "type": "chaser", "count": 2, "formation": "opposite" }
+      ]
+    },
+    {
+      "id": "snipers",
+      "weight": 25,
+      "minWave": 2,
+      "spawns": [
+        { "t": 0.0, "type": "shooter", "count": 2, "formation": "corners" },
+        { "t": 8.0, "type": "chaser", "count": 3, "formation": "random_ring" }
+      ]
+    },
+    {
+      "id": "cutters_window",
+      "weight": 18,
+      "minWave": 3,
+      "spawns": [
+        { "t": 2.0, "type": "cutter", "count": 1, "formation": "behind_tail_bias" },
+        { "t": 10.0, "type": "cutter", "count": 1, "formation": "behind_tail_bias" },
+        { "t": 0.0, "type": "chaser", "count": 3, "formation": "random_ring" }
+      ],
+      "capsOverride": { "maxCutters": 2 }
+    },
+    {
+      "id": "breather_scrap",
+      "weight": 10,
+      "minWave": 1,
+      "special": { "type": "breather" }
+    }
+  ]
+}

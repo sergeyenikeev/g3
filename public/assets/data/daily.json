@@ -1,0 +1,34 @@
+{
+  "seedMode": "utc_date_yyyymmdd",
+  "dailyRewards": {
+    "firstRunBonusBoltsMult": 1.25,
+    "extraAttemptRewardedMax": 2,
+    "coreDropBonus": 0.05
+  },
+  "dailyVariants": [
+    {
+      "id": "daily_fast_flip",
+      "weight": 40,
+      "modifiers": [
+        { "op": "mul", "path": "flip.cooldownBaseSec", "value": 0.85 }
+      ],
+      "specialRule": { "type": "double_shooter_waves", "fromWave": 4 }
+    },
+    {
+      "id": "daily_heavy_yard",
+      "weight": 35,
+      "modifiers": [
+        { "op": "mul", "path": "recycler.boltsPerScrapHeavy", "value": 1.2 }
+      ],
+      "specialRule": { "type": "more_heavy_scrap", "mult": 1.25 }
+    },
+    {
+      "id": "daily_fragile_tail",
+      "weight": 25,
+      "modifiers": [
+        { "op": "mul", "path": "tail.lossOnProjectile", "value": 1.5 }
+      ],
+      "specialRule": { "type": "rewarded_reroll_discount", "times": 1 }
+    }
+  ]
+}

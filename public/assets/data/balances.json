@@ -1,0 +1,142 @@
+{
+  "player": {
+    "speedBase": 260,
+    "speedMin": 140,
+    "tailSpeedPenaltyPerSegment": 0.006,
+    "turnSmoothing": 0.16,
+    "hpMax": 100,
+    "invulnOnHitSec": 0.55
+  },
+  "dash": {
+    "enabledByDefault": false,
+    "speedMult": 1.85,
+    "durationSec": 0.25,
+    "cooldownSec": 4.5,
+    "iframesSec": 0.15
+  },
+  "magnet": {
+    "radiusBase": 150,
+    "radiusMax": 260,
+    "pullAccelBase": 920,
+    "pullAccelCoreScale": 1.05,
+    "pullMaxSpeed": 520,
+    "captureDistance": 18,
+    "captureCooldownSec": 0.06
+  },
+  "tail": {
+    "segmentSpacing": 22,
+    "segmentRadius": 9,
+    "maxLenBase": 14,
+    "maxLenCap": 36,
+    "followStiffness": 0.48,
+    "damping": 0.12,
+    "lossOnCutter": 3,
+    "lossOnProjectile": 2,
+    "lossOnObstacle": 2
+  },
+  "flip": {
+    "cooldownBaseSec": 6.0,
+    "pulseDurationSec": 0.22,
+    "radius": 160,
+    "pushForce": 980,
+    "deflectProjectiles": true,
+    "postFlipInvulnSec": 0.35,
+    "shrapnel": {
+      "enabled": false,
+      "count": 6,
+      "damage": 9,
+      "speed": 520,
+      "lifetimeSec": 0.45
+    }
+  },
+  "scrap": {
+    "clusterSizeMin": 6,
+    "clusterSizeMax": 14,
+    "respawnTimeSec": 6.5,
+    "types": {
+      "common": { "weight": 70, "valueBolts": 1 },
+      "heavy": { "weight": 20, "valueBolts": 3 },
+      "rareShard": { "weight": 10, "coreDropChance": 0.2 }
+    }
+  },
+  "recycler": {
+    "count": 1,
+    "radius": 60,
+    "bankTimeSec": 0.75,
+    "healOnBank": 10,
+    "boltsPerScrapCommon": 1,
+    "boltsPerScrapHeavy": 3
+  },
+  "waves": {
+    "durationBaseSec": 25,
+    "durationEvery5PlusSec": 3,
+    "durationMaxSec": 40,
+
+    "enemyHpMultPerWave": 0.06,
+    "enemyHpMultCap": 2.0,
+    "enemySpeedMultPerWave": 0.02,
+    "enemySpeedMultCap": 1.35,
+
+    "scrapMultPerWave": 0.03,
+    "scrapMultCap": 1.6,
+
+    "budgetBase": 6,
+    "budgetPerWave": 1.6
+  },
+  "director": {
+    "safeSpawnDist": 220,
+    "recyclerSafeDist": 180,
+    "telegraphSec": 0.55,
+
+    "caps": {
+      "maxShootersBase": 3,
+      "maxCuttersUntilWave10": 2,
+      "maxCuttersFromWave11": 3,
+      "maxTotalEnemiesBase": 10,
+      "maxTotalEnemiesPerWave": 0.35
+    },
+
+    "breather": {
+      "everyWaves": 3,
+      "durationSec": 7.0,
+      "enemyRateMult": 0.55,
+      "extraScrapClusters": 1
+    },
+
+    "antiSnowball": {
+      "lowHpThreshold": 0.3,
+      "lowHpBudgetMult": 0.9,
+      "lowHpExtraScrapClusters": 1,
+
+      "bigTailThreshold": 24,
+      "bigTailCutterWeightMult": 0.8
+    },
+
+    "pressure": {
+      "radiusNearEnemies": 260,
+      "radiusNearProjectiles": 220,
+      "recentHitWindowSec": 6.0,
+
+      "weights": {
+        "nearEnemies": 0.6,
+        "nearProjectiles": 0.35,
+        "recentHits": 1.2,
+        "tailLenFactor": 1.0
+      },
+      "targetMinBase": 2.0,
+      "targetMinPerWave": 0.12,
+      "targetMaxBase": 4.5,
+      "targetMaxPerWave": 0.18
+    }
+  },
+  "upgradeRarityRoll": {
+    "pityNoRareOrEpicPicks": 6,
+    "pityBoost": { "rare": 0.06, "epic": 0.01, "takeFrom": "common" },
+    "tables": [
+      { "fromWave": 1, "toWave": 3, "common": 0.78, "uncommon": 0.20, "rare": 0.02, "epic": 0.0 },
+      { "fromWave": 4, "toWave": 7, "common": 0.68, "uncommon": 0.24, "rare": 0.07, "epic": 0.01 },
+      { "fromWave": 8, "toWave": 12, "common": 0.58, "uncommon": 0.28, "rare": 0.12, "epic": 0.02 },
+      { "fromWave": 13, "toWave": 999, "common": 0.50, "uncommon": 0.30, "rare": 0.16, "epic": 0.04 }
+    ]
+  }
+}
