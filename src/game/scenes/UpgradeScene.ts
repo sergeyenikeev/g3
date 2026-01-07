@@ -64,6 +64,7 @@ export class UpgradeScene extends Phaser.Scene {
     reroll.on("pointerdown", () => void this.handleReroll());
 
     this.renderOffer();
+    this.game.events.emit(GAME_EVENTS.UPGRADE_OFFER_SHOWN, { waveIndex: this.state.waveIndex });
 
     this.scale.on("resize", () => {
       this.scene.restart();

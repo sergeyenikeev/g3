@@ -1,13 +1,17 @@
 export const GAME_EVENTS = {
   SCRAP_COLLECTED: "scrap_collected",
   FLIP_USED: "flip_used",
+  PROJECTILE_DEFLECTED: "projectile_deflected",
   BANK_COMPLETE: "bank_complete",
   PLAYER_HIT: "player_hit",
+  TAIL_CUT: "tail_cut",
   REVIVE_OFFER: "revive_offer",
   REVIVE_ACCEPTED: "revive_accepted",
   REVIVE_DECLINED: "revive_declined",
+  WAVE_START: "wave_start",
   WAVE_COMPLETE: "wave_complete",
   RUN_END: "run_end",
+  UPGRADE_OFFER_SHOWN: "upgrade_offer_shown",
   UPGRADE_PICKED: "upgrade_picked",
   UPGRADE_REROLL: "upgrade_reroll",
 } as const;

@@ -14,6 +14,7 @@ import { consumeActions, inputState } from "../input/inputState";
 import type { RunMode, RunState } from "../run/runState";
 import { getCrazyGamesGameApi } from "../../platform/sdk/crazyGamesSdk";
 import { VISUAL_PALETTE, createBgFarSilhouette, createBgTile256, createDecals, createVfxTextures } from "../../visual/TextureFactory";
+import { VfxManager } from "../../visual/VfxManager";
 
 type EnemyEntity = {
   sprite: ArcadeImage;
@@ -50,6 +51,16 @@ export class GameScene extends Phaser.Scene {
   private bgDecals: Phaser.GameObjects.Image[] = [];
   private playerGlow: Phaser.GameObjects.Image | null = null;
   private playerGlowPhase = 0;
+  private vfx: VfxManager | null = null;
+
+  private readonly onVfxScrapCollected = (p: any) => this.vfx?.emit(GAME_EVENTS.SCRAP_COLLECTED, p);
+  private readonly onVfxFlipUsed = (p: any) => this.vfx?.emit(GAME_EVENTS.FLIP_USED, p);
+  private readonly onVfxProjectileDeflected = (p: any) => this.vfx?.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, p);
+  private readonly onVfxPlayerHit = (p: any) => this.vfx?.emit(GAME_EVENTS.PLAYER_HIT, p);
+  private readonly onVfxTailCut = (p: any) => this.vfx?.emit(GAME_EVENTS.TAIL_CUT, p);
+  private readonly onVfxBankComplete = (p: any) => this.vfx?.emit(GAME_EVENTS.BANK_COMPLETE, p);
+  private readonly onVfxWaveStart = (p: any) => this.vfx?.emit(GAME_EVENTS.WAVE_START, p);
+  private readonly onVfxUpgradeOfferShown = (p: any) => this.vfx?.emit(GAME_EVENTS.UPGRADE_OFFER_SHOWN, p);
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keys!: {
@@ -160,6 +171,7 @@ export class GameScene extends Phaser.Scene {
     this.createWorld();
     if (this.pendingStartBooster) this.applyStartBooster();
     this.createCollisions();
+    this.createVfxSystem();
     this.startWave(1);
     this.notifyPlatformGameplayStart();
 
@@ -206,6 +218,7 @@ export class GameScene extends Phaser.Scene {
     this.updateBanking(dt);
     this.updateWave(dt);
     this.updateBackgroundLayers(dt);
+    this.vfx?.update(dt);
   }
 
   private updateTimers(dt: number): void {
@@ -263,7 +276,12 @@ export class GameScene extends Phaser.Scene {
   private updateMagnet(dt: number): void {
     const magnet = this.state.config.magnet;
     const radius = clamp(magnet.radiusBase, 0, magnet.radiusMax);
-    if (radius <= 0) return;
+    if (radius <= 0) {
+      this.vfx?.setMagnetLines({ x: this.player.x, y: this.player.y }, []);
+      return;
+    }
+
+    const candidates: Array<{ x: number; y: number; d2: number }> = [];
 
     this.scrapGroup.children.iterate((o) => {
       const spr = o as ArcadeImage | null;
@@ -272,6 +290,7 @@ export class GameScene extends Phaser.Scene {
       const dy = this.player.y - spr.y;
       const d2 = dx * dx + dy * dy;
       if (d2 > radius * radius) return null;
+      candidates.push({ x: spr.x, y: spr.y, d2 });
       const d = Math.sqrt(d2);
       if (d < 0.001) return null;
       const nx = dx / d;
@@ -283,6 +302,12 @@ export class GameScene extends Phaser.Scene {
       if (spd > magnet.pullMaxSpeed) spr.body.velocity.scale(magnet.pullMaxSpeed / spd);
       return null;
     });
+
+    if (this.vfx) {
+      candidates.sort((a, b) => a.d2 - b.d2);
+      const targets = candidates.slice(0, 12).map((c) => ({ x: c.x, y: c.y }));
+      this.vfx.setMagnetLines({ x: this.player.x, y: this.player.y }, targets);
+    }
   }
 
   private updateFlipPulse(dt: number): void {
@@ -320,7 +345,12 @@ export class GameScene extends Phaser.Scene {
       p.body.velocity.x = nx * speed;
       p.body.velocity.y = ny * speed;
       const ent = this.projectiles.find((pp) => pp.sprite === p);
-      if (ent) ent.owner = "player";
+      if (ent && ent.owner === "enemy") {
+        ent.owner = "player";
+        this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: p.x, y: p.y });
+      } else if (ent) {
+        ent.owner = "player";
+      }
       return null;
     });
   }
@@ -453,6 +483,8 @@ export class GameScene extends Phaser.Scene {
       ctx,
       this.rng
     );
+
+    this.game.events.emit(GAME_EVENTS.WAVE_START, { waveIndex });
 
     if (import.meta.env.VITE_E2E === "1") {
       this.wavePlan.durationSec = Math.min(this.wavePlan.durationSec, 6);
@@ -735,7 +767,7 @@ export class GameScene extends Phaser.Scene {
     this.flipCooldown = cfg.cooldownBaseSec;
     this.flipPulse = cfg.pulseDurationSec;
     this.playerInvuln = Math.max(this.playerInvuln, cfg.postFlipInvulnSec);
-    this.game.events.emit(GAME_EVENTS.FLIP_USED, {});
+    this.game.events.emit(GAME_EVENTS.FLIP_USED, { x: this.player.x, y: this.player.y, radius: cfg.radius });
 
     if (!cfg.shrapnel.enabled) return;
     const count = Math.max(0, cfg.shrapnel.count);
@@ -850,7 +882,8 @@ export class GameScene extends Phaser.Scene {
       if (this.rng.next() < this.state.config.scrap.types.rareShard.coreDropChance + bonus) this.state.cores += 1;
     }
 
-    this.game.events.emit(GAME_EVENTS.SCRAP_COLLECTED, { type });
+    const tex = type === "heavy" ? "scrap_heavy" : type === "rareShard" ? "scrap_rare" : "scrap_common";
+    this.game.events.emit(GAME_EVENTS.SCRAP_COLLECTED, { x: s.x, y: s.y, type, tex });
     s.destroy();
 
     this.time.delayedCall(this.state.config.scrap.respawnTimeSec * 1000, () => {
@@ -865,16 +898,20 @@ export class GameScene extends Phaser.Scene {
     const mult = this.state.perks.recycler_bolts_mult?.params?.mult;
     const m = typeof mult === "number" ? mult : 1;
 
-    const bolts =
+    const boltsBase =
       counts.common * this.state.config.recycler.boltsPerScrapCommon +
       counts.heavy * this.state.config.recycler.boltsPerScrapHeavy;
-    this.state.bolts += Math.floor(bolts * m);
+    const bolts = Math.floor(boltsBase * m);
+    this.state.bolts += bolts;
 
     const heal = this.state.config.recycler.healOnBank;
+    const hpBefore = this.state.hp;
     this.state.hp = Math.min(this.state.config.player.hpMax, this.state.hp + heal);
+    const hpHealed = Math.max(0, this.state.hp - hpBefore);
 
     this.tail.clear();
-    this.game.events.emit(GAME_EVENTS.BANK_COMPLETE, { bolts });
+    const pos = this.state.config.arena.recyclerPos;
+    this.game.events.emit(GAME_EVENTS.BANK_COMPLETE, { x: pos.x, y: pos.y, bolts, hpHealed });
   }
 
   private onPlayerHitByEnemy(enemySpr: Phaser.Physics.Arcade.Image): void {
@@ -894,7 +931,8 @@ export class GameScene extends Phaser.Scene {
     this.player.body.velocity.x += nx * kb;
     this.player.body.velocity.y += ny * kb;
 
-    this.tail.removeLast(this.state.config.tail.lossOnObstacle);
+    const removed = this.tail.removeLast(this.state.config.tail.lossOnObstacle);
+    if (removed.length > 0) this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length });
   }
 
   private onPlayerHitByProjectile(pr: Phaser.Physics.Arcade.Image): void {
@@ -902,14 +940,16 @@ export class GameScene extends Phaser.Scene {
     const ent = this.projectiles.find((p) => p.sprite === pr);
     if (!ent || ent.owner !== "enemy") return;
     this.applyDamage(ent.damage);
-    this.tail.removeLast(this.state.config.tail.lossOnProjectile);
+    const removed = this.tail.removeLast(this.state.config.tail.lossOnProjectile);
+    if (removed.length > 0) this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length });
     pr.destroy();
   }
 
   private onTailHitByProjectile(_tail: any, pr: Phaser.Physics.Arcade.Image): void {
     const ent = this.projectiles.find((p) => p.sprite === pr);
     if (!ent || ent.owner !== "enemy") return;
-    this.tail.removeLast(this.state.config.tail.lossOnProjectile);
+    const removed = this.tail.removeLast(this.state.config.tail.lossOnProjectile);
+    if (removed.length > 0) this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length });
     pr.destroy();
   }
 
@@ -920,7 +960,8 @@ export class GameScene extends Phaser.Scene {
     if (now < ent.cutReadyAt) return;
     ent.cutReadyAt = now + this.state.config.enemies.cutter.cooldownAfterCutSec;
     const cut = Math.max(1, this.state.config.enemies.cutter.tailCut);
-    this.tail.removeLast(cut);
+    const removed = this.tail.removeLast(cut);
+    if (removed.length > 0) this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length });
   }
 
   private onEnemyHitByProjectile(enemySpr: Phaser.Physics.Arcade.Image, pr: Phaser.Physics.Arcade.Image): void {
@@ -956,7 +997,7 @@ export class GameScene extends Phaser.Scene {
     this.state.hp -= dmg;
     this.playerInvuln = Math.max(this.playerInvuln, this.state.config.player.invulnOnHitSec);
     this.state.recentHits.push({ t: this.time.now / 1000 });
-    this.game.events.emit(GAME_EVENTS.PLAYER_HIT, { damage: dmg });
+    this.game.events.emit(GAME_EVENTS.PLAYER_HIT, { x: this.player.x, y: this.player.y, damage: dmg });
     if (this.state.hp <= 0) {
       if (this.canOfferRevive()) this.offerRevive();
       else this.endRun("hp");
@@ -1148,6 +1189,40 @@ export class GameScene extends Phaser.Scene {
     } catch {
       // ignore
     }
+  }
+
+  private createVfxSystem(): void {
+    if (this.vfx) return;
+    let ui: any | undefined;
+    try {
+      ui = this.scene.get("ui");
+    } catch {
+      ui = undefined;
+    }
+
+    this.vfx = new VfxManager(this, ui, { quality: "medium" });
+
+    this.game.events.on(GAME_EVENTS.SCRAP_COLLECTED, this.onVfxScrapCollected);
+    this.game.events.on(GAME_EVENTS.FLIP_USED, this.onVfxFlipUsed);
+    this.game.events.on(GAME_EVENTS.PROJECTILE_DEFLECTED, this.onVfxProjectileDeflected);
+    this.game.events.on(GAME_EVENTS.PLAYER_HIT, this.onVfxPlayerHit);
+    this.game.events.on(GAME_EVENTS.TAIL_CUT, this.onVfxTailCut);
+    this.game.events.on(GAME_EVENTS.BANK_COMPLETE, this.onVfxBankComplete);
+    this.game.events.on(GAME_EVENTS.WAVE_START, this.onVfxWaveStart);
+    this.game.events.on(GAME_EVENTS.UPGRADE_OFFER_SHOWN, this.onVfxUpgradeOfferShown);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(GAME_EVENTS.SCRAP_COLLECTED, this.onVfxScrapCollected);
+      this.game.events.off(GAME_EVENTS.FLIP_USED, this.onVfxFlipUsed);
+      this.game.events.off(GAME_EVENTS.PROJECTILE_DEFLECTED, this.onVfxProjectileDeflected);
+      this.game.events.off(GAME_EVENTS.PLAYER_HIT, this.onVfxPlayerHit);
+      this.game.events.off(GAME_EVENTS.TAIL_CUT, this.onVfxTailCut);
+      this.game.events.off(GAME_EVENTS.BANK_COMPLETE, this.onVfxBankComplete);
+      this.game.events.off(GAME_EVENTS.WAVE_START, this.onVfxWaveStart);
+      this.game.events.off(GAME_EVENTS.UPGRADE_OFFER_SHOWN, this.onVfxUpgradeOfferShown);
+      this.vfx?.destroy();
+      this.vfx = null;
+    });
   }
 
   private ensureVisualTextures(): void {
