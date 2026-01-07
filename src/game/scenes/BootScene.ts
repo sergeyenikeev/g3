@@ -1,5 +1,9 @@
 import Phaser from "phaser";
 import type { StaticGameData } from "../../data/staticGameData";
+import { createAnalyticsAdapter } from "../../analytics/analyticsFactory";
+import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
+import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
+import { AdsManager } from "../../platform/ads/adsManager";
 import { createPlatformAdapter } from "../../platform/platformFactory";
 import { SaveManager } from "../../platform/save/saveManager";
 
@@ -60,10 +64,32 @@ export class BootScene extends Phaser.Scene {
     await adapter.init();
     const saveManager = new SaveManager(adapter);
     const save = await saveManager.load();
+
+    const analytics = createAnalyticsAdapter();
+    await analytics.init();
+    const adsManager = new AdsManager(adapter, analytics, saveManager);
+
     this.registry.set("platformAdapter", adapter);
     this.registry.set("saveManager", saveManager);
     this.registry.set("saveData", save);
+    this.registry.set("analytics", analytics);
+    this.registry.set("adsManager", adsManager);
+
+    trackSessionStart(analytics, adapter.name);
+    try {
+      window.addEventListener("beforeunload", () => trackSessionEnd(analytics, adapter.name));
+    } catch {
+      // ignore
+    }
 
     this.scene.start("menu");
   }
+}
+
+function trackSessionStart(analytics: AnalyticsAdapter, platform: string): void {
+  analytics.track(ANALYTICS_EVENTS.SESSION_START, { platform, t: Date.now() });
+}
+
+function trackSessionEnd(analytics: AnalyticsAdapter, platform: string): void {
+  analytics.track(ANALYTICS_EVENTS.SESSION_END, { platform, t: Date.now() });
 }

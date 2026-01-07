@@ -1,4 +1,6 @@
 import Phaser from "phaser";
+import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
+import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import { createRng, type Rng } from "../../core/prng";
 import { buildRuntimeConfig } from "../../data/runtimeConfig";
 import type { StaticGameData } from "../../data/staticGameData";
@@ -34,6 +36,9 @@ export class GameScene extends Phaser.Scene {
   private rng!: Rng;
   private staticData!: StaticGameData;
   private state!: RunState;
+  private analytics: AnalyticsAdapter | null = null;
+  private e2eKillKey: Phaser.Input.Keyboard.Key | null = null;
+  private e2eWindowBound = false;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keys!: {
@@ -86,6 +91,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.staticData = this.registry.get("staticGameData") as StaticGameData;
     const mode = (this.registry.get("runMode") as RunMode | undefined) ?? "run";
+    this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
 
     const built = buildRuntimeConfig(this.staticData, {
       presetId: "normal",
@@ -99,6 +105,8 @@ export class GameScene extends Phaser.Scene {
       rng: this.rng,
       config: built.config,
       perks: { ...built.basePerks },
+      startedAtMs: Date.now(),
+      tailMaxLen: 0,
       waveIndex: 1,
       bolts: 0,
       cores: 0,
@@ -127,10 +135,21 @@ export class GameScene extends Phaser.Scene {
       },
     };
 
+    if (import.meta.env.VITE_E2E === "1") {
+      this.e2eKillKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.K);
+      this.bindE2eWindowApi();
+    }
+
     this.createTextures();
     this.createWorld();
     this.createCollisions();
     this.startWave(1);
+
+    this.track(ANALYTICS_EVENTS.RUN_START, {
+      mode,
+      dateUtc: this.state.daily?.dateUtc ?? null,
+      variantId: this.state.daily?.variantId ?? null,
+    });
 
     this.game.events.on(GAME_EVENTS.REVIVE_ACCEPTED, this.onReviveAccepted, this);
     this.game.events.on(GAME_EVENTS.REVIVE_DECLINED, this.onReviveDeclined, this);
@@ -152,6 +171,11 @@ export class GameScene extends Phaser.Scene {
     const dt = dtMs / 1000;
     if (dt <= 0) return;
     if (this.revivePending) return;
+
+    if (import.meta.env.VITE_E2E === "1" && this.e2eKillKey && Phaser.Input.Keyboard.JustDown(this.e2eKillKey)) {
+      this.endRun("e2e");
+      return;
+    }
 
     this.updateTimers(dt);
     this.updateMovement(dt);
@@ -213,6 +237,7 @@ export class GameScene extends Phaser.Scene {
 
   private updateTail(dt: number): void {
     this.tail.update(dt, this.player.x, this.player.y);
+    this.state.tailMaxLen = Math.max(this.state.tailMaxLen, this.tail.length);
   }
 
   private updateMagnet(dt: number): void {
@@ -901,15 +926,31 @@ export class GameScene extends Phaser.Scene {
     this.game.events.emit(GAME_EVENTS.PLAYER_HIT, { damage: dmg });
     if (this.state.hp <= 0) {
       if (this.canOfferRevive()) this.offerRevive();
-      else this.endRun();
+      else this.endRun("hp");
     }
   }
 
-  private endRun(): void {
+  private endRun(reason: string): void {
+    if (this.state.deathReason) return;
+    this.state.deathReason = reason;
     this.game.events.emit(GAME_EVENTS.RUN_END, { waveIndex: this.state.waveIndex, bolts: this.state.bolts });
+    this.scene.stop("upgrade");
     this.scene.stop("ui");
     this.scene.launch("results");
     this.scene.stop();
+
+    const durationMs = Math.max(0, Date.now() - this.state.startedAtMs);
+    this.track(ANALYTICS_EVENTS.RUN_END, {
+      mode: this.state.mode,
+      durationMs,
+      wave: this.state.waveIndex,
+      bolts: this.state.bolts,
+      cores: this.state.cores,
+      tailMax: this.state.tailMaxLen,
+      reason,
+      dateUtc: this.state.daily?.dateUtc ?? null,
+      variantId: this.state.daily?.variantId ?? null,
+    });
   }
 
   private canOfferRevive(): boolean {
@@ -967,7 +1008,7 @@ export class GameScene extends Phaser.Scene {
     } catch {
       // ignore
     }
-    this.endRun();
+    this.endRun("hp");
   }
 
   private clearThreats(): void {
@@ -992,6 +1033,33 @@ export class GameScene extends Phaser.Scene {
     this.projectileGroup.clear(true, true);
 
     this.pendingTelegraphs = [];
+  }
+
+  private track(eventName: string, payload?: Record<string, unknown>): void {
+    try {
+      this.analytics?.track(eventName, payload);
+    } catch {
+      // ignore
+    }
+  }
+
+  private bindE2eWindowApi(): void {
+    if (this.e2eWindowBound) return;
+    this.e2eWindowBound = true;
+    try {
+      (window as any).__MC_E2E__ = {
+        endRun: () => this.endRun("e2e"),
+      };
+    } catch {
+      // ignore
+    }
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      try {
+        if ((window as any).__MC_E2E__) delete (window as any).__MC_E2E__;
+      } catch {
+        // ignore
+      }
+    });
   }
 
   private rollScrapType(): ScrapType {

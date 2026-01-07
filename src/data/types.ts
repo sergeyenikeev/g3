@@ -143,6 +143,8 @@ export type Balances = {
   ads: {
     interstitialCooldownSec: number;
     disableInterstitialUntilTutorialDone: boolean;
+    interstitialMinRunsCompleted: number;
+    noInterstitialAfterRewardedSec: number;
     rewarded: {
       revive: {
         enabled: boolean;
@@ -232,6 +234,7 @@ export type DailyConfig = {
     id: string;
     weight: number;
     modifiers: Array<{ op: "mul" | "add" | "set"; path: string; value: unknown }>;
+    ui?: { title?: string; desc?: string };
     specialRule?: Record<string, unknown>;
   }>;
 };

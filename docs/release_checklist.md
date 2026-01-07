@@ -1,14 +1,82 @@
-﻿# Release checklist
+﻿# Чеклист релиза Magnet Caravan
 
-## Перед сборкой
+Этот чеклист заполняется по факту и помогает быстро понять: что уже готово, а что ещё осталось.
 
+## 1) Репозиторий и безопасность
+- [x] `notouch.txt` в `.gitignore` и не коммитится
+- [x] `.env*` в `.gitignore` (кроме `.env.example`)
+- [x] Нет секретов/ключей/токенов в репозитории
+- [x] Все изменения коммитятся в git и пушатся в `origin/main`
 
-## Сборка и артефакты
+## 2) Кодировка RU-документации
+- [x] Все `docs/**/*.md` и `docs/platform_texts/*.md` в UTF-8 с BOM
+- [x] `npm run bom-check` фейлит сборку при проблемах
+- [x] `npm run fix-bom` автоматически исправляет BOM/кодировку
+- [x] CI запускает `bom-check`
 
+## 3) Сборка/тесты/CI
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] Unit (Vitest): PRNG, modifiers, rarity+pity, upgrade selection, pressure
+- [x] Integration (Vitest): RuntimeConfig из JSON, WaveDirector, SaveManager, Daily attempts, Ads guards/AdsManager
+- [x] E2E (Playwright): daily enter, tutorial skip, bank, upgrade, results x2
+- [x] CI (GitHub Actions): lint + bom-check + typecheck + unit+integration + Playwright
 
-## Проверки после выката
+## 4) Gameplay (core)
+- [x] Phaser 3 + TypeScript + Vite
+- [x] Магнит: притяжение scrap из `balances.json`
+- [x] Караван-хвост: сегменты, follow, потери от врагов/снарядов
+- [x] Flip: repel-пульс, дефлект снарядов, post-flip invuln, шрапнель через апгрейд
+- [x] Recycler Zone: bank time, heal, начисление bolts
+- [x] Враги: chaser / shooter / cutter
+- [x] Tutorial ≤ 30 секунд (3 шага) + skip
+- [x] UI mobile-first (landscape), виртуальный джойстик + Flip (+ Dash по условию)
+- [x] Resize + safe areas (viewport-fit=cover)
 
+## 5) Data-driven конфиги
+- [x] Все основные конфиги в `public/assets/data/*.json`
+- [x] RuntimeConfig собирается из JSON (presets + meta + daily modifiers)
+- [x] Run upgrades применяются по `path` через эффекты
+- [x] Daily modifiers применяются по `path`
+- [x] Балансные параметры рекламы в `balances.json` (`ads.*`)
+- [ ] Полный аудит «хардкодов баланса» в коде (оставшиеся константы вынести в JSON при необходимости)
 
-## Релизные заметки
-- Зафиксировать известные дефекты из `docs/defects.md` (особенно Monitoring/Открытые).
-- Описать ограничения: 
+## 6) Директор сложности / волны
+- [x] Safe spawn distance (player/recycler)
+- [x] Telegraph перед спавном
+- [x] Caps shooters/cutters/total
+- [x] Pressure gating (targetMin/Max + weights)
+- [x] Breather waves
+- [x] Anti-snowball (low HP + extra scrap)
+
+## 7) Daily (попытки/seed/UI)
+- [x] Seed UTC yyyymmdd
+- [x] Детеминированный выбор варианта дня
+- [x] Daily попытки: 1 бесплатная + rewarded extra attempts (лимит из `daily.json`)
+- [x] Показ в меню: seed, title/desc варианта, attempts, best daily score
+- [ ] Доп. правила из knowledge_base (start booster и т.п.) — при необходимости расширить
+
+## 8) Монетизация (ads)
+- [x] Rewarded: revive / x2 results / reroll
+- [x] Interstitial: только на results screen
+- [x] Cooldown между interstitial (из `balances.json`)
+- [x] Запрет interstitial до завершения/скипа туториала (из `balances.json`)
+- [x] Запрет interstitial первые N завершённых забегов (из `balances.json`)
+- [x] Запрет interstitial сразу после rewarded (из `balances.json`)
+
+## 9) Analytics
+- [x] Единый `AnalyticsAdapter` (mock + platform autodetect)
+- [x] События: session_start/end, tutorial*, run_start/end, upgrade_offer, bank/flip, ads rewarded/interstitial, daily*
+- [ ] Опционально: интеграции/специфика SDK платформ (если понадобится более «нативная» аналитика)
+
+## 10) Платформы/релизы
+- [x] PlatformAdapter слой (mock/local + CrazyGames/Poki/Yandex/VK) с безопасной деградацией
+- [x] `scripts/build_test_mock.mjs` (моки + проверки + тесты + dist-mock)
+- [x] `scripts/build_release.mjs` (unit+integration + prod build + zip релизы)
+- [x] ZIP: `dist/releases/magnet-caravan_{crazygames,poki,yandex,vk}.zip`
+- [ ] При необходимости: platform-specific `index.html`/SDK loader для порталов (если портал требует явный скрипт)
+
+## 11) Аудио
+- [x] Реальные `.mp3` в `public/assets/audio/`
+- [x] Генератор `npm run audio:generate` (без лицензированных ассетов)
+- [x] Музыка стартует только после user interaction (autoplay policy)

@@ -11,6 +11,10 @@ export type RunState = {
   config: RuntimeConfig;
   perks: PerkState;
 
+  startedAtMs: number;
+  tailMaxLen: number;
+  deathReason?: string;
+
   waveIndex: number;
   bolts: number;
   cores: number;

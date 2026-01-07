@@ -1,6 +1,8 @@
 import Phaser from "phaser";
-import type { PlatformAdapter } from "../../platform/platformAdapter";
+import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
+import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
+import type { AdsManager } from "../../platform/ads/adsManager";
 import type { RunState } from "../run/runState";
 import { applyEffects } from "../effects/applyEffects";
 import { GAME_EVENTS } from "../events";
@@ -15,7 +17,8 @@ const RARITY_COLORS: Record<string, number> = {
 };
 
 export class UpgradeScene extends Phaser.Scene {
-  private adapter!: PlatformAdapter;
+  private ads!: AdsManager;
+  private analytics: AnalyticsAdapter | null = null;
   private state!: RunState;
   private cards: Phaser.GameObjects.Container[] = [];
 
@@ -24,7 +27,8 @@ export class UpgradeScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.adapter = this.registry.get("platformAdapter") as PlatformAdapter;
+    this.ads = this.registry.get("adsManager") as AdsManager;
+    this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
     this.state = this.registry.get("runState") as RunState;
 
     const { width, height } = this.scale;
@@ -67,9 +71,9 @@ export class UpgradeScene extends Phaser.Scene {
   }
 
   private async handleReroll(): Promise<void> {
-    const res = await this.adapter.showRewarded(AD_PLACEMENTS.REROLL);
-    this.game.events.emit(GAME_EVENTS.UPGRADE_REROLL, { ok: res.ok, rewarded: (res as any).rewarded === true });
-    if (res.ok && (res as any).rewarded === true) {
+    const res = await this.ads.showRewarded(AD_PLACEMENTS.REROLL);
+    this.game.events.emit(GAME_EVENTS.UPGRADE_REROLL, { ok: res.ok, rewarded: res.ok && res.rewarded === true });
+    if (res.ok && res.rewarded) {
       this.renderOffer();
     }
   }
@@ -93,6 +97,11 @@ export class UpgradeScene extends Phaser.Scene {
       },
       this.state.rng
     );
+
+    this.track(ANALYTICS_EVENTS.UPGRADE_OFFER, {
+      wave: this.state.waveIndex,
+      offer: offer.map((o) => ({ id: o.upgrade.id, rarity: o.upgrade.rarity })),
+    });
 
     const w = Math.min(360, width * 0.86);
     const h = 140;
@@ -169,5 +178,13 @@ export class UpgradeScene extends Phaser.Scene {
 
     this.scene.stop("upgrade");
     this.scene.resume("game");
+  }
+
+  private track(eventName: string, payload?: Record<string, unknown>): void {
+    try {
+      this.analytics?.track(eventName, payload);
+    } catch {
+      // ignore
+    }
   }
 }

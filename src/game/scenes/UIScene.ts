@@ -2,8 +2,10 @@ import Phaser from "phaser";
 import { inputState } from "../input/inputState";
 import { GAME_EVENTS } from "../events";
 import type { RunState } from "../run/runState";
-import type { PlatformAdapter } from "../../platform/platformAdapter";
+import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
+import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { SaveData, SaveManager } from "../../platform/save/saveManager";
+import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 
 type TutorialStep = 1 | 2 | 3;
@@ -12,7 +14,8 @@ export class UIScene extends Phaser.Scene {
   private runState: RunState | null = null;
   private saveManager: SaveManager | null = null;
   private saveData: SaveData | null = null;
-  private adapter: PlatformAdapter | null = null;
+  private ads: AdsManager | null = null;
+  private analytics: AnalyticsAdapter | null = null;
 
   private hudText!: Phaser.GameObjects.Text;
 
@@ -51,6 +54,10 @@ export class UIScene extends Phaser.Scene {
   private readonly onSfxHit = () => this.playSfx("sfx_hit");
   private readonly onSfxUpgrade = () => this.playSfx("sfx_upgrade");
 
+  private readonly onAnalyticsFlip = () => this.track(ANALYTICS_EVENTS.FLIP_USED, {});
+  private readonly onAnalyticsBank = (p: any) => this.track(ANALYTICS_EVENTS.RECYCLER_BANK_COMPLETE, { bolts: p?.bolts });
+  private readonly onAnalyticsUpgradePick = (p: any) => this.track(ANALYTICS_EVENTS.UPGRADE_PICK, p ?? {});
+
   constructor() {
     super("ui");
   }
@@ -59,7 +66,8 @@ export class UIScene extends Phaser.Scene {
     this.runState = (this.registry.get("runState") as RunState | undefined) ?? null;
     this.saveManager = (this.registry.get("saveManager") as SaveManager | undefined) ?? null;
     this.saveData = (this.registry.get("saveData") as SaveData | undefined) ?? null;
-    this.adapter = (this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null;
+    this.ads = (this.registry.get("adsManager") as AdsManager | undefined) ?? null;
+    this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
 
     this.sfxVolume = this.saveData?.settings?.sfxVolume ?? 0.8;
     this.musicVolume = this.saveData?.settings?.musicVolume ?? 0.6;
@@ -78,6 +86,7 @@ export class UIScene extends Phaser.Scene {
     this.bindTutorialEvents();
     this.bindAudioEvents();
     this.bindReviveEvents();
+    this.bindAnalyticsEvents();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.SCRAP_COLLECTED, this.onTutorialScrap, this);
@@ -91,6 +100,10 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.UPGRADE_PICKED, this.onSfxUpgrade, this);
 
       this.game.events.off(GAME_EVENTS.REVIVE_OFFER, this.onReviveOffer, this);
+
+      this.game.events.off(GAME_EVENTS.FLIP_USED, this.onAnalyticsFlip, this);
+      this.game.events.off(GAME_EVENTS.BANK_COMPLETE, this.onAnalyticsBank, this);
+      this.game.events.off(GAME_EVENTS.UPGRADE_PICKED, this.onAnalyticsUpgradePick, this);
     });
 
     this.scale.on("resize", () => this.layout());
@@ -254,6 +267,10 @@ export class UIScene extends Phaser.Scene {
     this.tutorialBox = this.add.container(0, 0, [bg, this.tutorialText, btn, btnTxt]).setDepth(1200).setScrollFactor(0);
     this.tutorialBox.setVisible(this.tutorialActive);
     this.refreshTutorialText();
+
+    if (this.tutorialActive) {
+      this.track(ANALYTICS_EVENTS.TUTORIAL_START, { step: this.tutorialStep });
+    }
   }
 
   private refreshTutorialText(): void {
@@ -279,6 +296,20 @@ export class UIScene extends Phaser.Scene {
 
   private bindReviveEvents(): void {
     this.game.events.on(GAME_EVENTS.REVIVE_OFFER, this.onReviveOffer, this);
+  }
+
+  private bindAnalyticsEvents(): void {
+    this.game.events.on(GAME_EVENTS.FLIP_USED, this.onAnalyticsFlip, this);
+    this.game.events.on(GAME_EVENTS.BANK_COMPLETE, this.onAnalyticsBank, this);
+    this.game.events.on(GAME_EVENTS.UPGRADE_PICKED, this.onAnalyticsUpgradePick, this);
+  }
+
+  private track(eventName: string, payload?: Record<string, unknown>): void {
+    try {
+      this.analytics?.track(eventName, payload);
+    } catch {
+      // ignore
+    }
   }
 
   private createReviveOverlay(): void {
@@ -334,8 +365,8 @@ export class UIScene extends Phaser.Scene {
     }
 
     this.reviveBusy = true;
-    const adapter = this.adapter;
-    const res = adapter ? await adapter.showRewarded(AD_PLACEMENTS.REVIVE) : { ok: true, rewarded: false };
+    const ads = this.ads;
+    const res = ads ? await ads.showRewarded(AD_PLACEMENTS.REVIVE) : { ok: true, rewarded: false };
     this.reviveBusy = false;
     this.hideReviveOverlay();
 
@@ -357,6 +388,7 @@ export class UIScene extends Phaser.Scene {
     this.tutorialScrap += 1;
     if (this.tutorialScrap >= 3) {
       this.tutorialStep = 2;
+      this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 1 });
     }
     this.refreshTutorialText();
   }
@@ -364,17 +396,20 @@ export class UIScene extends Phaser.Scene {
   private onTutorialFlip(): void {
     if (!this.tutorialActive || this.tutorialStep !== 2) return;
     this.tutorialStep = 3;
+    this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 2 });
     this.refreshTutorialText();
   }
 
   private onTutorialBank(): void {
     if (!this.tutorialActive || this.tutorialStep !== 3) return;
+    this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 3 });
     void this.completeTutorial();
   }
 
   private async completeTutorial(): Promise<void> {
     this.tutorialActive = false;
     this.tutorialBox.setVisible(false);
+    this.track(ANALYTICS_EVENTS.TUTORIAL_COMPLETE, {});
     if (!this.saveManager) return;
     const s = this.saveManager.get();
     await this.saveManager.save({ ...s, tutorial: { ...s.tutorial, completed: true } });
@@ -384,6 +419,7 @@ export class UIScene extends Phaser.Scene {
   private async skipTutorial(): Promise<void> {
     this.tutorialActive = false;
     this.tutorialBox.setVisible(false);
+    this.track(ANALYTICS_EVENTS.TUTORIAL_SKIP, {});
     if (!this.saveManager) return;
     const s = this.saveManager.get();
     await this.saveManager.save({ ...s, tutorial: { ...s.tutorial, skipped: true } });

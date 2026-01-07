@@ -20,13 +20,17 @@ export type SaveDataV1 = {
   stats: {
     bestWave: number;
     bestBolts: number;
+    runsCompleted: number;
   };
   ads: {
     lastInterstitialAtMs: number;
+    lastRewardedAtMs: number;
   };
   daily: {
     lastDateUtc: string | null;
     attemptsUsed: number;
+    bestWave: number;
+    bestBolts: number;
   };
 };
 
@@ -44,9 +48,9 @@ export function makeDefaultSave(): SaveData {
       skipped: false,
     },
     meta: { nodeLevels: {} },
-    stats: { bestWave: 0, bestBolts: 0 },
-    ads: { lastInterstitialAtMs: 0 },
-    daily: { lastDateUtc: null, attemptsUsed: 0 },
+    stats: { bestWave: 0, bestBolts: 0, runsCompleted: 0 },
+    ads: { lastInterstitialAtMs: 0, lastRewardedAtMs: 0 },
+    daily: { lastDateUtc: null, attemptsUsed: 0, bestWave: 0, bestBolts: 0 },
   };
 }
 
@@ -106,6 +110,7 @@ function sanitize(raw: unknown): SaveData | null {
 
   const bestWave = clampNum((raw as any).stats?.bestWave, 0, 0, 9999);
   const bestBolts = clampNum((raw as any).stats?.bestBolts, 0, 0, 1e9);
+  const runsCompleted = clampNum((raw as any).stats?.runsCompleted, 0, 0, 9e15);
 
   const completed = Boolean((raw as any).tutorial?.completed);
   const skipped = Boolean((raw as any).tutorial?.skipped);
@@ -114,17 +119,20 @@ function sanitize(raw: unknown): SaveData | null {
 
   const lastDateUtc = typeof (raw as any).daily?.lastDateUtc === "string" ? ((raw as any).daily.lastDateUtc as string) : null;
   const attemptsUsed = clampNum((raw as any).daily?.attemptsUsed, 0, 0, 99);
+  const dailyBestWave = clampNum((raw as any).daily?.bestWave, 0, 0, 9999);
+  const dailyBestBolts = clampNum((raw as any).daily?.bestBolts, 0, 0, 1e9);
 
   const lastInterstitialAtMs = clampNum((raw as any).ads?.lastInterstitialAtMs, 0, 0, 9e15);
+  const lastRewardedAtMs = clampNum((raw as any).ads?.lastRewardedAtMs, 0, 0, 9e15);
 
   return {
     v: SAVE_VERSION,
     settings: { sfxVolume, musicVolume },
     tutorial: { completed, skipped },
     meta: { nodeLevels },
-    stats: { bestWave, bestBolts },
-    ads: { lastInterstitialAtMs },
-    daily: { lastDateUtc, attemptsUsed },
+    stats: { bestWave, bestBolts, runsCompleted },
+    ads: { lastInterstitialAtMs, lastRewardedAtMs },
+    daily: { lastDateUtc, attemptsUsed, bestWave: dailyBestWave, bestBolts: dailyBestBolts },
   };
 }
 

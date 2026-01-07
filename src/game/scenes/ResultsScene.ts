@@ -1,11 +1,12 @@
 import Phaser from "phaser";
-import type { PlatformAdapter } from "../../platform/platformAdapter";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
+import type { AdsManager } from "../../platform/ads/adsManager";
 import type { SaveManager } from "../../platform/save/saveManager";
 import type { RunState } from "../run/runState";
+import { normalizeDailySave } from "../daily/dailyAttempts";
 
 export class ResultsScene extends Phaser.Scene {
-  private adapter!: PlatformAdapter;
+  private ads!: AdsManager;
   private saveManager!: SaveManager;
   private state!: RunState;
   private statsText!: Phaser.GameObjects.Text;
@@ -13,13 +14,14 @@ export class ResultsScene extends Phaser.Scene {
   private x2Used = false;
   private x2Btn: Phaser.GameObjects.Rectangle | null = null;
   private x2Label: Phaser.GameObjects.Text | null = null;
+  private runRecorded = false;
 
   constructor() {
     super("results");
   }
 
   create(): void {
-    this.adapter = this.registry.get("platformAdapter") as PlatformAdapter;
+    this.ads = this.registry.get("adsManager") as AdsManager;
     this.saveManager = this.registry.get("saveManager") as SaveManager;
     this.state = this.registry.get("runState") as RunState;
 
@@ -80,7 +82,7 @@ export class ResultsScene extends Phaser.Scene {
     btnRestart.on("pointerdown", () => void this.exitTo("restart"));
     btnMenu.on("pointerdown", () => void this.exitTo("menu"));
 
-    void this.persistBest();
+    void this.recordRunOnceAndPersistScores();
   }
 
   private refreshStatsText(): void {
@@ -93,23 +95,59 @@ export class ResultsScene extends Phaser.Scene {
     const cfg = this.state.config.ads?.rewarded?.x2Results;
     if (!cfg?.enabled) return;
 
-    const res = await this.adapter.showRewarded(AD_PLACEMENTS.X2_RESULTS);
-    if (res.ok && (res as any).rewarded === true) {
+    const res = await this.ads.showRewarded(AD_PLACEMENTS.X2_RESULTS);
+    if (res.ok && res.rewarded) {
       const mult = typeof cfg.mult === "number" && Number.isFinite(cfg.mult) ? cfg.mult : 2;
       this.state.bolts = Math.floor(this.state.bolts * mult);
       this.x2Used = true;
       this.x2Btn?.setVisible(false);
       this.x2Label?.setVisible(false);
       this.refreshStatsText();
-      await this.persistBest();
+      await this.persistScoresOnly();
     }
   }
 
-  private async persistBest(): Promise<void> {
-    const s = this.saveManager.get();
+  private async recordRunOnceAndPersistScores(): Promise<void> {
+    if (this.runRecorded) return;
+    this.runRecorded = true;
+
+    const s0 = this.saveManager.get();
+    const s = this.state.mode === "daily" && this.state.daily?.dateUtc ? normalizeDailySave(s0, this.state.daily.dateUtc) : s0;
+
     const bestWave = Math.max(s.stats.bestWave, this.state.waveIndex);
     const bestBolts = Math.max(s.stats.bestBolts, this.state.bolts);
-    await this.saveManager.save({ ...s, stats: { bestWave, bestBolts } });
+    const runsCompleted = Math.max(0, Math.floor(s.stats.runsCompleted)) + 1;
+
+    let daily = s.daily;
+    if (this.state.mode === "daily" && this.state.daily?.dateUtc && daily.lastDateUtc === this.state.daily.dateUtc) {
+      daily = {
+        ...daily,
+        bestWave: Math.max(daily.bestWave, this.state.waveIndex),
+        bestBolts: Math.max(daily.bestBolts, this.state.bolts),
+      };
+    }
+
+    await this.saveManager.save({ ...s, stats: { ...s.stats, bestWave, bestBolts, runsCompleted }, daily });
+    this.registry.set("saveData", this.saveManager.get());
+  }
+
+  private async persistScoresOnly(): Promise<void> {
+    const s0 = this.saveManager.get();
+    const s = this.state.mode === "daily" && this.state.daily?.dateUtc ? normalizeDailySave(s0, this.state.daily.dateUtc) : s0;
+
+    const bestWave = Math.max(s.stats.bestWave, this.state.waveIndex);
+    const bestBolts = Math.max(s.stats.bestBolts, this.state.bolts);
+
+    let daily = s.daily;
+    if (this.state.mode === "daily" && this.state.daily?.dateUtc && daily.lastDateUtc === this.state.daily.dateUtc) {
+      daily = {
+        ...daily,
+        bestWave: Math.max(daily.bestWave, this.state.waveIndex),
+        bestBolts: Math.max(daily.bestBolts, this.state.bolts),
+      };
+    }
+
+    await this.saveManager.save({ ...s, stats: { ...s.stats, bestWave, bestBolts }, daily });
     this.registry.set("saveData", this.saveManager.get());
   }
 
@@ -117,8 +155,8 @@ export class ResultsScene extends Phaser.Scene {
     if (this.exitBusy) return;
     this.exitBusy = true;
 
-    await this.persistBest();
-    await this.maybeShowInterstitial();
+    await this.recordRunOnceAndPersistScores();
+    await this.ads.showInterstitial(this.state.config.ads, "results");
 
     if (target === "restart") {
       this.scene.stop("ui");
@@ -131,26 +169,5 @@ export class ResultsScene extends Phaser.Scene {
     this.scene.stop("ui");
     this.scene.start("menu");
     this.scene.stop();
-  }
-
-  private async maybeShowInterstitial(): Promise<void> {
-    const cfg = this.state.config.ads;
-    if (!cfg) return;
-
-    const save = this.saveManager.get();
-    if (cfg.disableInterstitialUntilTutorialDone) {
-      if (!save.tutorial.completed && !save.tutorial.skipped) return;
-    }
-
-    const cdMs = Math.max(0, cfg.interstitialCooldownSec) * 1000;
-    const now = Date.now();
-    if (now - (save.ads?.lastInterstitialAtMs ?? 0) < cdMs) return;
-
-    const shown = await this.adapter.showInterstitial();
-    if (!shown) return;
-
-    const next = this.saveManager.get();
-    await this.saveManager.save({ ...next, ads: { ...next.ads, lastInterstitialAtMs: now } });
-    this.registry.set("saveData", this.saveManager.get());
   }
 }
