@@ -93,6 +93,18 @@ export class VfxManager {
     return this.quality;
   }
 
+  getParticleCap(): number {
+    return this.getMaxParticles();
+  }
+
+  getMagnetLineCap(): number {
+    return this.quality === "low" ? 4 : 8;
+  }
+
+  getActiveCounts(): { fx: number; particles: number; magnetLines: number } {
+    return { fx: this.fx.length, particles: this.countParticles(), magnetLines: this.magLines.length };
+  }
+
   emit(eventName: string, params: any = {}): void {
     if (!eventName) return;
     switch (eventName) {
@@ -658,4 +670,3 @@ function easeInOutQuad(t: number): number {
 function num(v: any): number {
   return typeof v === "number" && Number.isFinite(v) ? v : NaN;
 }
-
