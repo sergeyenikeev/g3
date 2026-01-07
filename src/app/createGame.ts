@@ -2,7 +2,9 @@ import Phaser from "phaser";
 import { BootScene } from "../game/scenes/BootScene";
 import { GameScene } from "../game/scenes/GameScene";
 import { MenuScene } from "../game/scenes/MenuScene";
+import { ResultsScene } from "../game/scenes/ResultsScene";
 import { UIScene } from "../game/scenes/UIScene";
+import { UpgradeScene } from "../game/scenes/UpgradeScene";
 
 export function createGame(parentId: string): Phaser.Game {
   const game = new Phaser.Game({
@@ -21,9 +23,8 @@ export function createGame(parentId: string): Phaser.Game {
       height: window.innerHeight,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [BootScene, MenuScene, GameScene, UIScene],
+    scene: [BootScene, MenuScene, GameScene, UIScene, UpgradeScene, ResultsScene],
   });
 
   return game;
 }
-

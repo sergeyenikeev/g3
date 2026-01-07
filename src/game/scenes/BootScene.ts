@@ -1,4 +1,7 @@
 import Phaser from "phaser";
+import type { StaticGameData } from "../../data/staticGameData";
+import { createPlatformAdapter } from "../../platform/platformFactory";
+import { SaveManager } from "../../platform/save/saveManager";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -29,7 +32,30 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    const data: StaticGameData = {
+      balances: this.cache.json.get("balances"),
+      enemies: this.cache.json.get("enemies"),
+      waveSets: this.cache.json.get("wave_sets"),
+      patterns: this.cache.json.get("patterns"),
+      daily: this.cache.json.get("daily"),
+      runUpgrades: this.cache.json.get("run_upgrades"),
+      balancePresets: this.cache.json.get("balance_presets"),
+      metaTree: this.cache.json.get("meta_tree"),
+    };
+    this.registry.set("staticGameData", data);
+
+    void this.bootstrap();
+  }
+
+  private async bootstrap(): Promise<void> {
+    const adapter = createPlatformAdapter();
+    await adapter.init();
+    const saveManager = new SaveManager(adapter);
+    const save = await saveManager.load();
+    this.registry.set("platformAdapter", adapter);
+    this.registry.set("saveManager", saveManager);
+    this.registry.set("saveData", save);
+
     this.scene.start("menu");
   }
 }
-
