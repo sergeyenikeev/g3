@@ -39,6 +39,24 @@ export class BootScene extends Phaser.Scene {
     this.load.audio("sfx_upgrade", "audio/upgrade_select.mp3");
     this.load.audio("music_main", "audio/music_loop.mp3");
 
+    // Visual (generated / optional runtime fallback)
+    this.load.image("bg_tile_256", "generated/bg_tile_256.png");
+    this.load.image("bg_far_silhouette", "generated/bg_far_silhouette.png");
+    this.load.image("vignette", "generated/vignette.png");
+    this.load.image("lightGradient", "generated/lightGradient.png");
+
+    for (let i = 1; i <= 4; i++) this.load.image(`decal_oil_0${i}`, `generated/decal_oil_0${i}.png`);
+    for (let i = 1; i <= 4; i++) this.load.image(`decal_scratch_0${i}`, `generated/decal_scratch_0${i}.png`);
+    for (let i = 1; i <= 4; i++) this.load.image(`decal_bolts_0${i}`, `generated/decal_bolts_0${i}.png`);
+
+    this.load.image("vfx_ring", "generated/vfx_ring.png");
+    this.load.image("vfx_glow_blob", "generated/vfx_glow_blob.png");
+    this.load.image("vfx_spark", "generated/vfx_spark.png");
+    this.load.image("vfx_smoke_puff", "generated/vfx_smoke_puff.png");
+    this.load.image("vfx_trail", "generated/vfx_trail.png");
+    this.load.image("vfx_hit_flash", "generated/vfx_hit_flash.png");
+    this.load.image("vfx_line", "generated/vfx_line.png");
+
     const w = this.scale.width;
     const h = this.scale.height;
     const barBg = this.add.rectangle(w / 2, h / 2, Math.min(520, w * 0.8), 16, 0x1b2635);

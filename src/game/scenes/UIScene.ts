@@ -7,6 +7,7 @@ import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { SaveData, SaveManager } from "../../platform/save/saveManager";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
+import { createLightGradient, createVignette } from "../../visual/TextureFactory";
 
 type TutorialStep = 1 | 2 | 3;
 
@@ -16,6 +17,9 @@ export class UIScene extends Phaser.Scene {
   private saveData: SaveData | null = null;
   private ads: AdsManager | null = null;
   private analytics: AnalyticsAdapter | null = null;
+
+  private overlayVignette!: Phaser.GameObjects.Image;
+  private overlayLight!: Phaser.GameObjects.Image;
 
   private hudText!: Phaser.GameObjects.Text;
 
@@ -74,6 +78,16 @@ export class UIScene extends Phaser.Scene {
 
     this.input.once("pointerdown", () => this.enableAudio());
     this.input.keyboard?.once("keydown", () => this.enableAudio());
+
+    createVignette(this);
+    createLightGradient(this);
+    this.overlayLight = this.add
+      .image(0, 0, "lightGradient")
+      .setScrollFactor(0)
+      .setDepth(20)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0.14);
+    this.overlayVignette = this.add.image(0, 0, "vignette").setScrollFactor(0).setDepth(21).setAlpha(0.55);
 
     this.hudText = this.add
       .text(16, 12, "", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
@@ -187,6 +201,9 @@ export class UIScene extends Phaser.Scene {
   private layout(): void {
     const { width, height } = this.scale;
     const margin = 16;
+
+    this.overlayLight.setPosition(width / 2, height / 2).setDisplaySize(width, height);
+    this.overlayVignette.setPosition(width / 2, height / 2).setDisplaySize(width, height);
 
     const joyX = margin + this.joyRadius + 8;
     const joyY = height - margin - this.joyRadius - 8;

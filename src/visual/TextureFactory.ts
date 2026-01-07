@@ -31,7 +31,7 @@ type CanvasTextureLike = {
 type TextureManagerLike = {
   exists: (key: string) => boolean;
   get: (key: string) => any;
-  createCanvas: (key: string, width: number, height: number) => CanvasTextureLike;
+  createCanvas: (key: string, width: number, height: number) => CanvasTextureLike | null;
 };
 
 type SceneLike = { textures: TextureManagerLike };

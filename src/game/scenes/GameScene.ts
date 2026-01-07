@@ -13,6 +13,7 @@ import { GAME_EVENTS } from "../events";
 import { consumeActions, inputState } from "../input/inputState";
 import type { RunMode, RunState } from "../run/runState";
 import { getCrazyGamesGameApi } from "../../platform/sdk/crazyGamesSdk";
+import { VISUAL_PALETTE, createBgFarSilhouette, createBgTile256, createDecals, createVfxTextures } from "../../visual/TextureFactory";
 
 type EnemyEntity = {
   sprite: ArcadeImage;
@@ -40,6 +41,15 @@ export class GameScene extends Phaser.Scene {
   private analytics: AnalyticsAdapter | null = null;
   private e2eKillKey: Phaser.Input.Keyboard.Key | null = null;
   private e2eWindowBound = false;
+
+  private visualSeed = "visual";
+  private bgTime = 0;
+  private bgFar: Phaser.GameObjects.TileSprite | null = null;
+  private bgTile: Phaser.GameObjects.TileSprite | null = null;
+  private fgFog: Phaser.GameObjects.TileSprite | null = null;
+  private bgDecals: Phaser.GameObjects.Image[] = [];
+  private playerGlow: Phaser.GameObjects.Image | null = null;
+  private playerGlowPhase = 0;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keys!: {
@@ -129,6 +139,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.registry.set("runState", this.state);
+    this.visualSeed = mode === "daily" ? `daily:${this.state.daily?.dateUtc ?? getUtcYyyymmdd()}` : `run:${this.state.startedAtMs}`;
 
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = {
@@ -186,6 +197,7 @@ export class GameScene extends Phaser.Scene {
 
     this.updateTimers(dt);
     this.updateMovement(dt);
+    this.updatePlayerGlow(dt);
     this.updateTail(dt);
     this.updateMagnet(dt);
     this.updateFlipPulse(dt);
@@ -193,6 +205,7 @@ export class GameScene extends Phaser.Scene {
     this.updateProjectiles();
     this.updateBanking(dt);
     this.updateWave(dt);
+    this.updateBackgroundLayers(dt);
   }
 
   private updateTimers(dt: number): void {
@@ -618,6 +631,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createTextures(): void {
+    this.ensureVisualTextures();
     if (this.textures.exists("player")) return;
 
     const makeCircle = (
@@ -635,17 +649,17 @@ export class GameScene extends Phaser.Scene {
       g.destroy();
     };
 
-    makeCircle("player", 14, 0x5cc8ff);
-    makeCircle("recycler", 60, 0x10202c, { color: 0x3aa4d4, width: 4, alpha: 0.9 });
-    makeCircle("scrap_common", 6, 0xd9f2ff);
-    makeCircle("scrap_heavy", 8, 0xffc86b);
-    makeCircle("scrap_rare", 7, 0xbb7cff);
-    makeCircle("enemy_chaser", 12, 0xff5c7a);
-    makeCircle("enemy_shooter", 11, 0xff8d5c);
-    makeCircle("enemy_cutter", 11, 0xff5ce8);
-    makeCircle("projectile", 4, 0xf0f6ff);
-    makeCircle("shrapnel", 3, 0x5cc8ff);
-    makeCircle("telegraph", 14, 0x000000, { color: 0x5cc8ff, width: 2, alpha: 0.7 });
+    makeCircle("player", 14, VISUAL_PALETTE.neonCyan, { color: VISUAL_PALETTE.metalLight, width: 3, alpha: 0.95 });
+    makeCircle("recycler", 60, VISUAL_PALETTE.bgMid, { color: VISUAL_PALETTE.neonBlue, width: 4, alpha: 0.9 });
+    makeCircle("scrap_common", 6, VISUAL_PALETTE.metalLight, { color: VISUAL_PALETTE.metalGray, width: 2, alpha: 0.95 });
+    makeCircle("scrap_heavy", 8, VISUAL_PALETTE.warningAmber, { color: VISUAL_PALETTE.rustDark, width: 2, alpha: 0.95 });
+    makeCircle("scrap_rare", 7, VISUAL_PALETTE.neonMagenta, { color: VISUAL_PALETTE.neonBlue, width: 2, alpha: 0.95 });
+    makeCircle("enemy_chaser", 12, VISUAL_PALETTE.hpRed, { color: VISUAL_PALETTE.rustDark, width: 2, alpha: 0.95 });
+    makeCircle("enemy_shooter", 11, VISUAL_PALETTE.neonBlue, { color: VISUAL_PALETTE.rustDark, width: 2, alpha: 0.95 });
+    makeCircle("enemy_cutter", 11, VISUAL_PALETTE.neonMagenta, { color: VISUAL_PALETTE.rustDark, width: 2, alpha: 0.95 });
+    makeCircle("projectile", 4, 0xffffff);
+    makeCircle("shrapnel", 3, VISUAL_PALETTE.neonCyan);
+    makeCircle("telegraph", 14, 0x000000, { color: VISUAL_PALETTE.neonCyan, width: 2, alpha: 0.8 });
   }
 
   private createWorld(): void {
@@ -653,6 +667,7 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.world.setBounds(0, 0, cfg.arena.width, cfg.arena.height);
     this.cameras.main.setBounds(0, 0, cfg.arena.width, cfg.arena.height);
+    this.createBackgroundLayers();
 
     this.scrapGroup = this.physics.add.group({ collideWorldBounds: true });
     this.enemyGroup = this.physics.add.group({ collideWorldBounds: true });
@@ -682,6 +697,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(30);
     this.player.body.setAllowGravity(false);
+    this.createPlayerGlow();
 
     this.recycler = this.physics.add.staticImage(cfg.arena.recyclerPos.x, cfg.arena.recyclerPos.y, "recycler") as ArcadeStaticImage;
     this.recycler.setDepth(5);
@@ -689,10 +705,11 @@ export class GameScene extends Phaser.Scene {
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-    this.add
-      .text(16, 16, "Magnet Caravan", { fontSize: "14px", color: "#98b7c7" })
-      .setScrollFactor(0)
-      .setDepth(100);
+    this.scale.on("resize", this.onResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off("resize", this.onResize, this);
+    });
+    this.onResize();
   }
 
   private createCollisions(): void {
@@ -1130,6 +1147,148 @@ export class GameScene extends Phaser.Scene {
       cg?.sdkGameplayStop?.();
     } catch {
       // ignore
+    }
+  }
+
+  private ensureVisualTextures(): void {
+    const seed = this.visualSeed;
+    createBgTile256(this, seed);
+    createBgFarSilhouette(this, seed);
+    createDecals(this, seed);
+    createVfxTextures(this);
+  }
+
+  private createBackgroundLayers(): void {
+    const cfg = this.state.config;
+    const { width, height } = this.scale;
+
+    this.bgFar?.destroy();
+    this.bgTile?.destroy();
+    this.fgFog?.destroy();
+    for (const d of this.bgDecals) d.destroy();
+    this.bgDecals = [];
+
+    this.bgFar = this.add
+      .tileSprite(0, 0, width, height, "bg_far_silhouette")
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(0)
+      .setAlpha(0.9);
+
+    this.bgTile = this.add.tileSprite(0, 0, width, height, "bg_tile_256").setOrigin(0, 0).setScrollFactor(0).setDepth(1).setAlpha(1);
+
+    const vrng = createRng(`visual:world_decals:${this.visualSeed}`);
+
+    const oils = ["decal_oil_01", "decal_oil_02", "decal_oil_03", "decal_oil_04"] as const;
+    const scratches = ["decal_scratch_01", "decal_scratch_02", "decal_scratch_03", "decal_scratch_04"] as const;
+    const bolts = ["decal_bolts_01", "decal_bolts_02", "decal_bolts_03", "decal_bolts_04"] as const;
+
+    const bucket = [
+      { item: oils as readonly string[], weight: 0.34 },
+      { item: scratches as readonly string[], weight: 0.46 },
+      { item: bolts as readonly string[], weight: 0.2 },
+    ] as const;
+
+    const area = cfg.arena.width * cfg.arena.height;
+    const decalCount = clampInt(Math.round(area / 20_000), 60, 140);
+    const avoidR = cfg.recycler.radius + 140;
+
+    for (let i = 0; i < decalCount; i++) {
+      let placed = false;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const x = vrng.float(0, cfg.arena.width);
+        const y = vrng.float(0, cfg.arena.height);
+        const d = Phaser.Math.Distance.Between(x, y, cfg.arena.recyclerPos.x, cfg.arena.recyclerPos.y);
+        if (d < avoidR) continue;
+
+        const list = vrng.weightedPick(bucket);
+        const key = vrng.pick(list);
+
+        const img = this.add.image(x, y, key).setScrollFactor(0.1).setDepth(2);
+        img.setRotation(vrng.float(0, Math.PI * 2));
+
+        if (key.startsWith("decal_oil_")) {
+          img.setAlpha(vrng.float(0.14, 0.28));
+          img.setScale(vrng.float(1.1, 1.7));
+        } else if (key.startsWith("decal_scratch_")) {
+          img.setAlpha(vrng.float(0.18, 0.34));
+          img.setScale(vrng.float(0.9, 1.35));
+          img.setTint(VISUAL_PALETTE.metalGray);
+        } else {
+          img.setAlpha(vrng.float(0.22, 0.38));
+          img.setScale(vrng.float(0.9, 1.25));
+          img.setTint(VISUAL_PALETTE.metalLight);
+        }
+
+        this.bgDecals.push(img);
+        placed = true;
+        break;
+      }
+      if (!placed) continue;
+    }
+
+    this.fgFog = this.add
+      .tileSprite(0, 0, width, height, "vfx_smoke_puff")
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(90)
+      .setBlendMode(Phaser.BlendModes.SCREEN)
+      .setAlpha(0.09);
+  }
+
+  private updateBackgroundLayers(dt: number): void {
+    this.bgTime += dt;
+    const cam = this.cameras.main;
+
+    if (this.bgFar) {
+      this.bgFar.tilePositionX = cam.scrollX * 0.05;
+      this.bgFar.tilePositionY = cam.scrollY * 0.05 + 28;
+    }
+
+    if (this.bgTile) {
+      this.bgTile.tilePositionX = cam.scrollX * 0.1;
+      this.bgTile.tilePositionY = cam.scrollY * 0.1;
+    }
+
+    if (this.fgFog) {
+      this.fgFog.tilePositionX = cam.scrollX * 0.25 + this.bgTime * 10;
+      this.fgFog.tilePositionY = cam.scrollY * 0.25 + this.bgTime * 7;
+    }
+  }
+
+  private createPlayerGlow(): void {
+    this.playerGlow?.destroy();
+    this.playerGlow = this.add
+      .image(this.player.x, this.player.y, "vfx_glow_blob")
+      .setDepth(15)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(VISUAL_PALETTE.neonCyan)
+      .setAlpha(0.32)
+      .setScale(0.9);
+    this.playerGlowPhase = 0;
+  }
+
+  private updatePlayerGlow(dt: number): void {
+    if (!this.playerGlow) return;
+    this.playerGlowPhase += dt;
+    const pulse = 1 + Math.sin(this.playerGlowPhase * Math.PI * 2 * 1.15) * 0.06;
+    this.playerGlow.setPosition(this.player.x, this.player.y);
+    this.playerGlow.setScale(0.9 * pulse);
+  }
+
+  private onResize(): void {
+    const { width, height } = this.scale;
+    if (this.bgFar) {
+      this.bgFar.setSize(width, height);
+      this.bgFar.setDisplaySize(width, height);
+    }
+    if (this.bgTile) {
+      this.bgTile.setSize(width, height);
+      this.bgTile.setDisplaySize(width, height);
+    }
+    if (this.fgFog) {
+      this.fgFog.setSize(width, height);
+      this.fgFog.setDisplaySize(width, height);
     }
   }
 
