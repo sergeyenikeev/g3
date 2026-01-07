@@ -146,7 +146,8 @@
     "rewarded": {
       "revive": { "enabled": true, "hpRestoreFrac": 0.5, "invulnSec": 1.25, "clearEnemies": true },
       "x2Results": { "enabled": true, "mult": 2 },
-      "reroll": { "enabled": true }
+      "reroll": { "enabled": true },
+      "startBooster": { "enabled": true, "addTailSegments": 3, "addBolts": 0, "addCores": 0 }
     }
   },
   "upgradeRarityRoll": {
@@ -158,5 +159,43 @@
       { "fromWave": 8, "toWave": 12, "common": 0.58, "uncommon": 0.28, "rare": 0.12, "epic": 0.02 },
       { "fromWave": 13, "toWave": 999, "common": 0.50, "uncommon": 0.30, "rare": 0.16, "epic": 0.04 }
     ]
+  },
+  "tuning": {
+    "spawn": {
+      "clampMargin": 24,
+      "randomExtraDist": 180,
+      "cornerInset": 40,
+      "maxAttempts": 14
+    },
+    "scrapSpawn": {
+      "centerMargin": 40,
+      "recyclerBuffer": 80,
+      "fallbackOffsetX": 200,
+      "maxAttempts": 12,
+      "clusterCapOverflow": 10,
+      "enemyKillDropChance": 0.35
+    },
+    "enemyPhysics": {
+      "radius": 12,
+      "bounce": 0.6,
+      "drag": 40
+    },
+    "scrapPhysics": {
+      "bounce": 0.9,
+      "drag": 40
+    },
+    "projectile": {
+      "deflectMinSpeed": 60
+    },
+    "shooterAi": {
+      "keepAwayMult": 0.85,
+      "keepTowardMult": 1.25
+    },
+    "playerStart": {
+      "offsetYFromRecycler": 220
+    },
+    "upgrades": {
+      "offerSize": 3
+    }
   }
 }

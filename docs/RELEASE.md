@@ -7,8 +7,8 @@
 Последовательность:
 1) `bom-check`, `lint`, `typecheck`
 2) `test:unit` + `test:integration`
-3) `vite build` (production)
-4) упаковка `dist/` в ZIP под платформы:
+3) `vite build` (production) отдельно под каждую платформу (`VITE_PLATFORM_ADAPTER=crazygames|poki|yandex|vk`) в `dist/platform_builds/<platform>/`
+4) упаковка каждого билда в ZIP под платформы:
    - `dist/releases/magnet-caravan_crazygames.zip`
    - `dist/releases/magnet-caravan_poki.zip`
    - `dist/releases/magnet-caravan_yandex.zip`
@@ -25,4 +25,3 @@
 - `npm run build:release`
 - проверить запуск `index.html` из архива (локально / на портале)
 - убедиться, что музыка не стартует до первого клика/тапа
-

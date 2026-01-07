@@ -39,7 +39,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const btnPlay = this.add
-      .rectangle(width / 2, height * 0.62, 280, 64, 0x1b2635)
+      .rectangle(width / 2, height * 0.56, 280, 64, 0x1b2635)
       .setStrokeStyle(2, 0x5cc8ff, 0.9)
       .setInteractive({ useHandCursor: true });
     const labelPlay = this.add
@@ -51,6 +51,19 @@ export class MenuScene extends Phaser.Scene {
       this.scene.launch("ui");
     });
 
+    const boosterCfg = this.staticData.balances.ads?.rewarded?.startBooster;
+    const boosterEnabled = Boolean(boosterCfg?.enabled);
+    const btnPlayBoost = this.add
+      .rectangle(width / 2, height * 0.64, 280, 52, 0x121a24, 0.95)
+      .setStrokeStyle(2, 0x57c27d, 0.9)
+      .setInteractive({ useHandCursor: true });
+    const labelPlayBoost = this.add
+      .text(btnPlayBoost.x, btnPlayBoost.y, "PLAY + BOOST (Rewarded)", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
+    btnPlayBoost.setVisible(boosterEnabled);
+    labelPlayBoost.setVisible(boosterEnabled);
+    btnPlayBoost.on("pointerdown", () => void this.startRunBoosted());
+
     const btnDaily = this.add
       .rectangle(width / 2, height * 0.72, 280, 56, 0x121a24)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
@@ -59,11 +72,26 @@ export class MenuScene extends Phaser.Scene {
       .text(btnDaily.x, btnDaily.y, "DAILY", { fontSize: "22px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
 
+    const btnDailyBoost = this.add
+      .rectangle(width / 2, height * 0.79, 280, 46, 0x0f1720, 0.95)
+      .setStrokeStyle(2, 0x57c27d, 0.75)
+      .setInteractive({ useHandCursor: true });
+    const labelDailyBoost = this.add
+      .text(btnDailyBoost.x, btnDailyBoost.y, "DAILY + BOOST (Rewarded)", {
+        fontSize: "14px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+    btnDailyBoost.setVisible(boosterEnabled);
+    labelDailyBoost.setVisible(boosterEnabled);
+
     const dailyInfo = this.add
-      .text(width / 2, height * 0.78, "", { fontSize: "14px", color: "#98b7c7", align: "center", wordWrap: { width: 520 } })
+      .text(width / 2, height * 0.86, "", { fontSize: "14px", color: "#98b7c7", align: "center", wordWrap: { width: 520 } })
       .setOrigin(0.5);
 
-    btnDaily.on("pointerdown", () => void this.startDaily());
+    btnDaily.on("pointerdown", () => void this.startDaily(false));
+    btnDailyBoost.on("pointerdown", () => void this.startDaily(true));
 
     if (save) {
       this.add
@@ -75,7 +103,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.add
-      .text(width / 2, height * 0.9, "WASD/Arrows: move | Space: flip", {
+      .text(width / 2, height * 0.93, "WASD/Arrows: move | Space: flip", {
         fontSize: "16px",
         color: "#98b7c7",
       })
@@ -84,11 +112,15 @@ export class MenuScene extends Phaser.Scene {
     void this.ensureDailyNormalizedAndRefresh(dailyInfo);
 
     this.scale.on("resize", (s: Phaser.Structs.Size) => {
-      btnPlay.setPosition(s.width / 2, s.height * 0.62);
+      btnPlay.setPosition(s.width / 2, s.height * 0.56);
       labelPlay.setPosition(btnPlay.x, btnPlay.y);
+      btnPlayBoost.setPosition(s.width / 2, s.height * 0.64);
+      labelPlayBoost.setPosition(btnPlayBoost.x, btnPlayBoost.y);
       btnDaily.setPosition(s.width / 2, s.height * 0.72);
       labelDaily.setPosition(btnDaily.x, btnDaily.y);
-      dailyInfo.setPosition(s.width / 2, s.height * 0.78);
+      btnDailyBoost.setPosition(s.width / 2, s.height * 0.79);
+      labelDailyBoost.setPosition(btnDailyBoost.x, btnDailyBoost.y);
+      dailyInfo.setPosition(s.width / 2, s.height * 0.86);
     });
   }
 
@@ -112,7 +144,22 @@ export class MenuScene extends Phaser.Scene {
     dailyInfoText.setText(`Seed: ${dateUtc} | ${title}\n${desc}\nAttempts: ${info.attemptsUsed}/${info.maxAttempts} | ${best}`);
   }
 
-  private async startDaily(): Promise<void> {
+  private async startRunBoosted(): Promise<void> {
+    const cfg = this.staticData.balances.ads?.rewarded?.startBooster;
+    if (!cfg?.enabled) return;
+
+    const res = await this.ads.showRewarded(AD_PLACEMENTS.START_BOOSTER);
+    if (res.ok && res.rewarded) {
+      this.registry.set("pendingStartBooster", true);
+      this.scene.start("game", { mode: "run" });
+      this.scene.launch("ui");
+      return;
+    }
+
+    this.toast("Rewarded booster not granted.");
+  }
+
+  private async startDaily(boosted: boolean): Promise<void> {
     const dateUtc = getUtcYyyymmdd();
     const save0 = this.saveManager.get();
     const normalized = normalizeDailySave(save0, dateUtc);
@@ -126,38 +173,56 @@ export class MenuScene extends Phaser.Scene {
 
     this.analytics.track(ANALYTICS_EVENTS.DAILY_ENTER, { dateUtc, attemptsUsed: info.attemptsUsed, maxAttempts: info.maxAttempts });
 
-    if (info.canStartFree) {
-      const next = consumeDailyAttempt(save, dateUtc);
-      await this.saveManager.save(next);
-      this.registry.set("saveData", this.saveManager.get());
-      this.analytics.track(ANALYTICS_EVENTS.DAILY_ATTEMPT_USED, { dateUtc, rewarded: false, attemptsUsed: next.daily.attemptsUsed });
-      this.scene.start("game", { mode: "daily" });
-      this.scene.launch("ui");
+    if (!info.canStartFree && !info.canStartRewarded) {
+      this.toast("No daily attempts left today.");
       return;
     }
 
-    if (info.canStartRewarded) {
-      const res = await this.ads.showRewarded(AD_PLACEMENTS.DAILY_ATTEMPT);
-      if (res.ok && res.rewarded) {
-        const next = consumeDailyAttempt(this.saveManager.get(), dateUtc);
-        await this.saveManager.save(next);
-        this.registry.set("saveData", this.saveManager.get());
-        this.analytics.track(ANALYTICS_EVENTS.DAILY_ATTEMPT_USED, { dateUtc, rewarded: true, attemptsUsed: next.daily.attemptsUsed });
-        this.scene.start("game", { mode: "daily" });
-        this.scene.launch("ui");
+    let attemptWasRewarded = false;
+    let boosterGranted = false;
+
+    if (boosted) {
+      const boosterCfg = this.staticData.balances.ads?.rewarded?.startBooster;
+      if (!boosterCfg?.enabled) {
+        this.toast("Boosters are disabled.");
         return;
       }
-      this.toast("Rewarded attempt not granted.");
-      return;
+      const res = await this.ads.showRewarded(AD_PLACEMENTS.DAILY_START_BOOSTER);
+      if (!(res.ok && res.rewarded)) {
+        this.toast("Rewarded booster not granted.");
+        return;
+      }
+      boosterGranted = true;
+      attemptWasRewarded = !info.canStartFree;
+    } else if (info.canStartRewarded) {
+      const res = await this.ads.showRewarded(AD_PLACEMENTS.DAILY_ATTEMPT);
+      if (!(res.ok && res.rewarded)) {
+        this.toast("Rewarded attempt not granted.");
+        return;
+      }
+      attemptWasRewarded = true;
     }
 
-    this.toast("No daily attempts left today.");
+    const next = consumeDailyAttempt(this.saveManager.get(), dateUtc);
+    await this.saveManager.save(next);
+    this.registry.set("saveData", this.saveManager.get());
+
+    this.analytics.track(ANALYTICS_EVENTS.DAILY_ATTEMPT_USED, {
+      dateUtc,
+      rewarded: attemptWasRewarded,
+      attemptsUsed: next.daily.attemptsUsed,
+      boosted,
+    });
+
+    if (boosterGranted) this.registry.set("pendingStartBooster", true);
+    this.scene.start("game", { mode: "daily" });
+    this.scene.launch("ui");
   }
 
   private toast(msg: string): void {
     const { width, height } = this.scale;
     if (this.toastText) this.toastText.destroy();
-    this.toastText = this.add.text(width / 2, height * 0.9, msg, { fontSize: "14px", color: "#d9f2ff" }).setOrigin(0.5);
+    this.toastText = this.add.text(width / 2, height * 0.93, msg, { fontSize: "14px", color: "#d9f2ff" }).setOrigin(0.5);
     this.time.delayedCall(1500, () => {
       this.toastText?.destroy();
       this.toastText = null;

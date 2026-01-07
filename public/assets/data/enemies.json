@@ -9,6 +9,8 @@
   "shooter": {
     "hp": 20,
     "speed": 135,
+    "contactDamage": 10,
+    "knockback": 220,
     "keepDistance": 220,
     "fireCooldownSec": 1.55,
     "projectile": { "speed": 320, "damage": 10, "lifetimeSec": 2.2 },
@@ -17,6 +19,8 @@
   "cutter": {
     "hp": 18,
     "speed": 210,
+    "contactDamage": 10,
+    "knockback": 220,
     "tailCut": 3,
     "cooldownAfterCutSec": 1.2,
     "ai": { "type": "tail_hunt", "preferTail": true }

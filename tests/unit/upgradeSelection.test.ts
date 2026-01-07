@@ -4,7 +4,7 @@ import { makeUpgradeOffer } from "../../src/game/upgrades/upgradeSelection";
 import type { Balances, RunUpgradeDef } from "../../src/data/types";
 
 describe("makeUpgradeOffer", () => {
-  it("не повторяет апгрейды и уважает maxStacks", () => {
+  it("does not repeat upgrades and respects maxStacks", () => {
     const rng = createRng("offer-seed");
 
     const cfg: Pick<Balances, "upgradeRarityRoll"> = {
@@ -22,9 +22,14 @@ describe("makeUpgradeOffer", () => {
       { id: "d", name: "D", rarity: "common", weight: 10, maxStacks: 2, effects: [] },
     ];
 
-    const offer = makeUpgradeOffer(cfg, upgrades, { waveIndex: 1, rarityState: { noRareOrEpicPicks: 0 }, pickedCounts: { a: 1 } }, rng);
-    expect(offer).toHaveLength(3);
+    const offer = makeUpgradeOffer(
+      cfg,
+      upgrades,
+      { waveIndex: 1, rarityState: { noRareOrEpicPicks: 0 }, pickedCounts: { a: 1 }, offerSize: 3 },
+      rng
+    );
 
+    expect(offer).toHaveLength(3);
     const ids = offer.map((o) => o.upgrade.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).not.toContain("a");

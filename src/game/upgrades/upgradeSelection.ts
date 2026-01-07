@@ -6,7 +6,7 @@ export type OfferContext = {
   waveIndex: number;
   rarityState: RarityRollState;
   pickedCounts: Record<string, number>;
-  offerSize?: number;
+  offerSize: number;
 };
 
 export type UpgradeOfferItem = {
@@ -15,7 +15,7 @@ export type UpgradeOfferItem = {
 };
 
 export function makeUpgradeOffer(cfg: Pick<Balances, "upgradeRarityRoll">, all: RunUpgradeDef[], ctx: OfferContext, rng: Rng): UpgradeOfferItem[] {
-  const size = ctx.offerSize ?? 3;
+  const size = ctx.offerSize;
   const offered = new Set<string>();
   const result: UpgradeOfferItem[] = [];
 
@@ -50,4 +50,3 @@ function pickUpgrade(
 
   return null;
 }
-

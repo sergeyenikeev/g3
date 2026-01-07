@@ -16,7 +16,7 @@
         "title": "Fast Flip",
         "desc": "Shorter FLIP cooldown. More shooters from Wave 4."
       },
-      "specialRule": { "type": "double_shooter_waves", "fromWave": 4 }
+      "specialRule": { "type": "double_shooter_waves", "fromWave": 4, "chance": 0.35 }
     },
     {
       "id": "daily_heavy_yard",

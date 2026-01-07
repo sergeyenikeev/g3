@@ -39,7 +39,7 @@
 - [x] Run upgrades применяются по `path` через эффекты
 - [x] Daily modifiers применяются по `path`
 - [x] Балансные параметры рекламы в `balances.json` (`ads.*`)
-- [ ] Полный аудит «хардкодов баланса» в коде (оставшиеся константы вынести в JSON при необходимости)
+- [x] Аудит «хардкодов баланса»: ключевые константы вынесены в `balances.json` (`tuning.*`) и `daily.json` (specialRule.*)
 
 ## 6) Директор сложности / волны
 - [x] Safe spawn distance (player/recycler)
@@ -54,7 +54,7 @@
 - [x] Детеминированный выбор варианта дня
 - [x] Daily попытки: 1 бесплатная + rewarded extra attempts (лимит из `daily.json`)
 - [x] Показ в меню: seed, title/desc варианта, attempts, best daily score
-- [ ] Доп. правила из knowledge_base (start booster и т.п.) — при необходимости расширить
+- [x] Доп. правила из knowledge_base: rewarded `start booster` (через `ads.rewarded.startBooster`)
 
 ## 8) Монетизация (ads)
 - [x] Rewarded: revive / x2 results / reroll
@@ -67,14 +67,14 @@
 ## 9) Analytics
 - [x] Единый `AnalyticsAdapter` (mock + platform autodetect)
 - [x] События: session_start/end, tutorial*, run_start/end, upgrade_offer, bank/flip, ads rewarded/interstitial, daily*
-- [ ] Опционально: интеграции/специфика SDK платформ (если понадобится более «нативная» аналитика)
+- [x] SDK-интеграции best-effort (CrazyGames loading/gameplay hooks, VK trackEvent если доступен)
 
 ## 10) Платформы/релизы
 - [x] PlatformAdapter слой (mock/local + CrazyGames/Poki/Yandex/VK) с безопасной деградацией
 - [x] `scripts/build_test_mock.mjs` (моки + проверки + тесты + dist-mock)
 - [x] `scripts/build_release.mjs` (unit+integration + prod build + zip релизы)
 - [x] ZIP: `dist/releases/magnet-caravan_{crazygames,poki,yandex,vk}.zip`
-- [ ] При необходимости: platform-specific `index.html`/SDK loader для порталов (если портал требует явный скрипт)
+- [x] SDK loader + platform builds: `src/platform/sdk/loadPlatformSdk.ts` + release-сборка по платформам
 
 ## 11) Аудио
 - [x] Реальные `.mp3` в `public/assets/audio/`

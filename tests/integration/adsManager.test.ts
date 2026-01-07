@@ -60,6 +60,7 @@ const ADS_CFG: Balances["ads"] = {
     revive: { enabled: true, hpRestoreFrac: 0.5, invulnSec: 1, clearEnemies: true },
     x2Results: { enabled: true, mult: 2 },
     reroll: { enabled: true },
+    startBooster: { enabled: true, addTailSegments: 3, addBolts: 0, addCores: 0 },
   },
 };
 

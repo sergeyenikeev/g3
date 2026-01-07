@@ -13,23 +13,25 @@ await run("npm", ["run", "typecheck"]);
 await run("npm", ["run", "test:unit"]);
 await run("npm", ["run", "test:integration"]);
 
-await run(
-  "npx",
-  ["vite", "build"],
-  {
-    ...process.env,
-    VITE_PLATFORM_ADAPTER: "auto",
-  }
-);
-
 const distDir = join(process.cwd(), "dist");
+const buildsDir = join(distDir, "platform_builds");
 const releasesDir = join(distDir, "releases");
+await mkdir(buildsDir, { recursive: true });
 await mkdir(releasesDir, { recursive: true });
 
 const platforms = ["crazygames", "poki", "yandex", "vk"];
 for (const p of platforms) {
   const zipPath = join(releasesDir, `magnet-caravan_${p}.zip`);
-  await zipDist(distDir, zipPath);
+  const outDir = join(buildsDir, p);
+  await run(
+    "npx",
+    ["vite", "build", "--outDir", outDir],
+    {
+      ...process.env,
+      VITE_PLATFORM_ADAPTER: p,
+    }
+  );
+  await zipDist(outDir, zipPath);
   console.log(`release: ${zipPath}`);
 }
 
@@ -60,4 +62,3 @@ function zipDist(distDir, zipPath) {
     archive.finalize();
   });
 }
-

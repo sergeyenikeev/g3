@@ -93,7 +93,7 @@ export class UpgradeScene extends Phaser.Scene {
         waveIndex: this.state.waveIndex,
         rarityState: { noRareOrEpicPicks: this.state.pityNoRareOrEpicPicks },
         pickedCounts,
-        offerSize: 3,
+        offerSize: this.state.config.tuning.upgrades.offerSize,
       },
       this.state.rng
     );

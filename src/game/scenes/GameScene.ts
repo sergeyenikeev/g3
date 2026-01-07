@@ -12,6 +12,7 @@ import { Tail, type ScrapType } from "../entities/tail";
 import { GAME_EVENTS } from "../events";
 import { consumeActions, inputState } from "../input/inputState";
 import type { RunMode, RunState } from "../run/runState";
+import { getCrazyGamesGameApi } from "../../platform/sdk/crazyGamesSdk";
 
 type EnemyEntity = {
   sprite: ArcadeImage;
@@ -79,6 +80,7 @@ export class GameScene extends Phaser.Scene {
   private banking = { active: false, t: 0 };
   private revivePending = false;
   private reviveOffered = false;
+  private pendingStartBooster = false;
 
   constructor() {
     super("game");
@@ -97,6 +99,9 @@ export class GameScene extends Phaser.Scene {
       presetId: "normal",
       metaLevels: (this.registry.get("saveData") as any)?.meta?.nodeLevels ?? {},
     });
+
+    this.pendingStartBooster = Boolean(this.registry.get("pendingStartBooster"));
+    this.registry.set("pendingStartBooster", false);
 
     this.rng = createRng(mode === "daily" ? `daily-run:${getUtcYyyymmdd()}` : `run:${Date.now()}`);
 
@@ -142,8 +147,10 @@ export class GameScene extends Phaser.Scene {
 
     this.createTextures();
     this.createWorld();
+    if (this.pendingStartBooster) this.applyStartBooster();
     this.createCollisions();
     this.startWave(1);
+    this.notifyPlatformGameplayStart();
 
     this.track(ANALYTICS_EVENTS.RUN_START, {
       mode,
@@ -296,7 +303,7 @@ export class GameScene extends Phaser.Scene {
       const d = Math.sqrt(d2);
       const nx = dx / d;
       const ny = dy / d;
-      const speed = Math.max(60, p.body.velocity.length());
+      const speed = Math.max(this.state.config.tuning.projectile.deflectMinSpeed, p.body.velocity.length());
       p.body.velocity.x = nx * speed;
       p.body.velocity.y = ny * speed;
       const ent = this.projectiles.find((pp) => pp.sprite === p);
@@ -328,16 +335,16 @@ export class GameScene extends Phaser.Scene {
         spr.body.velocity.x = nx * cfg.enemies.chaser.speed * speedMult;
         spr.body.velocity.y = ny * cfg.enemies.chaser.speed * speedMult;
       } else if (e.type === "shooter") {
-        const keep = cfg.enemies.shooter.keepDistance ?? 220;
+        const keep = cfg.enemies.shooter.keepDistance;
         const spd = cfg.enemies.shooter.speed * speedMult;
-        const wantAway = d < keep * 0.85;
-        const wantToward = d > keep * 1.25;
+        const wantAway = d < keep * cfg.tuning.shooterAi.keepAwayMult;
+        const wantToward = d > keep * cfg.tuning.shooterAi.keepTowardMult;
         const dir = wantAway ? -1 : wantToward ? 1 : 0;
         spr.body.velocity.x = nx * spd * dir;
         spr.body.velocity.y = ny * spd * dir;
 
-        if (now >= e.nextFireAt && cfg.enemies.shooter.projectile) {
-          e.nextFireAt = now + (cfg.enemies.shooter.fireCooldownSec ?? 1.5);
+        if (now >= e.nextFireAt) {
+          e.nextFireAt = now + cfg.enemies.shooter.fireCooldownSec;
           const pr = cfg.enemies.shooter.projectile;
           this.spawnProjectile("enemy", spr.x, spr.y, nx, ny, pr.speed * speedMult, pr.damage, pr.lifetimeSec);
         }
@@ -496,11 +503,11 @@ export class GameScene extends Phaser.Scene {
     const tex = type === "shooter" ? "enemy_shooter" : type === "cutter" ? "enemy_cutter" : "enemy_chaser";
     const spr = this.enemyGroup.create(x, y, tex) as ArcadeImage;
     spr.setDepth(25);
-    spr.setCircle(12);
+    spr.setCircle(this.state.config.tuning.enemyPhysics.radius);
     spr.body.setAllowGravity(false);
     spr.setCollideWorldBounds(true);
-    spr.body.setBounce(0.6, 0.6);
-    spr.body.setDrag(40, 40);
+    spr.body.setBounce(this.state.config.tuning.enemyPhysics.bounce, this.state.config.tuning.enemyPhysics.bounce);
+    spr.body.setDrag(this.state.config.tuning.enemyPhysics.drag, this.state.config.tuning.enemyPhysics.drag);
 
     const base = this.state.config.enemies[type];
     const waveMultHp = clamp(
@@ -555,6 +562,7 @@ export class GameScene extends Phaser.Scene {
 
   private pickSpawnPos(formation: string, idx: number, count: number, arcDeg?: number): { x: number; y: number } {
     const cfg = this.state.config;
+    const clampMargin = cfg.tuning.spawn.clampMargin;
     const safe = cfg.director.safeSpawnDist;
     const rSafe = cfg.director.recyclerSafeDist;
     const px = this.player.x;
@@ -563,23 +571,23 @@ export class GameScene extends Phaser.Scene {
     const ry = cfg.arena.recyclerPos.y;
 
     const tryPick = (angle: number, dist: number) => {
-      const x = clamp(px + Math.cos(angle) * dist, 24, cfg.arena.width - 24);
-      const y = clamp(py + Math.sin(angle) * dist, 24, cfg.arena.height - 24);
+      const x = clamp(px + Math.cos(angle) * dist, clampMargin, cfg.arena.width - clampMargin);
+      const y = clamp(py + Math.sin(angle) * dist, clampMargin, cfg.arena.height - clampMargin);
       if (Phaser.Math.Distance.Between(x, y, rx, ry) < rSafe) return null;
       if (Phaser.Math.Distance.Between(x, y, px, py) < safe) return null;
       return { x, y };
     };
 
-    for (let attempt = 0; attempt < 14; attempt++) {
+    for (let attempt = 0; attempt < cfg.tuning.spawn.maxAttempts; attempt++) {
       let angle = this.rng.next() * Math.PI * 2;
-      let dist = safe + this.rng.float(0, 180);
+      let dist = safe + this.rng.float(0, cfg.tuning.spawn.randomExtraDist);
 
       if (formation === "corners") {
         const corners = [
-          { x: 40, y: 40 },
-          { x: cfg.arena.width - 40, y: 40 },
-          { x: 40, y: cfg.arena.height - 40 },
-          { x: cfg.arena.width - 40, y: cfg.arena.height - 40 },
+          { x: cfg.tuning.spawn.cornerInset, y: cfg.tuning.spawn.cornerInset },
+          { x: cfg.arena.width - cfg.tuning.spawn.cornerInset, y: cfg.tuning.spawn.cornerInset },
+          { x: cfg.tuning.spawn.cornerInset, y: cfg.arena.height - cfg.tuning.spawn.cornerInset },
+          { x: cfg.arena.width - cfg.tuning.spawn.cornerInset, y: cfg.arena.height - cfg.tuning.spawn.cornerInset },
         ];
         const c = corners[idx % corners.length]!;
         if (Phaser.Math.Distance.Between(c.x, c.y, rx, ry) >= rSafe) return c;
@@ -665,7 +673,11 @@ export class GameScene extends Phaser.Scene {
       { common: "scrap_common", heavy: "scrap_heavy", rareShard: "scrap_rare" }
     );
 
-    this.player = this.physics.add.image(cfg.arena.recyclerPos.x, cfg.arena.recyclerPos.y + 220, "player") as ArcadeImage;
+    this.player = this.physics.add.image(
+      cfg.arena.recyclerPos.x,
+      cfg.arena.recyclerPos.y + cfg.tuning.playerStart.offsetYFromRecycler,
+      "player"
+    ) as ArcadeImage;
     this.player.setCircle(14);
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(30);
@@ -741,7 +753,11 @@ export class GameScene extends Phaser.Scene {
       0,
       cfg.scrap.clusterCountCap
     );
-    const clusters = clampInt(Math.round(baseClusters * mult) + extraClusters, 0, cfg.scrap.clusterCountCap + 10);
+    const clusters = clampInt(
+      Math.round(baseClusters * mult) + extraClusters,
+      0,
+      cfg.scrap.clusterCountCap + cfg.tuning.scrapSpawn.clusterCapOverflow
+    );
 
     for (let i = 0; i < clusters; i++) {
       const center = this.pickScrapCenter();
@@ -792,8 +808,8 @@ export class GameScene extends Phaser.Scene {
     spr.setData("scrapType", type);
     spr.body.setAllowGravity(false);
     spr.setCollideWorldBounds(true);
-    spr.body.setBounce(0.9, 0.9);
-    spr.body.setDrag(40, 40);
+    spr.body.setBounce(this.state.config.tuning.scrapPhysics.bounce, this.state.config.tuning.scrapPhysics.bounce);
+    spr.body.setDrag(this.state.config.tuning.scrapPhysics.drag, this.state.config.tuning.scrapPhysics.drag);
   }
 
   private onScrapOverlap(s: Phaser.Physics.Arcade.Image): void {
@@ -849,7 +865,7 @@ export class GameScene extends Phaser.Scene {
     const ent = this.enemies.find((e) => e.sprite === enemySpr);
     if (!ent) return;
     const def = this.state.config.enemies[ent.type];
-    const dmg = Math.max(1, Math.floor(def.contactDamage ?? 10));
+    const dmg = Math.max(1, Math.floor(def.contactDamage));
     this.applyDamage(dmg);
 
     const dx = this.player.x - enemySpr.x;
@@ -857,7 +873,7 @@ export class GameScene extends Phaser.Scene {
     const dist = Math.sqrt(dx * dx + dy * dy);
     const nx = dist > 0.001 ? dx / dist : 0;
     const ny = dist > 0.001 ? dy / dist : 0;
-    const kb = def.knockback ?? 220;
+    const kb = def.knockback;
     this.player.body.velocity.x += nx * kb;
     this.player.body.velocity.y += ny * kb;
 
@@ -885,8 +901,8 @@ export class GameScene extends Phaser.Scene {
     if (!ent || ent.type !== "cutter") return;
     const now = this.time.now / 1000;
     if (now < ent.cutReadyAt) return;
-    ent.cutReadyAt = now + (this.state.config.enemies.cutter.cooldownAfterCutSec ?? 1.0);
-    const cut = Math.max(1, this.state.config.enemies.cutter.tailCut ?? this.state.config.tail.lossOnCutter);
+    ent.cutReadyAt = now + this.state.config.enemies.cutter.cooldownAfterCutSec;
+    const cut = Math.max(1, this.state.config.enemies.cutter.tailCut);
     this.tail.removeLast(cut);
   }
 
@@ -912,7 +928,7 @@ export class GameScene extends Phaser.Scene {
     const x = ent.sprite.x;
     const y = ent.sprite.y;
     ent.sprite.destroy();
-    if (this.rng.next() < 0.35) this.spawnScrapAt(x, y);
+    if (this.rng.next() < this.state.config.tuning.scrapSpawn.enemyKillDropChance) this.spawnScrapAt(x, y);
   }
 
   private applyDamage(damage: number): void {
@@ -934,6 +950,7 @@ export class GameScene extends Phaser.Scene {
     if (this.state.deathReason) return;
     this.state.deathReason = reason;
     this.game.events.emit(GAME_EVENTS.RUN_END, { waveIndex: this.state.waveIndex, bolts: this.state.bolts });
+    this.notifyPlatformGameplayStop();
     this.scene.stop("upgrade");
     this.scene.stop("ui");
     this.scene.launch("results");
@@ -1082,15 +1099,49 @@ export class GameScene extends Phaser.Scene {
     return "rareShard";
   }
 
+  private applyStartBooster(): void {
+    const cfg = this.state.config.ads?.rewarded?.startBooster;
+    if (!cfg?.enabled) return;
+
+    const addBolts = Math.max(0, Math.floor(cfg.addBolts));
+    const addCores = Math.max(0, Math.floor(cfg.addCores));
+    const addTailSegments = Math.max(0, Math.floor(cfg.addTailSegments));
+
+    this.state.bolts += addBolts;
+    this.state.cores += addCores;
+
+    for (let i = 0; i < addTailSegments; i++) {
+      this.tail.addSegment("common", this.player.x, this.player.y);
+    }
+  }
+
+  private notifyPlatformGameplayStart(): void {
+    const cg = getCrazyGamesGameApi();
+    try {
+      cg?.sdkGameplayStart?.();
+    } catch {
+      // ignore
+    }
+  }
+
+  private notifyPlatformGameplayStop(): void {
+    const cg = getCrazyGamesGameApi();
+    try {
+      cg?.sdkGameplayStop?.();
+    } catch {
+      // ignore
+    }
+  }
+
   private pickScrapCenter(): { x: number; y: number } {
     const cfg = this.state.config;
-    for (let i = 0; i < 12; i++) {
-      const x = this.rng.float(40, cfg.arena.width - 40);
-      const y = this.rng.float(40, cfg.arena.height - 40);
+    for (let i = 0; i < cfg.tuning.scrapSpawn.maxAttempts; i++) {
+      const x = this.rng.float(cfg.tuning.scrapSpawn.centerMargin, cfg.arena.width - cfg.tuning.scrapSpawn.centerMargin);
+      const y = this.rng.float(cfg.tuning.scrapSpawn.centerMargin, cfg.arena.height - cfg.tuning.scrapSpawn.centerMargin);
       const d = Phaser.Math.Distance.Between(x, y, cfg.arena.recyclerPos.x, cfg.arena.recyclerPos.y);
-      if (d > cfg.recycler.radius + 80) return { x, y };
+      if (d > cfg.recycler.radius + cfg.tuning.scrapSpawn.recyclerBuffer) return { x, y };
     }
-    return { x: cfg.arena.recyclerPos.x + 200, y: cfg.arena.recyclerPos.y };
+    return { x: cfg.arena.recyclerPos.x + cfg.tuning.scrapSpawn.fallbackOffsetX, y: cfg.arena.recyclerPos.y };
   }
 }
 

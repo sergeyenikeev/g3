@@ -49,7 +49,7 @@
 - `save()/load()`
 
 Для разработки/тестов используется mock-адаптер.
-Для релиза используется `auto` режим (безопасная деградация, если SDK недоступен).
+Для релиза `scripts/build_release.mjs` собирает отдельные бандлы под платформы (CrazyGames/Poki/Yandex/VK) и включает SDK loader (`src/platform/sdk/loadPlatformSdk.ts`) с безопасной деградацией, если SDK недоступен.
 
 ### Сохранения
 
@@ -65,4 +65,3 @@
 - `UIScene`: HUD + mobile-first контролы + tutorial + аудио-старт по user interaction
 - `UpgradeScene`: выбор апгрейда между волнами
 - `ResultsScene`: экран результатов
-

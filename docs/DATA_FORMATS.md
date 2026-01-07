@@ -17,12 +17,14 @@
 - `director`: правила спавна, caps, breather, anti-snowball, pressure
 - `ads`: настройки рекламы (cooldown interstitial, rewarded-плейсменты)
 - `upgradeRarityRoll`: таблицы редкости и pity
+- `tuning`: внутренние параметры (убираем «хардкоды», тонкая настройка)
 
 Добавленные поля (важные для data-driven):
 - `scrap.clusterCountBase / clusterCountPerWave / clusterCountCap / clusterRadius`
 - `arena.width / arena.height / arena.recyclerPos`
 - `ads.interstitialCooldownSec / ads.disableInterstitialUntilTutorialDone / ads.interstitialMinRunsCompleted / ads.noInterstitialAfterRewardedSec`
-- `ads.rewarded.revive / ads.rewarded.x2Results / ads.rewarded.reroll`
+- `ads.rewarded.revive / ads.rewarded.x2Results / ads.rewarded.reroll / ads.rewarded.startBooster`
+- `tuning.spawn / tuning.scrapSpawn / tuning.enemyPhysics / tuning.scrapPhysics / tuning.projectile / tuning.shooterAi / tuning.playerStart / tuning.upgrades`
 
 ## enemies.json
 
@@ -61,6 +63,7 @@ Daily seed: `utc_date_yyyymmdd`.
 - `modifiers`: список эффектов (`add/mul/set`) по `path`
 - `ui.title/ui.desc` (опционально): отображение варианта дня в UI
 - `specialRule`: доп.правила (например, «двойные shooter волны», больше heavy scrap)
+  - `double_shooter_waves`: `{ fromWave, chance }`
 
 ## run_upgrades.json
 

@@ -8,7 +8,7 @@ import { UpgradeScene } from "../game/scenes/UpgradeScene";
 
 export function createGame(parentId: string): Phaser.Game {
   const game = new Phaser.Game({
-    type: Phaser.AUTO,
+    type: import.meta.env.VITE_E2E === "1" ? Phaser.CANVAS : Phaser.AUTO,
     parent: parentId,
     backgroundColor: "#0b0f14",
     physics: {

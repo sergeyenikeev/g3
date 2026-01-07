@@ -181,7 +181,8 @@ function getMixForWave(waveSet: WaveSet, waveIndex: number): Partial<Record<Enem
 
 function applyDailyTypeRule(type: EnemyType, dailyRule: Record<string, unknown> | undefined, waveIndex: number, rng: Rng): EnemyType {
   if (dailyRule?.type === "double_shooter_waves" && typeof dailyRule.fromWave === "number") {
-    if (waveIndex >= dailyRule.fromWave && type === "chaser" && rng.next() < 0.35) return "shooter";
+    const chance = typeof (dailyRule as any).chance === "number" ? ((dailyRule as any).chance as number) : 0;
+    if (waveIndex >= dailyRule.fromWave && type === "chaser" && chance > 0 && rng.next() < chance) return "shooter";
   }
   return type;
 }

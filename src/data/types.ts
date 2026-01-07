@@ -159,6 +159,12 @@ export type Balances = {
       reroll: {
         enabled: boolean;
       };
+      startBooster: {
+        enabled: boolean;
+        addTailSegments: number;
+        addBolts: number;
+        addCores: number;
+      };
     };
   };
   upgradeRarityRoll: {
@@ -173,22 +179,77 @@ export type Balances = {
       epic: number;
     }>;
   };
+  tuning: {
+    spawn: {
+      clampMargin: number;
+      randomExtraDist: number;
+      cornerInset: number;
+      maxAttempts: number;
+    };
+    scrapSpawn: {
+      centerMargin: number;
+      recyclerBuffer: number;
+      fallbackOffsetX: number;
+      maxAttempts: number;
+      clusterCapOverflow: number;
+      enemyKillDropChance: number;
+    };
+    enemyPhysics: {
+      radius: number;
+      bounce: number;
+      drag: number;
+    };
+    scrapPhysics: {
+      bounce: number;
+      drag: number;
+    };
+    projectile: {
+      deflectMinSpeed: number;
+    };
+    shooterAi: {
+      keepAwayMult: number;
+      keepTowardMult: number;
+    };
+    playerStart: {
+      offsetYFromRecycler: number;
+    };
+    upgrades: {
+      offerSize: number;
+    };
+  };
 };
 
-export type EnemyDef = {
+export type BaseEnemyDef = {
   hp: number;
   speed: number;
-  contactDamage?: number;
-  knockback?: number;
-  keepDistance?: number;
-  fireCooldownSec?: number;
-  projectile?: { speed: number; damage: number; lifetimeSec: number };
-  tailCut?: number;
-  cooldownAfterCutSec?: number;
-  ai: { type: "chase" | "kite" | "tail_hunt"; zigzag?: number; preferTail?: boolean };
+  contactDamage: number;
+  knockback: number;
 };
 
-export type EnemiesConfig = Record<EnemyType, EnemyDef>;
+export type ChaserDef = BaseEnemyDef & {
+  ai: { type: "chase"; zigzag?: number };
+};
+
+export type ShooterDef = BaseEnemyDef & {
+  keepDistance: number;
+  fireCooldownSec: number;
+  projectile: { speed: number; damage: number; lifetimeSec: number };
+  ai: { type: "kite" };
+};
+
+export type CutterDef = BaseEnemyDef & {
+  tailCut: number;
+  cooldownAfterCutSec: number;
+  ai: { type: "tail_hunt"; preferTail?: boolean };
+};
+
+export type EnemyDef = ChaserDef | ShooterDef | CutterDef;
+
+export type EnemiesConfig = {
+  chaser: ChaserDef;
+  shooter: ShooterDef;
+  cutter: CutterDef;
+};
 
 export type WaveScriptEntry = { wave: number; budget: number; mix: Partial<Record<EnemyType, number>> };
 

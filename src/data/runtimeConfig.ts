@@ -65,12 +65,9 @@ function applyEnemyMultipliers(enemies: EnemiesConfig, mults: Partial<Record<Ene
     if (typeof m.speedMult === "number") e.speed *= m.speedMult;
     if (typeof m.hpMult === "number") e.hp *= m.hpMult;
     if (type === "shooter") {
-      if (typeof m.fireCooldownMult === "number" && typeof e.fireCooldownSec === "number") {
-        e.fireCooldownSec *= m.fireCooldownMult;
-      }
-      if (typeof m.projectileSpeedMult === "number" && e.projectile) {
-        e.projectile.speed *= m.projectileSpeedMult;
-      }
+      const shooter = enemies.shooter;
+      if (typeof m.fireCooldownMult === "number") shooter.fireCooldownSec *= m.fireCooldownMult;
+      if (typeof m.projectileSpeedMult === "number") shooter.projectile.speed *= m.projectileSpeedMult;
     }
   });
 }
@@ -90,4 +87,3 @@ function applyMetaTree(cfg: RuntimeConfig, basePerks: PerkState, levels: Record<
     }
   }
 }
-
