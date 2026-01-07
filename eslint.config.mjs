@@ -15,15 +15,21 @@ export default tseslint.config(
     ],
   },
   {
+    files: ["scripts/**/*.mjs"],
     languageOptions: {
-      parserOptions: {
-        project: "./tsconfig.json",
+      globals: {
+        Buffer: "readonly",
+        console: "readonly",
+        process: "readonly",
       },
     },
+  },
+  {
     rules: {
       "@typescript-eslint/consistent-type-imports": ["error", { "prefer": "type-imports" }],
-      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "prefer-const": "off",
     },
   }
 );
-

@@ -399,6 +399,15 @@ export class GameScene extends Phaser.Scene {
       this.rng
     );
 
+    if (import.meta.env.VITE_E2E === "1") {
+      this.wavePlan.durationSec = Math.min(this.wavePlan.durationSec, 6);
+      this.scrapGroup.clear(true, true);
+      for (let i = 0; i < 3; i++) {
+        this.spawnScrapAt(this.player.x + (i - 1) * 10, this.player.y);
+      }
+      return;
+    }
+
     this.spawnScrapClusters(this.wavePlan.extraScrapClusters);
   }
 

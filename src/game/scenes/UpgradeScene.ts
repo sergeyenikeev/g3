@@ -43,7 +43,7 @@ export class UpgradeScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true })
       .setDepth(1001);
-    const rerollLabel = this.add
+    this.add
       .text(reroll.x, reroll.y, "REROLL (Rewarded)", {
         fontSize: "16px",
         color: "#d9f2ff",
