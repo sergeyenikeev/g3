@@ -138,6 +138,15 @@
       "targetMaxPerWave": 0.18
     }
   },
+  "ads": {
+    "interstitialCooldownSec": 90,
+    "disableInterstitialUntilTutorialDone": true,
+    "rewarded": {
+      "revive": { "enabled": true, "hpRestoreFrac": 0.5, "invulnSec": 1.25, "clearEnemies": true },
+      "x2Results": { "enabled": true, "mult": 2 },
+      "reroll": { "enabled": true }
+    }
+  },
   "upgradeRarityRoll": {
     "pityNoRareOrEpicPicks": 6,
     "pityBoost": { "rare": 0.06, "epic": 0.01, "takeFrom": "common" },

@@ -72,6 +72,8 @@ export class GameScene extends Phaser.Scene {
 
   private captureCooldown = 0;
   private banking = { active: false, t: 0 };
+  private revivePending = false;
+  private reviveOffered = false;
 
   constructor() {
     super("game");
@@ -130,6 +132,13 @@ export class GameScene extends Phaser.Scene {
     this.createCollisions();
     this.startWave(1);
 
+    this.game.events.on(GAME_EVENTS.REVIVE_ACCEPTED, this.onReviveAccepted, this);
+    this.game.events.on(GAME_EVENTS.REVIVE_DECLINED, this.onReviveDeclined, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(GAME_EVENTS.REVIVE_ACCEPTED, this.onReviveAccepted, this);
+      this.game.events.off(GAME_EVENTS.REVIVE_DECLINED, this.onReviveDeclined, this);
+    });
+
     this.events.on(Phaser.Scenes.Events.RESUME, () => {
       if (this.awaitingUpgrade) {
         this.awaitingUpgrade = false;
@@ -142,6 +151,7 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, dtMs: number): void {
     const dt = dtMs / 1000;
     if (dt <= 0) return;
+    if (this.revivePending) return;
 
     this.updateTimers(dt);
     this.updateMovement(dt);
@@ -888,7 +898,11 @@ export class GameScene extends Phaser.Scene {
     this.state.hp -= dmg;
     this.playerInvuln = Math.max(this.playerInvuln, this.state.config.player.invulnOnHitSec);
     this.state.recentHits.push({ t: this.time.now / 1000 });
-    if (this.state.hp <= 0) this.endRun();
+    this.game.events.emit(GAME_EVENTS.PLAYER_HIT, { damage: dmg });
+    if (this.state.hp <= 0) {
+      if (this.canOfferRevive()) this.offerRevive();
+      else this.endRun();
+    }
   }
 
   private endRun(): void {
@@ -896,6 +910,88 @@ export class GameScene extends Phaser.Scene {
     this.scene.stop("ui");
     this.scene.launch("results");
     this.scene.stop();
+  }
+
+  private canOfferRevive(): boolean {
+    const cfg = this.state.config.ads?.rewarded?.revive;
+    return Boolean(cfg?.enabled) && !this.reviveOffered;
+  }
+
+  private offerRevive(): void {
+    this.revivePending = true;
+    this.reviveOffered = true;
+    this.physics.world.pause();
+    try {
+      (this.time as any).paused = true;
+    } catch {
+      // ignore
+    }
+    try {
+      this.player.setVelocity(0, 0);
+    } catch {
+      // ignore
+    }
+    inputState.moveX = 0;
+    inputState.moveY = 0;
+    consumeActions();
+    this.game.events.emit(GAME_EVENTS.REVIVE_OFFER, {});
+  }
+
+  private onReviveAccepted(): void {
+    if (!this.revivePending) return;
+    this.revivePending = false;
+    this.physics.world.resume();
+    try {
+      (this.time as any).paused = false;
+    } catch {
+      // ignore
+    }
+
+    const cfg = this.state.config.ads.rewarded.revive;
+    const hp = Math.max(1, Math.floor(this.state.config.player.hpMax * cfg.hpRestoreFrac));
+    this.state.hp = hp;
+    this.playerInvuln = Math.max(this.playerInvuln, cfg.invulnSec);
+    this.state.recentHits = [];
+    this.banking.active = false;
+    this.banking.t = 0;
+
+    if (cfg.clearEnemies) this.clearThreats();
+  }
+
+  private onReviveDeclined(): void {
+    if (!this.revivePending) return;
+    this.revivePending = false;
+    this.physics.world.resume();
+    try {
+      (this.time as any).paused = false;
+    } catch {
+      // ignore
+    }
+    this.endRun();
+  }
+
+  private clearThreats(): void {
+    for (const e of this.enemies) {
+      try {
+        e.sprite.destroy();
+      } catch {
+        // ignore
+      }
+    }
+    this.enemies = [];
+    this.enemyGroup.clear(true, true);
+
+    for (const p of this.projectiles) {
+      try {
+        p.sprite.destroy();
+      } catch {
+        // ignore
+      }
+    }
+    this.projectiles = [];
+    this.projectileGroup.clear(true, true);
+
+    this.pendingTelegraphs = [];
   }
 
   private rollScrapType(): ScrapType {

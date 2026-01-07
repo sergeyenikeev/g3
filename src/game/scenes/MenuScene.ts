@@ -46,7 +46,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (save) {
       this.add
-        .text(width / 2, height * 0.48, `Best wave: ${save.stats.bestWave} • Best bolts: ${save.stats.bestBolts}`, {
+        .text(width / 2, height * 0.48, `Best wave: ${save.stats.bestWave} | Best bolts: ${save.stats.bestBolts}`, {
           fontSize: "16px",
           color: "#98b7c7",
         })
@@ -54,7 +54,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.add
-      .text(width / 2, height * 0.82, "WASD/Arrows — move • Space — flip", {
+      .text(width / 2, height * 0.82, "WASD/Arrows: move | Space: flip", {
         fontSize: "16px",
         color: "#98b7c7",
       })

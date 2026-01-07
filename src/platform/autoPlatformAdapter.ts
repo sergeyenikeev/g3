@@ -1,13 +1,17 @@
 import type { PlatformAdapter, RewardedResult } from "./platformAdapter";
-import { MockPlatformAdapter } from "./mockPlatformAdapter";
+import { CrazyGamesPlatformAdapter } from "./adapters/crazyGamesPlatformAdapter";
+import { LocalPlatformAdapter } from "./localPlatformAdapter";
+import { PokiPlatformAdapter } from "./adapters/pokiPlatformAdapter";
+import { VkPlatformAdapter } from "./adapters/vkPlatformAdapter";
+import { YandexGamesPlatformAdapter } from "./adapters/yandexGamesPlatformAdapter";
 
 export class AutoPlatformAdapter implements PlatformAdapter {
   readonly name = "auto";
-  private impl: PlatformAdapter = new MockPlatformAdapter();
+  private impl: PlatformAdapter = new LocalPlatformAdapter();
 
   async init(): Promise<void> {
-    // Сейчас безопасная деградация: если SDK не найден — остаёмся на mock.
-    // Реальные SDK-адаптеры подключаем по мере необходимости (CrazyGames/Poki/Yandex/VK).
+    // Авто-детект: если SDK доступен на странице — используем его, иначе деградируем в localStorage без рекламы.
+    this.impl = detect();
     await this.impl.init();
   }
 
@@ -28,3 +32,11 @@ export class AutoPlatformAdapter implements PlatformAdapter {
   }
 }
 
+function detect(): PlatformAdapter {
+  const w = window as any;
+  if (w?.CrazyGames?.SDK || w?.CrazyGamesSDK) return new CrazyGamesPlatformAdapter();
+  if (w?.PokiSDK) return new PokiPlatformAdapter();
+  if (w?.YaGames?.init) return new YandexGamesPlatformAdapter();
+  if (w?.vkBridge?.send) return new VkPlatformAdapter();
+  return new LocalPlatformAdapter();
+}

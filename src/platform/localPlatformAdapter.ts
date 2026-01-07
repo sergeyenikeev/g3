@@ -2,21 +2,19 @@ import type { PlatformAdapter, RewardedResult } from "./platformAdapter";
 import { PLATFORM_SAVE_KEY } from "./storageKeys";
 import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "./utils/localStorage";
 
-export class MockPlatformAdapter implements PlatformAdapter {
-  readonly name = "mock";
+export class LocalPlatformAdapter implements PlatformAdapter {
+  readonly name = "local";
 
   async init(): Promise<void> {
     // no-op
   }
 
   async showInterstitial(): Promise<boolean> {
-    await delay(250);
-    return true;
+    return false;
   }
 
   async showRewarded(_placement: string): Promise<RewardedResult> {
-    await delay(350);
-    return { ok: true, rewarded: true };
+    return { ok: true, rewarded: false };
   }
 
   async save(data: unknown): Promise<void> {
@@ -30,6 +28,3 @@ export class MockPlatformAdapter implements PlatformAdapter {
   }
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}

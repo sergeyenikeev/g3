@@ -140,6 +140,25 @@ export type Balances = {
       targetMaxPerWave: number;
     };
   };
+  ads: {
+    interstitialCooldownSec: number;
+    disableInterstitialUntilTutorialDone: boolean;
+    rewarded: {
+      revive: {
+        enabled: boolean;
+        hpRestoreFrac: number;
+        invulnSec: number;
+        clearEnemies: boolean;
+      };
+      x2Results: {
+        enabled: boolean;
+        mult: number;
+      };
+      reroll: {
+        enabled: boolean;
+      };
+    };
+  };
   upgradeRarityRoll: {
     pityNoRareOrEpicPicks: number;
     pityBoost: { rare: number; epic: number; takeFrom: Rarity };

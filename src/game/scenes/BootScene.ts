@@ -19,6 +19,14 @@ export class BootScene extends Phaser.Scene {
     this.load.json("balance_presets", "data/balance_presets.json");
     this.load.json("meta_tree", "data/meta_tree.json");
 
+    this.load.audio("sfx_pickup", "audio/pickup.mp3");
+    this.load.audio("sfx_hit", "audio/hit.mp3");
+    this.load.audio("sfx_flip", "audio/flip.mp3");
+    this.load.audio("sfx_bank", "audio/bank.mp3");
+    this.load.audio("sfx_ui_click", "audio/ui_click.mp3");
+    this.load.audio("sfx_upgrade", "audio/upgrade_select.mp3");
+    this.load.audio("music_main", "audio/music_loop.mp3");
+
     const w = this.scale.width;
     const h = this.scale.height;
     const barBg = this.add.rectangle(w / 2, h / 2, Math.min(520, w * 0.8), 16, 0x1b2635);

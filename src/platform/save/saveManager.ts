@@ -1,4 +1,6 @@
 import type { PlatformAdapter } from "../platformAdapter";
+import { LOCAL_SAVE_BACKUP_KEY, LOCAL_SAVE_MIRROR_KEY } from "../storageKeys";
+import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "../utils/localStorage";
 
 export const SAVE_VERSION = 1 as const;
 
@@ -18,6 +20,9 @@ export type SaveDataV1 = {
   stats: {
     bestWave: number;
     bestBolts: number;
+  };
+  ads: {
+    lastInterstitialAtMs: number;
   };
   daily: {
     lastDateUtc: string | null;
@@ -40,6 +45,7 @@ export function makeDefaultSave(): SaveData {
     },
     meta: { nodeLevels: {} },
     stats: { bestWave: 0, bestBolts: 0 },
+    ads: { lastInterstitialAtMs: 0 },
     daily: { lastDateUtc: null, attemptsUsed: 0 },
   };
 }
@@ -56,11 +62,35 @@ export class SaveManager {
   async load(): Promise<SaveData> {
     const raw = await this.adapter.load();
     const parsed = sanitize(raw);
-    this.cache = parsed ?? makeDefaultSave();
+    if (parsed) {
+      this.cache = parsed;
+      writeMirror(parsed);
+      return this.cache;
+    }
+
+    const mirror = sanitize(readMirror());
+    if (mirror) {
+      this.cache = mirror;
+      writeMirror(mirror);
+      void this.adapter.save(mirror).catch(() => {});
+      return this.cache;
+    }
+
+    const backup = sanitize(readBackup());
+    if (backup) {
+      this.cache = backup;
+      writeMirror(backup);
+      void this.adapter.save(backup).catch(() => {});
+      return this.cache;
+    }
+
+    this.cache = makeDefaultSave();
     return this.cache;
   }
 
   async save(next: SaveData): Promise<void> {
+    rotateBackup();
+    writeMirror(next);
     this.cache = next;
     await this.adapter.save(next);
   }
@@ -85,12 +115,15 @@ function sanitize(raw: unknown): SaveData | null {
   const lastDateUtc = typeof (raw as any).daily?.lastDateUtc === "string" ? ((raw as any).daily.lastDateUtc as string) : null;
   const attemptsUsed = clampNum((raw as any).daily?.attemptsUsed, 0, 0, 99);
 
+  const lastInterstitialAtMs = clampNum((raw as any).ads?.lastInterstitialAtMs, 0, 0, 9e15);
+
   return {
     v: SAVE_VERSION,
     settings: { sfxVolume, musicVolume },
     tutorial: { completed, skipped },
     meta: { nodeLevels },
     stats: { bestWave, bestBolts },
+    ads: { lastInterstitialAtMs },
     daily: { lastDateUtc, attemptsUsed },
   };
 }
@@ -104,3 +137,21 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && Object.getPrototypeOf(v) === Object.prototype;
 }
 
+function readMirror(): unknown | null {
+  return safeJsonParse(safeLocalStorageGet(LOCAL_SAVE_MIRROR_KEY));
+}
+
+function readBackup(): unknown | null {
+  return safeJsonParse(safeLocalStorageGet(LOCAL_SAVE_BACKUP_KEY));
+}
+
+function rotateBackup(): void {
+  const mirrorRaw = safeLocalStorageGet(LOCAL_SAVE_MIRROR_KEY);
+  if (mirrorRaw) safeLocalStorageSet(LOCAL_SAVE_BACKUP_KEY, mirrorRaw);
+}
+
+function writeMirror(data: unknown): void {
+  const raw = safeJsonStringify(data);
+  if (!raw) return;
+  safeLocalStorageSet(LOCAL_SAVE_MIRROR_KEY, raw);
+}

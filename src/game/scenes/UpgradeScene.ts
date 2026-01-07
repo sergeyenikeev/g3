@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import type { PlatformAdapter } from "../../platform/platformAdapter";
+import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import type { RunState } from "../run/runState";
 import { applyEffects } from "../effects/applyEffects";
 import { GAME_EVENTS } from "../events";
@@ -30,7 +31,7 @@ export class UpgradeScene extends Phaser.Scene {
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.72).setScrollFactor(0).setDepth(1000);
 
     this.add
-      .text(width / 2, height * 0.16, `UPGRADE PICK • WAVE ${this.state.waveIndex}`, {
+      .text(width / 2, height * 0.16, `UPGRADE PICK - WAVE ${this.state.waveIndex}`, {
         fontSize: "24px",
         color: "#d9f2ff",
         fontStyle: "700",
@@ -43,7 +44,7 @@ export class UpgradeScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true })
       .setDepth(1001);
-    this.add
+    const rerollLabel = this.add
       .text(reroll.x, reroll.y, "REROLL (Rewarded)", {
         fontSize: "16px",
         color: "#d9f2ff",
@@ -51,6 +52,10 @@ export class UpgradeScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(1001);
+
+    const rerollEnabled = Boolean(this.state.config.ads?.rewarded?.reroll?.enabled);
+    reroll.setVisible(rerollEnabled);
+    rerollLabel.setVisible(rerollEnabled);
 
     reroll.on("pointerdown", () => void this.handleReroll());
 
@@ -62,7 +67,7 @@ export class UpgradeScene extends Phaser.Scene {
   }
 
   private async handleReroll(): Promise<void> {
-    const res = await this.adapter.showRewarded("reroll");
+    const res = await this.adapter.showRewarded(AD_PLACEMENTS.REROLL);
     this.game.events.emit(GAME_EVENTS.UPGRADE_REROLL, { ok: res.ok, rewarded: (res as any).rewarded === true });
     if (res.ok && (res as any).rewarded === true) {
       this.renderOffer();
