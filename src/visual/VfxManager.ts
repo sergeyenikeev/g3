@@ -132,6 +132,9 @@ export class VfxManager {
       case "upgrade_offer_shown":
         this.onUpgradeOfferShown(params);
         return;
+      case "upgrade_picked":
+        this.onUpgradePicked(params);
+        return;
       default:
         return;
     }
@@ -413,6 +416,67 @@ export class VfxManager {
     safeSet(glow, "setAlpha", 0.18);
     safeSet(glow, "setScale", 4.2);
     this.fx.push({ kind: "ring", obj: glow, age: 0, life: 0.25, x: width / 2, y: height / 2, s0: 4.2, s1: 5.1, a0: 0.18, a1: 0 });
+  }
+
+  private onUpgradePicked(p: any): void {
+    if (!this.ui) return;
+    const rarity = typeof p?.rarity === "string" ? (p.rarity as string) : "common";
+    const tint =
+      rarity === "epic"
+        ? VISUAL_PALETTE.neonMagenta
+        : rarity === "rare"
+          ? VISUAL_PALETTE.neonBlue
+          : rarity === "uncommon"
+            ? VISUAL_PALETTE.successGreen
+            : VISUAL_PALETTE.metalGray;
+
+    const { width, height } = this.ui.scale ?? { width: 0, height: 0 };
+    const x = width / 2;
+    const y = height * 0.42;
+
+    const glow = this.ui.add?.image?.(x, y, "vfx_glow_blob");
+    if (glow) {
+      safeSet(glow, "setScrollFactor", 0);
+      safeSet(glow, "setDepth", 1060);
+      safeSet(glow, "setBlendMode", "ADD");
+      safeSet(glow, "setTint", tint);
+      safeSet(glow, "setAlpha", 0.22);
+      safeSet(glow, "setScale", 3.2);
+      this.fx.push({ kind: "ring", obj: glow, age: 0, life: 0.22, x, y, s0: 3.2, s1: 3.9, a0: 0.22, a1: 0 });
+    }
+
+    const n = this.quality === "low" ? 10 : this.quality === "high" ? 18 : 14;
+    const cap = this.getMaxParticles();
+    const current = this.countParticles();
+    const avail = Math.max(0, cap - current);
+    const spawn = Math.min(n, avail);
+    for (let i = 0; i < spawn; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const vx = Math.cos(a) * (220 + Math.random() * 160);
+      const vy = Math.sin(a) * (220 + Math.random() * 160);
+      const obj = this.ui.add?.image?.(x, y, "vfx_spark");
+      if (!obj) continue;
+      safeSet(obj, "setScrollFactor", 0);
+      safeSet(obj, "setDepth", 1061);
+      safeSet(obj, "setBlendMode", "ADD");
+      safeSet(obj, "setTint", tint);
+      safeSet(obj, "setAlpha", 1);
+      safeSet(obj, "setScale", 0.9 + Math.random() * 0.6);
+      safeSet(obj, "setRotation", a);
+      this.fx.push({
+        kind: "particle",
+        obj,
+        age: 0,
+        life: 0.22 * (0.7 + Math.random() * 0.5),
+        vx,
+        vy,
+        drag: 0.16,
+        s0: 1,
+        s1: 0,
+        a0: 1,
+        a1: 0,
+      });
+    }
   }
 
   private spawnSparkBurst(

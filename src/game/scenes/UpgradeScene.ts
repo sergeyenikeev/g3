@@ -8,12 +8,13 @@ import { applyEffects } from "../effects/applyEffects";
 import { GAME_EVENTS } from "../events";
 import { makeUpgradeOffer } from "../upgrades/upgradeSelection";
 import { updatePityAfterPick } from "../upgrades/rarity";
+import { createVfxTextures } from "../../visual/TextureFactory";
 
 const RARITY_COLORS: Record<string, number> = {
-  common: 0x7a8a93,
-  uncommon: 0x57c27d,
-  rare: 0x5cc8ff,
-  epic: 0xbb7cff,
+  common: 0x6e7a86,
+  uncommon: 0x3dff9b,
+  rare: 0x2d7bff,
+  epic: 0xff3ad7,
 };
 
 export class UpgradeScene extends Phaser.Scene {
@@ -30,6 +31,7 @@ export class UpgradeScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
     this.state = this.registry.get("runState") as RunState;
+    createVfxTextures(this);
 
     const { width, height } = this.scale;
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.72).setScrollFactor(0).setDepth(1000);
@@ -113,7 +115,14 @@ export class UpgradeScene extends Phaser.Scene {
     offer.forEach((o, idx) => {
       const x = width / 2;
       const y = y0 + idx * (h + gap) + totalH * 0.02;
-      const rarityColor = RARITY_COLORS[o.upgrade.rarity] ?? 0x7a8a93;
+      const rarityColor = RARITY_COLORS[o.upgrade.rarity] ?? 0x6e7a86;
+
+      const glow = this.add
+        .image(0, 0, "vfx_glow_blob")
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(rarityColor)
+        .setAlpha(0.18)
+        .setScale((w / 128) * 1.2, (h / 128) * 0.9);
 
       const bg = this.add
         .rectangle(0, 0, w, h, 0x0f1720, 0.96)
@@ -146,8 +155,27 @@ export class UpgradeScene extends Phaser.Scene {
         })
         .setOrigin(1, 0);
 
-      const card = this.add.container(x, y, [bg, title, desc, chip]).setDepth(1002);
-      bg.on("pointerdown", () => this.pickUpgrade(o.upgrade.id));
+      const card = this.add.container(x, y + 18, [glow, bg, title, desc, chip]).setDepth(1002).setAlpha(0).setScale(0.98);
+      this.tweens.add({ targets: card, y, alpha: 1, scale: 1, duration: 240, delay: idx * 70, ease: "Cubic.Out" });
+
+      bg.on("pointerover", () => {
+        this.tweens.killTweensOf(card);
+        this.tweens.add({ targets: card, scale: 1.03, duration: 90, ease: "Quad.Out" });
+        glow.setAlpha(0.24);
+      });
+
+      bg.on("pointerout", () => {
+        this.tweens.killTweensOf(card);
+        this.tweens.add({ targets: card, scale: 1, duration: 120, ease: "Quad.Out" });
+        glow.setAlpha(0.18);
+      });
+
+      bg.on("pointerdown", () => {
+        bg.disableInteractive();
+        this.tweens.killTweensOf(card);
+        this.tweens.add({ targets: card, scale: 0.98, duration: 70, ease: "Quad.Out" });
+        this.time.delayedCall(70, () => this.pickUpgrade(o.upgrade.id));
+      });
 
       this.cards.push(card);
     });
