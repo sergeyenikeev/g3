@@ -7,6 +7,12 @@ export type TailSegment = {
   type: ScrapType;
 };
 
+export type TailCutInfo = {
+  x: number;
+  y: number;
+  type: ScrapType;
+};
+
 export class Tail {
   private readonly segments: TailSegment[] = [];
   private readonly trail: Phaser.Math.Vector2[] = [];
@@ -57,18 +63,18 @@ export class Tail {
     this.segments.push({ sprite: spr, type });
   }
 
-  removeLast(n: number): TailSegment[] {
-    const removed: TailSegment[] = [];
+  removeLast(n: number): TailCutInfo[] {
+    const removed: TailCutInfo[] = [];
     for (let i = 0; i < n; i++) {
       const seg = this.segments.pop();
       if (!seg) break;
+      removed.push({ x: seg.sprite.x, y: seg.sprite.y, type: seg.type });
       seg.sprite.destroy();
-      removed.push(seg);
     }
     return removed;
   }
 
-  clear(): TailSegment[] {
+  clear(): TailCutInfo[] {
     return this.removeLast(this.segments.length);
   }
 

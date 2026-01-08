@@ -335,26 +335,30 @@ export class VfxManager {
   private onTailCut(p: any): void {
     const x = num(p?.x);
     const y = num(p?.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const segments = Array.isArray(p?.segments) ? (p.segments as any[]) : [];
 
-    this.cameraShake(140, 0.0035);
-    this.spawnSparkBurst(x, y, this.quality === "low" ? 10 : 14, {
-      tintA: VISUAL_PALETTE.warningAmber,
-      tintB: VISUAL_PALETTE.metalLight,
-      speed: 250,
-      life: 0.28,
-      spread: 1,
-    });
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      this.cameraShake(140, 0.0035);
+      this.spawnSparkBurst(x, y, this.quality === "low" ? 10 : 14, {
+        tintA: VISUAL_PALETTE.warningAmber,
+        tintB: VISUAL_PALETTE.metalLight,
+        speed: 250,
+        life: 0.28,
+        spread: 1,
+      });
 
-    const smoke = this.world?.add?.image?.(x, y, "vfx_smoke_puff");
-    if (smoke) {
-      safeSet(smoke, "setDepth", 66);
-      safeSet(smoke, "setBlendMode", "SCREEN");
-      safeSet(smoke, "setTint", VISUAL_PALETTE.metalGray);
-      safeSet(smoke, "setAlpha", 0.22);
-      safeSet(smoke, "setScale", 0.9);
-      this.fx.push({ kind: "ring", obj: smoke, age: 0, life: 0.42, x, y, s0: 0.9, s1: 1.45, a0: 0.22, a1: 0 });
+      const smoke = this.world?.add?.image?.(x, y, "vfx_smoke_puff");
+      if (smoke) {
+        safeSet(smoke, "setDepth", 66);
+        safeSet(smoke, "setBlendMode", "SCREEN");
+        safeSet(smoke, "setTint", VISUAL_PALETTE.metalGray);
+        safeSet(smoke, "setAlpha", 0.22);
+        safeSet(smoke, "setScale", 0.9);
+        this.fx.push({ kind: "ring", obj: smoke, age: 0, life: 0.42, x, y, s0: 0.9, s1: 1.45, a0: 0.22, a1: 0 });
+      }
     }
+
+    this.spawnTailFragments(segments);
   }
 
   private onBankComplete(p: any): void {
@@ -630,6 +634,60 @@ export class VfxManager {
     safeSet(obj, "setAlpha", alpha);
     safeSet(obj, "setScale", scale * 0.7);
     this.fx.push({ kind: "ring", obj, age: 0, life, x, y, s0: scale * 0.7, s1: scale, a0: alpha, a1: 0 });
+  }
+
+  private spawnTailFragments(segments: any[]): void {
+    if (!segments || segments.length === 0) return;
+    const cap = this.getMaxParticles();
+    const current = this.countParticles();
+    const avail = Math.max(0, cap - current);
+    if (avail <= 0) return;
+
+    const max = this.quality === "low" ? 4 : this.quality === "high" ? 10 : 7;
+    const spawn = Math.min(max, avail, segments.length);
+
+    for (let i = 0; i < spawn; i++) {
+      const seg = segments[i] ?? {};
+      const x = num(seg.x);
+      const y = num(seg.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+      const type = typeof seg.type === "string" ? (seg.type as string) : "common";
+      const tint =
+        type === "rareShard"
+          ? VISUAL_PALETTE.neonMagenta
+          : type === "heavy"
+            ? VISUAL_PALETTE.warningAmber
+            : VISUAL_PALETTE.metalLight;
+
+      const a = Math.random() * Math.PI * 2;
+      const speed = 140 + Math.random() * 140;
+      const vx = Math.cos(a) * speed;
+      const vy = Math.sin(a) * speed;
+      const obj = this.world?.add?.image?.(x, y, "vfx_trail");
+      if (!obj) continue;
+
+      safeSet(obj, "setDepth", 67);
+      safeSet(obj, "setBlendMode", "ADD");
+      safeSet(obj, "setTint", tint);
+      safeSet(obj, "setAlpha", 0.7);
+      safeSet(obj, "setScale", 0.6);
+      safeSet(obj, "setRotation", a);
+
+      this.fx.push({
+        kind: "particle",
+        obj,
+        age: 0,
+        life: 0.3 + Math.random() * 0.2,
+        vx,
+        vy,
+        drag: 0.2,
+        s0: 0.8,
+        s1: 0,
+        a0: 0.7,
+        a1: 0,
+      });
+    }
   }
 
   private spawnUiFlyIcon(worldX: number, worldY: number, uiX: number, uiY: number, key: string, tint: number): void {

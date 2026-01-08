@@ -50,6 +50,9 @@ export class GameScene extends Phaser.Scene {
   private bgTile: Phaser.GameObjects.TileSprite | null = null;
   private fgFog: Phaser.GameObjects.TileSprite | null = null;
   private bgDecals: Phaser.GameObjects.Image[] = [];
+  private bgDust: Array<{ obj: Phaser.GameObjects.Image; vx: number; vy: number; scroll: number }> = [];
+  private bgSparkFx: Array<{ obj: Phaser.GameObjects.Image; vx: number; vy: number; age: number; life: number; a0: number }> = [];
+  private bgSparkTimer = 0;
   private playerGlow: Phaser.GameObjects.Image | null = null;
   private playerGlowPhase = 0;
   private vfx: VfxManager | null = null;
@@ -980,7 +983,9 @@ export class GameScene extends Phaser.Scene {
     this.player.body.velocity.y += ny * kb;
 
     const removed = this.tail.removeLast(this.state.config.tail.lossOnObstacle);
-    if (removed.length > 0) this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length });
+    if (removed.length > 0) {
+      this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length, segments: removed });
+    }
   }
 
   private onPlayerHitByProjectile(pr: Phaser.Physics.Arcade.Image): void {
@@ -989,7 +994,9 @@ export class GameScene extends Phaser.Scene {
     if (!ent || ent.owner !== "enemy") return;
     this.applyDamage(ent.damage);
     const removed = this.tail.removeLast(this.state.config.tail.lossOnProjectile);
-    if (removed.length > 0) this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length });
+    if (removed.length > 0) {
+      this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length, segments: removed });
+    }
     pr.destroy();
   }
 
@@ -997,7 +1004,9 @@ export class GameScene extends Phaser.Scene {
     const ent = this.projectiles.find((p) => p.sprite === pr);
     if (!ent || ent.owner !== "enemy") return;
     const removed = this.tail.removeLast(this.state.config.tail.lossOnProjectile);
-    if (removed.length > 0) this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length });
+    if (removed.length > 0) {
+      this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length, segments: removed });
+    }
     pr.destroy();
   }
 
@@ -1009,7 +1018,9 @@ export class GameScene extends Phaser.Scene {
     ent.cutReadyAt = now + this.state.config.enemies.cutter.cooldownAfterCutSec;
     const cut = Math.max(1, this.state.config.enemies.cutter.tailCut);
     const removed = this.tail.removeLast(cut);
-    if (removed.length > 0) this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length });
+    if (removed.length > 0) {
+      this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length, segments: removed });
+    }
   }
 
   private onEnemyHitByProjectile(enemySpr: Phaser.Physics.Arcade.Image, pr: Phaser.Physics.Arcade.Image): void {
@@ -1292,6 +1303,7 @@ export class GameScene extends Phaser.Scene {
     this.fgFog?.destroy();
     for (const d of this.bgDecals) d.destroy();
     this.bgDecals = [];
+    this.clearBackgroundAmbient();
 
     this.bgFar = null;
     if (this.visualQuality !== "low") {
@@ -1370,6 +1382,39 @@ export class GameScene extends Phaser.Scene {
         .setBlendMode(Phaser.BlendModes.SCREEN)
         .setAlpha(0.09);
     }
+
+    this.createBackgroundDust(vrng);
+    this.bgSparkTimer = 0;
+  }
+
+  private clearBackgroundAmbient(): void {
+    for (const d of this.bgDust) d.obj.destroy();
+    this.bgDust = [];
+    for (const s of this.bgSparkFx) s.obj.destroy();
+    this.bgSparkFx = [];
+  }
+
+  private createBackgroundDust(rng: Rng): void {
+    if (this.visualQuality === "low") return;
+    const { width, height } = this.scale;
+    const cam = this.cameras.main;
+    const scroll = 0.22;
+    const count = this.visualQuality === "high" ? 26 : 18;
+
+    for (let i = 0; i < count; i++) {
+      const x = cam.scrollX * scroll + rng.float(0, width);
+      const y = cam.scrollY * scroll + rng.float(0, height);
+      const obj = this.add.image(x, y, "vfx_spark");
+      obj.setDepth(88);
+      obj.setScrollFactor(scroll);
+      obj.setTint(VISUAL_PALETTE.metalLight);
+      obj.setAlpha(rng.float(0.08, 0.18));
+      obj.setScale(rng.float(0.18, 0.35));
+
+      const vx = rng.float(-10, 10);
+      const vy = rng.float(-8, 8);
+      this.bgDust.push({ obj, vx, vy, scroll });
+    }
   }
 
   private updateBackgroundLayers(dt: number): void {
@@ -1390,6 +1435,78 @@ export class GameScene extends Phaser.Scene {
       this.fgFog.tilePositionX = cam.scrollX * 0.25 + this.bgTime * 10;
       this.fgFog.tilePositionY = cam.scrollY * 0.25 + this.bgTime * 7;
     }
+
+    this.updateBackgroundAmbient(dt);
+  }
+
+  private updateBackgroundAmbient(dt: number): void {
+    if (!Number.isFinite(dt) || dt <= 0) return;
+
+    if (this.bgDust.length > 0) {
+      const cam = this.cameras.main;
+      const { width, height } = this.scale;
+      const margin = 40;
+      for (const d of this.bgDust) {
+        const obj = d.obj;
+        obj.x += d.vx * dt;
+        obj.y += d.vy * dt;
+
+        const minX = cam.scrollX * d.scroll - margin;
+        const maxX = cam.scrollX * d.scroll + width + margin;
+        const minY = cam.scrollY * d.scroll - margin;
+        const maxY = cam.scrollY * d.scroll + height + margin;
+
+        if (obj.x < minX) obj.x = maxX;
+        else if (obj.x > maxX) obj.x = minX;
+        if (obj.y < minY) obj.y = maxY;
+        else if (obj.y > maxY) obj.y = minY;
+      }
+    }
+
+    if (this.visualQuality !== "low") {
+      this.bgSparkTimer -= dt;
+      if (this.bgSparkTimer <= 0) {
+        this.spawnBackgroundSpark();
+        this.bgSparkTimer = (this.visualQuality === "high" ? 0.45 : 0.7) + Math.random() * 0.6;
+      }
+    }
+
+    for (let i = this.bgSparkFx.length - 1; i >= 0; i--) {
+      const s = this.bgSparkFx[i]!;
+      s.age += dt;
+      const t = clamp01(s.age / Math.max(1e-6, s.life));
+      s.obj.x += s.vx * dt;
+      s.obj.y += s.vy * dt;
+      s.obj.setAlpha(s.a0 * (1 - t));
+      if (s.age >= s.life) {
+        s.obj.destroy();
+        this.bgSparkFx.splice(i, 1);
+      }
+    }
+  }
+
+  private spawnBackgroundSpark(): void {
+    const cam = this.cameras.main;
+    const { width, height } = this.scale;
+    const scroll = 0.08;
+    const x = cam.scrollX * scroll + Math.random() * width;
+    const y = cam.scrollY * scroll + Math.random() * height;
+
+    const obj = this.add.image(x, y, "vfx_spark");
+    obj.setDepth(1.5);
+    obj.setScrollFactor(scroll);
+    obj.setBlendMode(Phaser.BlendModes.ADD);
+    obj.setTint(VISUAL_PALETTE.neonCyan);
+    obj.setAlpha(0.2);
+    obj.setScale(0.35);
+
+    const a = Math.random() * Math.PI * 2;
+    const speed = 12 + Math.random() * 20;
+    const vx = Math.cos(a) * speed;
+    const vy = Math.sin(a) * speed;
+    const life = 0.6 + Math.random() * 0.5;
+    const a0 = 0.16 + Math.random() * 0.12;
+    this.bgSparkFx.push({ obj, vx, vy, age: 0, life, a0 });
   }
 
   private createPlayerGlow(): void {
