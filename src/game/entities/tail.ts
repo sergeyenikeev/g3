@@ -13,6 +13,7 @@ export class Tail {
   private lastHeadX = 0;
   private lastHeadY = 0;
   private initialized = false;
+  private pulseT = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -78,6 +79,7 @@ export class Tail {
   }
 
   update(dt: number, headX: number, headY: number): void {
+    this.pulseT += dt;
     if (!this.initialized) {
       this.trail.length = 0;
       this.trail.push(new Phaser.Math.Vector2(headX, headY));
@@ -115,6 +117,10 @@ export class Tail {
       const desired = sampleTrail(this.trail, (i + 1) * this.cfg.segmentSpacing);
       seg.sprite.x = Phaser.Math.Linear(seg.sprite.x, desired.x, alpha);
       seg.sprite.y = Phaser.Math.Linear(seg.sprite.y, desired.y, alpha);
+
+      const amp = seg.type === "rareShard" ? 0.06 : seg.type === "heavy" ? 0.04 : 0.05;
+      const phase = this.pulseT * 2.2 + i * 0.85;
+      seg.sprite.setScale(1 + Math.sin(phase) * amp);
 
       // микро-дэмпинг для стабильности (Arcade body может иметь velocity от коллизий)
       const body = seg.sprite.body as Phaser.Physics.Arcade.Body;
