@@ -265,7 +265,7 @@ export class VfxManager {
       spread: 1,
     });
 
-    const uiTarget = { x: 90, y: 20 };
+    const uiTarget = this.getUiBoltsTarget() ?? { x: 90, y: 20 };
     this.spawnUiFlyIcon(x, y, uiTarget.x, uiTarget.y, "vfx_spark", VISUAL_PALETTE.neonCyan);
   }
 
@@ -634,6 +634,15 @@ export class VfxManager {
     safeSet(obj, "setAlpha", alpha);
     safeSet(obj, "setScale", scale * 0.7);
     this.fx.push({ kind: "ring", obj, age: 0, life, x, y, s0: scale * 0.7, s1: scale, a0: alpha, a1: 0 });
+  }
+
+  private getUiBoltsTarget(): { x: number; y: number } | null {
+    const reg = this.ui?.registry;
+    const pos = reg?.get?.("uiBoltsPos");
+    const x = typeof pos?.x === "number" ? pos.x : NaN;
+    const y = typeof pos?.y === "number" ? pos.y : NaN;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x, y };
   }
 
   private spawnTailFragments(segments: any[]): void {

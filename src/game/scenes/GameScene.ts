@@ -85,6 +85,7 @@ export class GameScene extends Phaser.Scene {
 
   private tail!: Tail;
   private tailGroup!: Phaser.Physics.Arcade.Group;
+  private tailDebrisGroup!: Phaser.Physics.Arcade.Group;
   private scrapGroup!: Phaser.Physics.Arcade.Group;
   private enemyGroup!: Phaser.Physics.Arcade.Group;
   private projectileGroup!: Phaser.Physics.Arcade.Group;
@@ -748,6 +749,7 @@ export class GameScene extends Phaser.Scene {
     this.shrapnelGroup = this.physics.add.group({ collideWorldBounds: true });
 
     this.tailGroup = this.physics.add.group({ collideWorldBounds: true });
+    this.tailDebrisGroup = this.physics.add.group({ collideWorldBounds: true });
     this.tail = new Tail(
       this,
       this.tailGroup,
@@ -985,6 +987,7 @@ export class GameScene extends Phaser.Scene {
     const removed = this.tail.removeLast(this.state.config.tail.lossOnObstacle);
     if (removed.length > 0) {
       this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length, segments: removed });
+      this.spawnTailDebris(removed);
     }
   }
 
@@ -996,6 +999,7 @@ export class GameScene extends Phaser.Scene {
     const removed = this.tail.removeLast(this.state.config.tail.lossOnProjectile);
     if (removed.length > 0) {
       this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length, segments: removed });
+      this.spawnTailDebris(removed);
     }
     pr.destroy();
   }
@@ -1006,6 +1010,7 @@ export class GameScene extends Phaser.Scene {
     const removed = this.tail.removeLast(this.state.config.tail.lossOnProjectile);
     if (removed.length > 0) {
       this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length, segments: removed });
+      this.spawnTailDebris(removed);
     }
     pr.destroy();
   }
@@ -1020,6 +1025,40 @@ export class GameScene extends Phaser.Scene {
     const removed = this.tail.removeLast(cut);
     if (removed.length > 0) {
       this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length, segments: removed });
+      this.spawnTailDebris(removed);
+    }
+  }
+
+  private spawnTailDebris(segments: Array<{ x: number; y: number; type: ScrapType }>): void {
+    if (!segments || segments.length === 0) return;
+    const max = this.visualQuality === "low" ? 3 : this.visualQuality === "high" ? 8 : 5;
+    const count = Math.min(max, segments.length);
+    for (let i = 0; i < count; i++) {
+      const seg = segments[i]!;
+      const tex = seg.type === "heavy" ? "scrap_heavy" : seg.type === "rareShard" ? "scrap_rare" : "scrap_common";
+      const spr = this.tailDebrisGroup.create(seg.x, seg.y, tex) as ArcadeImage;
+      spr.setDepth(22);
+      spr.setScale(0.7 + Math.random() * 0.25);
+      spr.setAlpha(0.85);
+      spr.setRotation(Math.random() * Math.PI * 2);
+      spr.body.setAllowGravity(false);
+      spr.body.setCollideWorldBounds(true);
+      spr.body.setBounce(0.3, 0.3);
+      spr.body.setDrag(90, 90);
+
+      const a = Math.random() * Math.PI * 2;
+      const speed = 120 + Math.random() * 160;
+      spr.body.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
+
+      const life = 320 + Math.random() * 260;
+      this.tweens.add({
+        targets: spr,
+        alpha: 0,
+        scale: 0.2,
+        duration: life,
+        ease: "Quad.Out",
+        onComplete: () => spr.destroy(),
+      });
     }
   }
 

@@ -22,6 +22,8 @@ export class UIScene extends Phaser.Scene {
   private overlayLight!: Phaser.GameObjects.Image;
 
   private hudText!: Phaser.GameObjects.Text;
+  private boltsText!: Phaser.GameObjects.Text;
+  private dailyText!: Phaser.GameObjects.Text;
 
   private joyBase!: Phaser.GameObjects.Arc;
   private joyKnob!: Phaser.GameObjects.Arc;
@@ -93,10 +95,10 @@ export class UIScene extends Phaser.Scene {
       .setAlpha(0.14);
     this.overlayVignette = this.add.image(0, 0, "vignette").setScrollFactor(0).setDepth(21).setAlpha(0.55);
 
-    this.hudText = this.add
-      .text(16, 12, "", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
-      .setDepth(1000)
-      .setScrollFactor(0);
+    const hudStyle = { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" };
+    this.hudText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
+    this.boltsText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
+    this.dailyText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
 
     this.createControls();
     this.createTutorial();
@@ -138,9 +140,13 @@ export class UIScene extends Phaser.Scene {
     const hp = Math.max(0, this.runState.hp);
     const wave = this.runState.waveIndex;
     const bolts = this.runState.bolts;
-    const daily = this.runState.mode === "daily" ? ` | Daily: ${this.runState.daily?.variantId ?? "?"}` : "";
+    const daily = this.runState.mode === "daily" ? `| Daily: ${this.runState.daily?.variantId ?? "?"}` : "";
 
-    this.hudText.setText(`HP ${Math.ceil(hp)}/${Math.ceil(hpMax)} | Wave ${wave} | Bolts ${bolts}${daily}`);
+    this.hudText.setText(`HP ${Math.ceil(hp)}/${Math.ceil(hpMax)} | Wave ${wave} |`);
+    this.boltsText.setText(`Bolts ${bolts}`);
+    this.dailyText.setText(daily);
+    this.dailyText.setVisible(Boolean(daily));
+    this.layoutHud();
 
     const dashEnabled = Boolean(this.runState.config.dash.enabledByDefault) || Boolean((this.runState.perks as any).dash_module);
     this.btnDash.setVisible(dashEnabled);
@@ -276,6 +282,27 @@ export class UIScene extends Phaser.Scene {
     this.tutorialBox.setPosition(width / 2, margin + 62);
     this.reviveBox.setPosition(width / 2, height / 2);
     this.reviveDim.setSize(width, height);
+
+    this.layoutHud();
+  }
+
+  private layoutHud(): void {
+    const x = 16;
+    const y = 12;
+    const gap = 8;
+
+    this.hudText.setPosition(x, y);
+    this.boltsText.setPosition(x + this.hudText.width + gap, y);
+    if (this.dailyText.visible) {
+      this.dailyText.setPosition(this.boltsText.x + this.boltsText.width + gap, y);
+    }
+
+    const bounds = this.boltsText.getBounds();
+    const bx = bounds.centerX;
+    const by = bounds.centerY;
+    if (Number.isFinite(bx) && Number.isFinite(by)) {
+      this.registry.set("uiBoltsPos", { x: bx, y: by });
+    }
   }
 
   private onPointerDown(p: Phaser.Input.Pointer): void {
