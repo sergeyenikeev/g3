@@ -255,6 +255,15 @@ export function createDecalsPixels(seed: number | string): Record<string, PixelT
   return out;
 }
 
+export function createRarityFramesPixels(): Record<string, PixelTexture> {
+  return {
+    rarity_frame_common: rarityFramePixels(256, 128, VISUAL_PALETTE.metalGray),
+    rarity_frame_uncommon: rarityFramePixels(256, 128, VISUAL_PALETTE.successGreen),
+    rarity_frame_rare: rarityFramePixels(256, 128, VISUAL_PALETTE.neonBlue),
+    rarity_frame_epic: rarityFramePixels(256, 128, VISUAL_PALETTE.neonMagenta),
+  };
+}
+
 export function createBgTile256(scene: SceneLike, seed: number | string, key = "bg_tile_256"): CanvasTextureLike {
   return ensureCanvasTexture(scene, key, createBgTile256Pixels(seed));
 }
@@ -280,6 +289,13 @@ export function createVfxTextures(scene: SceneLike): Record<string, CanvasTextur
 
 export function createDecals(scene: SceneLike, seed: number | string): Record<string, CanvasTextureLike> {
   const pixels = createDecalsPixels(seed);
+  const out: Record<string, CanvasTextureLike> = {};
+  for (const [key, tex] of Object.entries(pixels)) out[key] = ensureCanvasTexture(scene, key, tex);
+  return out;
+}
+
+export function createRarityFrames(scene: SceneLike): Record<string, CanvasTextureLike> {
+  const pixels = createRarityFramesPixels();
   const out: Record<string, CanvasTextureLike> = {};
   for (const [key, tex] of Object.entries(pixels)) out[key] = ensureCanvasTexture(scene, key, tex);
   return out;
@@ -535,6 +551,36 @@ function scratchPixels(size: number, tone: number): PixelTexture {
     const a = rng.float(0.18, 0.32);
     drawLine(pixels, w, h, x0, y0, x1, y1, base, a, rng.int(1, 2));
   }
+
+  return { width: w, height: h, pixels };
+}
+
+function rarityFramePixels(w: number, h: number, color: number): PixelTexture {
+  const pixels = new Uint8ClampedArray(w * h * 4);
+  const col = rgb(color);
+  const accent = rgb(VISUAL_PALETTE.metalLight);
+  const t = Math.max(3, Math.round(Math.min(w, h) * 0.03));
+
+  fillRect(pixels, w, h, 0, 0, w, t, col, 0.9);
+  fillRect(pixels, w, h, 0, h - t, w, t, col, 0.9);
+  fillRect(pixels, w, h, 0, 0, t, h, col, 0.9);
+  fillRect(pixels, w, h, w - t, 0, t, h, col, 0.9);
+
+  const inner = t + 2;
+  if (w - inner * 2 > 8 && h - inner * 2 > 8) {
+    fillRect(pixels, w, h, inner, inner, w - inner * 2, 1, col, 0.35);
+    fillRect(pixels, w, h, inner, h - inner - 1, w - inner * 2, 1, col, 0.35);
+  }
+
+  const len = Math.min(22, Math.floor(w * 0.1));
+  drawLine(pixels, w, h, inner, inner, inner + len, inner, accent, 0.55, 1);
+  drawLine(pixels, w, h, inner, inner, inner, inner + len, accent, 0.55, 1);
+  drawLine(pixels, w, h, w - inner - len, inner, w - inner, inner, accent, 0.55, 1);
+  drawLine(pixels, w, h, w - inner, inner, w - inner, inner + len, accent, 0.55, 1);
+  drawLine(pixels, w, h, inner, h - inner, inner + len, h - inner, accent, 0.55, 1);
+  drawLine(pixels, w, h, inner, h - inner - len, inner, h - inner, accent, 0.55, 1);
+  drawLine(pixels, w, h, w - inner - len, h - inner, w - inner, h - inner, accent, 0.55, 1);
+  drawLine(pixels, w, h, w - inner, h - inner - len, w - inner, h - inner, accent, 0.55, 1);
 
   return { width: w, height: h, pixels };
 }

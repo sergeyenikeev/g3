@@ -8,7 +8,7 @@ import { applyEffects } from "../effects/applyEffects";
 import { GAME_EVENTS } from "../events";
 import { makeUpgradeOffer } from "../upgrades/upgradeSelection";
 import { updatePityAfterPick } from "../upgrades/rarity";
-import { createVfxTextures } from "../../visual/TextureFactory";
+import { createRarityFrames, createVfxTextures } from "../../visual/TextureFactory";
 
 const RARITY_COLORS: Record<string, number> = {
   common: 0x6e7a86,
@@ -32,6 +32,7 @@ export class UpgradeScene extends Phaser.Scene {
     this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
     this.state = this.registry.get("runState") as RunState;
     createVfxTextures(this);
+    createRarityFrames(this);
 
     const { width, height } = this.scale;
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.72).setScrollFactor(0).setDepth(1000);
@@ -129,6 +130,13 @@ export class UpgradeScene extends Phaser.Scene {
         .setStrokeStyle(2, rarityColor, 0.9)
         .setInteractive({ useHandCursor: true });
 
+      const frameKey = `rarity_frame_${o.upgrade.rarity}`;
+      const frame = this.add
+        .image(0, 0, this.textures.exists(frameKey) ? frameKey : "rarity_frame_common")
+        .setDisplaySize(w, h)
+        .setAlpha(o.upgrade.rarity === "rare" || o.upgrade.rarity === "epic" ? 0.85 : 0.9);
+      if (o.upgrade.rarity === "rare" || o.upgrade.rarity === "epic") frame.setBlendMode(Phaser.BlendModes.ADD);
+
       const title = this.add
         .text(-w / 2 + 18, -h / 2 + 14, o.upgrade.ui?.title ?? o.upgrade.name, {
           fontSize: "18px",
@@ -155,7 +163,7 @@ export class UpgradeScene extends Phaser.Scene {
         })
         .setOrigin(1, 0);
 
-      const card = this.add.container(x, y + 18, [glow, bg, title, desc, chip]).setDepth(1002).setAlpha(0).setScale(0.98);
+      const card = this.add.container(x, y + 18, [glow, bg, frame, title, desc, chip]).setDepth(1002).setAlpha(0).setScale(0.98);
       this.tweens.add({ targets: card, y, alpha: 1, scale: 1, duration: 240, delay: idx * 70, ease: "Cubic.Out" });
 
       bg.on("pointerover", () => {

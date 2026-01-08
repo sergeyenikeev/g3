@@ -78,7 +78,9 @@ const PALETTE = {
   rustMid: 0x6b3f2b,
   metalGray: 0x6e7a86,
   metalLight: 0xa7b2be,
+  successGreen: 0x3dff9b,
   neonBlue: 0x2d7bff,
+  neonMagenta: 0xff3ad7,
   warningAmber: 0xffb02e,
 };
 
@@ -537,6 +539,38 @@ function decalBolts64(seedStr) {
   return { width: w, height: h, pixels };
 }
 
+function rarityFrame256x128(colorHex) {
+  const w = 256;
+  const h = 128;
+  const pixels = new Uint8ClampedArray(w * h * 4);
+  const col = rgb(colorHex);
+  const accent = rgb(PALETTE.metalLight);
+  const t = Math.max(3, Math.round(Math.min(w, h) * 0.03));
+
+  fillRectAlpha(pixels, w, h, 0, 0, w, t, col, 0.9);
+  fillRectAlpha(pixels, w, h, 0, h - t, w, t, col, 0.9);
+  fillRectAlpha(pixels, w, h, 0, 0, t, h, col, 0.9);
+  fillRectAlpha(pixels, w, h, w - t, 0, t, h, col, 0.9);
+
+  const inner = t + 2;
+  if (w - inner * 2 > 8 && h - inner * 2 > 8) {
+    fillRectAlpha(pixels, w, h, inner, inner, w - inner * 2, 1, col, 0.35);
+    fillRectAlpha(pixels, w, h, inner, h - inner - 1, w - inner * 2, 1, col, 0.35);
+  }
+
+  const len = Math.min(22, Math.floor(w * 0.1));
+  drawLineAlpha(pixels, w, h, inner, inner, inner + len, inner, accent, 0.55, 1);
+  drawLineAlpha(pixels, w, h, inner, inner, inner, inner + len, accent, 0.55, 1);
+  drawLineAlpha(pixels, w, h, w - inner - len, inner, w - inner, inner, accent, 0.55, 1);
+  drawLineAlpha(pixels, w, h, w - inner, inner, w - inner, inner + len, accent, 0.55, 1);
+  drawLineAlpha(pixels, w, h, inner, h - inner, inner + len, h - inner, accent, 0.55, 1);
+  drawLineAlpha(pixels, w, h, inner, h - inner - len, inner, h - inner, accent, 0.55, 1);
+  drawLineAlpha(pixels, w, h, w - inner - len, h - inner, w - inner, h - inner, accent, 0.55, 1);
+  drawLineAlpha(pixels, w, h, w - inner, h - inner - len, w - inner, h - inner, accent, 0.55, 1);
+
+  return { width: w, height: h, pixels };
+}
+
 function fillRectAlpha(pixels, w, h, x0, y0, rw, rh, col, alpha) {
   const x1 = x0 + rw - 1;
   const y1 = y0 + rh - 1;
@@ -628,6 +662,10 @@ async function main() {
   await writePng(join(outDir, "vfx_trail.png"), vfxTrail64x16());
   await writePng(join(outDir, "vfx_hit_flash.png"), vfxHitFlash64());
   await writePng(join(outDir, "vfx_line.png"), vfxLine1x64());
+  await writePng(join(outDir, "rarity_frame_common.png"), rarityFrame256x128(PALETTE.metalGray));
+  await writePng(join(outDir, "rarity_frame_uncommon.png"), rarityFrame256x128(PALETTE.successGreen));
+  await writePng(join(outDir, "rarity_frame_rare.png"), rarityFrame256x128(PALETTE.neonBlue));
+  await writePng(join(outDir, "rarity_frame_epic.png"), rarityFrame256x128(PALETTE.neonMagenta));
 
   console.log(`visual assets generated in ${outDir}`);
 }

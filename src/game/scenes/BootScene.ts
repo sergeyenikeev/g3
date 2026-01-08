@@ -56,6 +56,10 @@ export class BootScene extends Phaser.Scene {
     this.load.image("vfx_trail", "generated/vfx_trail.png");
     this.load.image("vfx_hit_flash", "generated/vfx_hit_flash.png");
     this.load.image("vfx_line", "generated/vfx_line.png");
+    this.load.image("rarity_frame_common", "generated/rarity_frame_common.png");
+    this.load.image("rarity_frame_uncommon", "generated/rarity_frame_uncommon.png");
+    this.load.image("rarity_frame_rare", "generated/rarity_frame_rare.png");
+    this.load.image("rarity_frame_epic", "generated/rarity_frame_epic.png");
 
     const w = this.scale.width;
     const h = this.scale.height;

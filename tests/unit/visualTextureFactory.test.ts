@@ -4,6 +4,7 @@ import {
   createBgTile256,
   createDecals,
   createLightGradient,
+  createRarityFrames,
   createVfxTextures,
   createVignette,
 } from "../../src/visual/TextureFactory";
@@ -89,5 +90,16 @@ describe("TextureFactory (visual)", () => {
     expect(vfx["vfx_hit_flash"]!.height).toBe(64);
     expect(vfx["vfx_line"]!.width).toBe(1);
     expect(vfx["vfx_line"]!.height).toBe(64);
+  });
+
+  it("creates rarity frames (4) with 256x128", () => {
+    const scene: any = { textures: new StubTextureManager() };
+    const frames = createRarityFrames(scene);
+    expect(Object.keys(frames)).toHaveLength(4);
+    for (const [k, t] of Object.entries(frames)) {
+      expect(k).toMatch(/^rarity_frame_(common|uncommon|rare|epic)$/);
+      expect(t.width).toBe(256);
+      expect(t.height).toBe(128);
+    }
   });
 });
