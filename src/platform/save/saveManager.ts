@@ -9,6 +9,7 @@ export type SaveDataV1 = {
   settings: {
     sfxVolume: number;
     musicVolume: number;
+    visualQuality: "auto" | "low" | "medium" | "high";
   };
   tutorial: {
     completed: boolean;
@@ -42,6 +43,7 @@ export function makeDefaultSave(): SaveData {
     settings: {
       sfxVolume: 0.8,
       musicVolume: 0.6,
+      visualQuality: "auto",
     },
     tutorial: {
       completed: false,
@@ -107,6 +109,7 @@ function sanitize(raw: unknown): SaveData | null {
 
   const sfxVolume = clampNum((raw as any).settings?.sfxVolume, 0.8, 0, 1);
   const musicVolume = clampNum((raw as any).settings?.musicVolume, 0.6, 0, 1);
+  const visualQuality = sanitizeVisualQuality((raw as any).settings?.visualQuality);
 
   const bestWave = clampNum((raw as any).stats?.bestWave, 0, 0, 9999);
   const bestBolts = clampNum((raw as any).stats?.bestBolts, 0, 0, 1e9);
@@ -127,7 +130,7 @@ function sanitize(raw: unknown): SaveData | null {
 
   return {
     v: SAVE_VERSION,
-    settings: { sfxVolume, musicVolume },
+    settings: { sfxVolume, musicVolume, visualQuality },
     tutorial: { completed, skipped },
     meta: { nodeLevels },
     stats: { bestWave, bestBolts, runsCompleted },
@@ -139,6 +142,11 @@ function sanitize(raw: unknown): SaveData | null {
 function clampNum(v: unknown, fallback: number, min: number, max: number): number {
   const n = typeof v === "number" && Number.isFinite(v) ? v : fallback;
   return Math.max(min, Math.min(max, n));
+}
+
+function sanitizeVisualQuality(v: unknown): "auto" | "low" | "medium" | "high" {
+  if (v === "auto" || v === "low" || v === "medium" || v === "high") return v;
+  return "auto";
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {

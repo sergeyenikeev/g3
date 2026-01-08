@@ -27,7 +27,7 @@ export class MenuScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.analytics = this.registry.get("analytics") as AnalyticsAdapter;
     this.saveManager = this.registry.get("saveManager") as SaveManager;
-    this.saveData = (this.registry.get("saveData") as SaveData | undefined) ?? null;
+    this.saveData = (this.registry.get("saveData") as SaveData | undefined) ?? this.saveManager.get();
     const save = this.saveData;
 
     this.add
@@ -37,6 +37,39 @@ export class MenuScene extends Phaser.Scene {
         fontStyle: "700",
       })
       .setOrigin(0.5);
+
+    const btnQuality = this.add
+      .rectangle(width - 16, 16, 168, 34, 0x121a24, 0.9)
+      .setOrigin(1, 0)
+      .setStrokeStyle(2, 0x3aa4d4, 0.7)
+      .setInteractive({ useHandCursor: true });
+    const labelQuality = this.add
+      .text(btnQuality.x - btnQuality.width / 2, btnQuality.y + btnQuality.height / 2, "", {
+        fontSize: "14px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+
+    const order: SaveData["settings"]["visualQuality"][] = ["auto", "low", "medium", "high"];
+    let qualityPref: SaveData["settings"]["visualQuality"] = save?.settings?.visualQuality ?? "auto";
+    const applyQualityLabel = (q: SaveData["settings"]["visualQuality"]) => {
+      const label = q === "auto" ? "AUTO" : q === "medium" ? "MED" : q.toUpperCase();
+      labelQuality.setText(`GFX: ${label}`);
+      const stroke = q === "low" ? 0x6e7a86 : q === "medium" ? 0x2d7bff : q === "high" ? 0x3af2ff : 0x3aa4d4;
+      btnQuality.setStrokeStyle(2, stroke, 0.8);
+    };
+    applyQualityLabel(qualityPref);
+
+    btnQuality.on("pointerdown", () => {
+      const idx = order.indexOf(qualityPref);
+      const next = order[(idx + 1) % order.length]!;
+      void this.setVisualQuality(next).then(() => {
+        qualityPref = next;
+        applyQualityLabel(next);
+        this.toast(`Graphics: ${next.toUpperCase()}`);
+      });
+    });
 
     const btnPlay = this.add
       .rectangle(width / 2, height * 0.56, 280, 64, 0x1b2635)
@@ -112,6 +145,8 @@ export class MenuScene extends Phaser.Scene {
     void this.ensureDailyNormalizedAndRefresh(dailyInfo);
 
     this.scale.on("resize", (s: Phaser.Structs.Size) => {
+      btnQuality.setPosition(s.width - 16, 16);
+      labelQuality.setPosition(btnQuality.x - btnQuality.width / 2, btnQuality.y + btnQuality.height / 2);
       btnPlay.setPosition(s.width / 2, s.height * 0.56);
       labelPlay.setPosition(btnPlay.x, btnPlay.y);
       btnPlayBoost.setPosition(s.width / 2, s.height * 0.64);
@@ -217,6 +252,14 @@ export class MenuScene extends Phaser.Scene {
     if (boosterGranted) this.registry.set("pendingStartBooster", true);
     this.scene.start("game", { mode: "daily" });
     this.scene.launch("ui");
+  }
+
+  private async setVisualQuality(quality: SaveData["settings"]["visualQuality"]): Promise<void> {
+    const save = this.saveManager.get();
+    const next: SaveData = { ...save, settings: { ...save.settings, visualQuality: quality } };
+    await this.saveManager.save(next);
+    this.registry.set("saveData", this.saveManager.get());
+    this.saveData = this.saveManager.get();
   }
 
   private toast(msg: string): void {

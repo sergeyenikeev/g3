@@ -7,7 +7,7 @@ import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { SaveData, SaveManager } from "../../platform/save/saveManager";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
-import { createLightGradient, createVignette } from "../../visual/TextureFactory";
+import { VISUAL_PALETTE, createLightGradient, createVfxTextures, createVignette } from "../../visual/TextureFactory";
 
 type TutorialStep = 1 | 2 | 3;
 
@@ -32,6 +32,9 @@ export class UIScene extends Phaser.Scene {
   private btnDash!: Phaser.GameObjects.Arc;
   private flipLabel!: Phaser.GameObjects.Text;
   private dashLabel!: Phaser.GameObjects.Text;
+  private flipGlow!: Phaser.GameObjects.Image;
+  private dashGlow!: Phaser.GameObjects.Image;
+  private flipPulseT = 0;
 
   private tutorialActive = false;
   private tutorialStep: TutorialStep = 1;
@@ -81,6 +84,7 @@ export class UIScene extends Phaser.Scene {
 
     createVignette(this);
     createLightGradient(this);
+    createVfxTextures(this);
     this.overlayLight = this.add
       .image(0, 0, "lightGradient")
       .setScrollFactor(0)
@@ -124,7 +128,8 @@ export class UIScene extends Phaser.Scene {
     this.layout();
   }
 
-  update(): void {
+  update(_time: number, dtMs: number): void {
+    const dt = dtMs / 1000;
     const s = (this.registry.get("runState") as RunState | undefined) ?? null;
     this.runState = s;
 
@@ -139,6 +144,36 @@ export class UIScene extends Phaser.Scene {
 
     const dashEnabled = Boolean(this.runState.config.dash.enabledByDefault) || Boolean((this.runState.perks as any).dash_module);
     this.btnDash.setVisible(dashEnabled);
+    this.dashLabel.setVisible(dashEnabled);
+    this.dashGlow.setVisible(dashEnabled);
+
+    let flipCd = (this.registry.get("flipCooldown") as number | undefined) ?? 0;
+    let dashCd = (this.registry.get("dashCooldown") as number | undefined) ?? 0;
+    if (!Number.isFinite(flipCd)) flipCd = 0;
+    if (!Number.isFinite(dashCd)) dashCd = 0;
+
+    const flipReady = flipCd <= 0.001;
+    this.flipPulseT = flipReady ? this.flipPulseT + Math.max(0, dt) : 0;
+
+    if (flipReady) {
+      const pulse = 1 + Math.sin(this.flipPulseT * Math.PI * 2 * 1.25) * 0.045;
+      this.btnFlip.setScale(pulse);
+      this.flipGlow.setAlpha(0.22 + Math.sin(this.flipPulseT * Math.PI * 2 * 1.25) * 0.06);
+      this.btnFlip.setStrokeStyle(2, VISUAL_PALETTE.neonCyan, 0.95);
+      this.flipLabel.setText("FLIP");
+    } else {
+      this.btnFlip.setScale(1);
+      this.flipGlow.setAlpha(0.08);
+      this.btnFlip.setStrokeStyle(2, VISUAL_PALETTE.metalGray, 0.75);
+      this.flipLabel.setText(`FLIP ${Math.ceil(flipCd)}s`);
+    }
+
+    if (dashEnabled) {
+      const dashReady = dashCd <= 0.001;
+      this.btnDash.setStrokeStyle(2, dashReady ? VISUAL_PALETTE.successGreen : VISUAL_PALETTE.metalGray, dashReady ? 0.95 : 0.7);
+      this.dashGlow.setAlpha(dashReady ? 0.16 : 0.06);
+      this.dashLabel.setText(dashReady ? "DASH" : `DASH ${Math.ceil(dashCd)}s`);
+    }
   }
 
   private createControls(): void {
@@ -163,9 +198,17 @@ export class UIScene extends Phaser.Scene {
 
     this.btnFlip = this.add
       .circle(0, 0, 44, 0x1b2635, 0.9)
-      .setStrokeStyle(2, 0x5cc8ff, 0.95)
+      .setStrokeStyle(2, VISUAL_PALETTE.neonCyan, 0.95)
       .setDepth(1000)
       .setScrollFactor(0) as Phaser.GameObjects.Arc;
+    this.flipGlow = this.add
+      .image(0, 0, "vfx_glow_blob")
+      .setDepth(999)
+      .setScrollFactor(0)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(VISUAL_PALETTE.neonCyan)
+      .setAlpha(0.14)
+      .setScale(0.8);
     this.btnFlip.setInteractive(new Phaser.Geom.Circle(0, 0, 44), Phaser.Geom.Circle.Contains);
     this.btnFlip.on("pointerdown", () => {
       if (this.modalActive) return;
@@ -181,9 +224,17 @@ export class UIScene extends Phaser.Scene {
 
     this.btnDash = this.add
       .circle(0, 0, 34, 0x121a24, 0.85)
-      .setStrokeStyle(2, 0x3aa4d4, 0.85)
+      .setStrokeStyle(2, VISUAL_PALETTE.metalGray, 0.85)
       .setDepth(1000)
       .setScrollFactor(0) as Phaser.GameObjects.Arc;
+    this.dashGlow = this.add
+      .image(0, 0, "vfx_glow_blob")
+      .setDepth(999)
+      .setScrollFactor(0)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(VISUAL_PALETTE.successGreen)
+      .setAlpha(0.09)
+      .setScale(0.62);
     this.btnDash.setInteractive(new Phaser.Geom.Circle(0, 0, 34), Phaser.Geom.Circle.Contains);
     this.btnDash.on("pointerdown", () => {
       if (this.modalActive) return;
@@ -214,11 +265,13 @@ export class UIScene extends Phaser.Scene {
     const flipY = height - margin - 60;
     this.btnFlip.setPosition(flipX, flipY);
     this.flipLabel.setPosition(flipX, flipY);
+    this.flipGlow.setPosition(flipX, flipY);
 
     const dashX = width - margin - 56;
     const dashY = flipY - 78;
     this.btnDash.setPosition(dashX, dashY);
     this.dashLabel.setPosition(dashX, dashY);
+    this.dashGlow.setPosition(dashX, dashY);
 
     this.tutorialBox.setPosition(width / 2, margin + 62);
     this.reviveBox.setPosition(width / 2, height / 2);
