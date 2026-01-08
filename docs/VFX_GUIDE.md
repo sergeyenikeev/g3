@@ -38,7 +38,7 @@
 | `flip_used` | `GameScene` / UI | `{ x, y, radius }` | ring burst + sparks + micro shake |
 | `projectile_deflected` | `GameScene` | `{ x, y }` | мини burst искр + мини-ring |
 | `player_hit` | `GameScene` | `{ x, y, damage }` | hit flash + sparks + красный vignette pulse |
-| `tail_cut` | `GameScene` | `{ x, y, segmentsLost }` | sparks + smoke puff |
+| `tail_cut` | `GameScene` | `{ x, y, segmentsLost, segments[] }` | sparks + smoke puff + разлёт фрагментов с трейлом |
 | `bank_complete` | `GameScene` | `{ x, y, bolts, hpHealed }` | зелёные частицы + pulse; (опционально) fly-to-ui |
 | `wave_start` | `GameScene` | `{ waveIndex }` | лёгкая пыль/фоновые искры |
 | `upgrade_offer_shown` | `UpgradeScene` | `{}` | UI glow/slide-in у карточек |
@@ -53,4 +53,3 @@
 2) Эмитить событие из нужного места (`this.game.events.emit(...)`).
 3) Добавить обработчик в `VfxManager.emit()` и реализацию эффекта.
 4) Проверить caps (частицы/линии) и добавить unit-тест при необходимости.
-

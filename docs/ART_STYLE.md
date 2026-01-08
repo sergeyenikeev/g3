@@ -63,3 +63,7 @@
 - Overlays: `vignette`, `lightGradient`
 - VFX: `vfx_ring`, `vfx_glow_blob`, `vfx_spark`, `vfx_smoke_puff`, `vfx_trail`, `vfx_hit_flash`, `vfx_line`
 
+## 7) Фон: “живость”
+- Пыль: 10–30 маленьких альфа-точек, медленный дрейф.
+- Редкие дальние искры: 1–2 в секунду, слабые.
+- `FG_FOG`: лёгкий дым/туман поверх мира (низкая альфа).
