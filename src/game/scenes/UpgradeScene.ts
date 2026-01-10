@@ -131,11 +131,12 @@ export class UpgradeScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
 
       const frameKey = `rarity_frame_${o.upgrade.rarity}`;
+      const isNeon = o.upgrade.rarity !== "common";
       const frame = this.add
         .image(0, 0, this.textures.exists(frameKey) ? frameKey : "rarity_frame_common")
         .setDisplaySize(w, h)
-        .setAlpha(o.upgrade.rarity === "rare" || o.upgrade.rarity === "epic" ? 0.85 : 0.9);
-      if (o.upgrade.rarity === "rare" || o.upgrade.rarity === "epic") frame.setBlendMode(Phaser.BlendModes.ADD);
+        .setAlpha(isNeon ? 0.98 : 0.9);
+      if (isNeon) frame.setBlendMode(Phaser.BlendModes.ADD);
 
       const title = this.add
         .text(-w / 2 + 18, -h / 2 + 14, o.upgrade.ui?.title ?? o.upgrade.name, {

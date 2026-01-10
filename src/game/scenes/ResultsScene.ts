@@ -24,6 +24,12 @@ export class ResultsScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.saveManager = this.registry.get("saveManager") as SaveManager;
     this.state = this.registry.get("runState") as RunState;
+    this.exitBusy = false;
+    this.x2Used = false;
+    this.runRecorded = false;
+    this.x2Btn = null;
+    this.x2Label = null;
+    this.input.enabled = true;
 
     const { width, height } = this.scale;
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.78).setDepth(2000);
