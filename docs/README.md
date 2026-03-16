@@ -14,6 +14,11 @@
 - production: `npm run build`
 - preview: `npm run preview`
 
+## Что есть в меню
+
+- Быстрые настройки `GFX / SFX / MUSIC` сохраняются в сейв и применяются в следующих запусках.
+- Daily режим показывает текущий seed/вариант дня, best за сегодня и статус следующего старта: free / rewarded / locked.
+
 ## Тесты и проверки
 
 - Проверка BOM/UTF-8: `npm run bom-check`
@@ -57,4 +62,3 @@
 - `docs/DATA_FORMATS.md`
 - `docs/TESTING.md`
 - `docs/RELEASE.md`
-

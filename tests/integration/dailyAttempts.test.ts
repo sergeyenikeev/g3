@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { consumeDailyAttempt, getDailyAttemptsInfo, normalizeDailySave } from "../../src/game/daily/dailyAttempts";
+import { consumeDailyAttempt, getDailyAttemptsInfo, normalizeDailySave, planDailyStart } from "../../src/game/daily/dailyAttempts";
 import type { DailyConfig } from "../../src/data/types";
 import { makeDefaultSave } from "../../src/platform/save/saveManager";
 
@@ -45,5 +45,56 @@ describe("daily attempts (integration)", () => {
     expect(a3.canStartRewarded).toBe(false);
     expect(a3.attemptsLeft).toBe(0);
   });
-});
 
+  it("planDailyStart prefers the free attempt before rewarded extras", () => {
+    const s = makeDefaultSave();
+    const date = "20260101";
+    const info = getDailyAttemptsInfo(DAILY_CFG, s, date);
+
+    expect(planDailyStart(info, { boosted: false, boosterEnabled: true })).toEqual({
+      canStart: true,
+      kind: "free",
+      needsAttemptRewarded: false,
+      needsBoosterRewarded: false,
+      attemptWasRewarded: false,
+    });
+  });
+
+  it("planDailyStart requires the rewarded attempt only after the free one is spent", () => {
+    const s = consumeDailyAttempt(makeDefaultSave(), "20260101");
+    const info = getDailyAttemptsInfo(DAILY_CFG, s, "20260101");
+
+    expect(planDailyStart(info, { boosted: false, boosterEnabled: true })).toEqual({
+      canStart: true,
+      kind: "rewarded",
+      needsAttemptRewarded: true,
+      needsBoosterRewarded: false,
+      attemptWasRewarded: true,
+    });
+  });
+
+  it("planDailyStart keeps boosted daily to one rewarded ad while free attempt exists", () => {
+    const info = getDailyAttemptsInfo(DAILY_CFG, makeDefaultSave(), "20260101");
+
+    expect(planDailyStart(info, { boosted: true, boosterEnabled: true })).toEqual({
+      canStart: true,
+      kind: "boosted_free",
+      needsAttemptRewarded: false,
+      needsBoosterRewarded: true,
+      attemptWasRewarded: false,
+    });
+  });
+
+  it("planDailyStart uses the booster ad as the rewarded extra attempt when free daily is exhausted", () => {
+    const s = consumeDailyAttempt(makeDefaultSave(), "20260101");
+    const info = getDailyAttemptsInfo(DAILY_CFG, s, "20260101");
+
+    expect(planDailyStart(info, { boosted: true, boosterEnabled: true })).toEqual({
+      canStart: true,
+      kind: "boosted_rewarded",
+      needsAttemptRewarded: false,
+      needsBoosterRewarded: true,
+      attemptWasRewarded: true,
+    });
+  });
+});

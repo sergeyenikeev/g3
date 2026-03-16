@@ -19,6 +19,7 @@
 - загрузку JSON и сборку RuntimeConfig (preset/meta/daily modifiers)
 - генерацию волны (wave_sets + patterns + director rules)
 - сохранение/загрузка (через mock adapter)
+- daily attempts: free vs rewarded vs boosted entry planning
 
 ## E2E (Playwright)
 
@@ -40,4 +41,3 @@ GitHub Actions запускает:
 - `typecheck`
 - unit + integration
 - e2e (Playwright chromium)
-

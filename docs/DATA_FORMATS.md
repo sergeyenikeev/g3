@@ -59,11 +59,17 @@
 
 Daily seed: `utc_date_yyyymmdd`.
 
+- `dailyRewards.firstRunBonusBoltsMult / extraAttemptRewardedMax / coreDropBonus`
 - `dailyVariants[]`: выбор варианта дня по весам
 - `modifiers`: список эффектов (`add/mul/set`) по `path`
 - `ui.title/ui.desc` (опционально): отображение варианта дня в UI
 - `specialRule`: доп.правила (например, «двойные shooter волны», больше heavy scrap)
   - `double_shooter_waves`: `{ fromWave, chance }`
+
+Семантика попыток:
+- первый daily-старт за дату UTC — бесплатный
+- затем доступны rewarded extra attempts в количестве `extraAttemptRewardedMax`
+- boosted daily использует rewarded booster; если бесплатная попытка уже потрачена, этот же rewarded flow расходует одну rewarded extra attempt
 
 ## run_upgrades.json
 
