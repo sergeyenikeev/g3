@@ -165,6 +165,19 @@ export class MenuScene extends Phaser.Scene {
     labelPlayBoost.setVisible(boosterEnabled);
     btnPlayBoost.on("pointerdown", () => void this.startRunBoosted());
 
+    const btnTraining = this.add
+      .rectangle(0, 0, 280, 46, 0x0f1720, 0.95)
+      .setStrokeStyle(2, 0xffd166, 0.78)
+      .setInteractive({ useHandCursor: true });
+    const labelTraining = this.add
+      .text(0, 0, "TRAINING", { fontSize: "18px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
+
+    btnTraining.on("pointerdown", () => {
+      this.scene.start("game", { mode: "tutorial" });
+      this.scene.launch("ui");
+    });
+
     const btnDaily = this.add
       .rectangle(0, 0, 280, 56, 0x121a24)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
@@ -246,17 +259,19 @@ export class MenuScene extends Phaser.Scene {
       btnMusic.setPosition(s.width - 16, 96);
       labelMusic.setPosition(btnMusic.x - btnMusic.width / 2, btnMusic.y + btnMusic.height / 2);
 
-      btnPlay.setPosition(s.width / 2, s.height * 0.49);
+      btnPlay.setPosition(s.width / 2, s.height * 0.47);
       labelPlay.setPosition(btnPlay.x, btnPlay.y);
-      btnPlayBoost.setPosition(s.width / 2, s.height * 0.58);
+      btnPlayBoost.setPosition(s.width / 2, s.height * 0.56);
       labelPlayBoost.setPosition(btnPlayBoost.x, btnPlayBoost.y);
-      btnDaily.setPosition(s.width / 2, s.height * 0.69);
+      btnTraining.setPosition(s.width / 2, s.height * 0.65);
+      labelTraining.setPosition(btnTraining.x, btnTraining.y);
+      btnDaily.setPosition(s.width / 2, s.height * 0.75);
       labelDaily.setPosition(btnDaily.x, btnDaily.y);
-      btnDailyBoost.setPosition(s.width / 2, s.height * 0.78);
+      btnDailyBoost.setPosition(s.width / 2, s.height * 0.84);
       labelDailyBoost.setPosition(btnDailyBoost.x, btnDailyBoost.y);
-      dailyInfo.setPosition(s.width / 2, s.height * 0.885);
+      dailyInfo.setPosition(s.width / 2, s.height * 0.92);
       dailyInfo.setWordWrapWidth(Math.max(280, Math.min(580, s.width - 48)), true);
-      controlsText.setPosition(s.width / 2, s.height * 0.965);
+      controlsText.setPosition(s.width / 2, s.height * 0.975);
       if (this.toastText) this.toastText.setPosition(s.width / 2, s.height * 0.93);
     };
 

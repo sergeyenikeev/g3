@@ -98,9 +98,10 @@ D) CI:
 - SEO описание (meta/short SEO blurb)
 - “Как играть” (для пользователя)
 Сохрани в:
-docs/platform_texts/crazygames_ru.md
-docs/platform_texts/crazygames_en.md
-… и так далее для всех платформ.
+docs/platform_texts/yandex_ru.md
+docs/platform_texts/yandex_en.md
+docs/platform_texts/vk_ru.md
+docs/platform_texts/vk_en.md
 Все эти файлы — UTF-8 BOM.
 
 СКРИПТЫ СБОРКИ (ДВА СКРИПТА, ОБЯЗАТЕЛЬНО):
@@ -114,8 +115,7 @@ docs/platform_texts/crazygames_en.md
    - собирает production build (без моков)
    - формирует чистые дистрибутивы для платформ
    - создаёт ZIP архивы:
-     dist/releases/magnet-caravan_crazygames.zip
-     dist/releases/magnet-caravan_poki.zip
+     dist/releases/magnet-caravan_web.zip
      dist/releases/magnet-caravan_yandex.zip
      dist/releases/magnet-caravan_vk.zip
    - внутри каждого архива только нужные файлы (index.html, assets, js bundle и т.д.)

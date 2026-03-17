@@ -49,7 +49,8 @@
 - `save()/load()`
 
 Для разработки/тестов используется mock-адаптер.
-Для релиза `scripts/build_release.mjs` собирает отдельные бандлы под платформы (CrazyGames/Poki/Yandex/VK) и включает SDK loader (`src/platform/sdk/loadPlatformSdk.ts`) с безопасной деградацией, если SDK недоступен.
+Активно поддерживаемые release-цели: `web`, `yandex`, `vk`.
+`scripts/build_release.mjs` собирает отдельные ZIP только для этих целей, а `src/platform/sdk/loadPlatformSdk.ts` подгружает SDK только там, где они ещё используются.
 
 ### Сохранения
 
@@ -60,8 +61,8 @@
 ## Сцены Phaser
 
 - `BootScene`: загрузка JSON + audio, инициализация адаптера/сейва
-- `MenuScene`: старт обычного/дневного забега
-- `GameScene`: основной геймплей (магнит, хвост, враги, flip, recycler, волны)
-- `UIScene`: HUD + mobile-first контролы + tutorial + аудио-старт по user interaction
+- `MenuScene`: старт обычного/дневного забега и отдельного `TRAINING`
+- `GameScene`: основной геймплей (магнит, хвост, враги, flip, recycler, волны) + облегчённый training flow
+- `UIScene`: HUD + mobile-first контролы + onboarding tutorial + режим обучения + аудио-старт по user interaction
 - `UpgradeScene`: выбор апгрейда между волнами
 - `ResultsScene`: экран результатов

@@ -122,8 +122,6 @@ Magnet Caravan — HTML5 игра (2D top-down arcade survival / run-based rogue
   TESTING.md
   RELEASE.md
   /platform_texts
-    crazygames_ru.md / crazygames_en.md
-    poki_ru.md / poki_en.md
     yandex_ru.md / yandex_en.md
     vk_ru.md / vk_en.md
 
@@ -364,8 +362,7 @@ scripts/build_release.mjs (обязательно):
 - запускает unit + integration
 - production build без моков
 - формирует zip релизы:
-  dist/releases/magnet-caravan_crazygames.zip
-  dist/releases/magnet-caravan_poki.zip
+  dist/releases/magnet-caravan_web.zip
   dist/releases/magnet-caravan_yandex.zip
   dist/releases/magnet-caravan_vk.zip
 - архивы содержат только нужные файлы (index.html, assets, bundles)

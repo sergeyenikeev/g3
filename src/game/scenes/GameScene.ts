@@ -12,7 +12,7 @@ import { Tail, type ScrapType } from "../entities/tail";
 import { GAME_EVENTS } from "../events";
 import { consumeActions, inputState } from "../input/inputState";
 import type { RunMode, RunState } from "../run/runState";
-import { getCrazyGamesGameApi } from "../../platform/sdk/crazyGamesSdk";
+import { applyTrainingModeConfig, TRAINING_STARTING_SCRAP } from "../tutorial/trainingMode";
 import type { SaveData } from "../../platform/save/saveManager";
 import { VISUAL_PALETTE, createBgFarSilhouette, createBgTile256, createDecals, createVfxTextures } from "../../visual/TextureFactory";
 import { VfxManager, type VfxQuality } from "../../visual/VfxManager";
@@ -111,6 +111,7 @@ export class GameScene extends Phaser.Scene {
   private revivePending = false;
   private reviveOffered = false;
   private pendingStartBooster = false;
+  private tutorialEnemySpawned = false;
 
   constructor() {
     super("game");
@@ -129,11 +130,14 @@ export class GameScene extends Phaser.Scene {
       presetId: "normal",
       metaLevels: (this.registry.get("saveData") as any)?.meta?.nodeLevels ?? {},
     });
+    if (mode === "tutorial") applyTrainingModeConfig(built.config);
 
     this.pendingStartBooster = Boolean(this.registry.get("pendingStartBooster"));
     this.registry.set("pendingStartBooster", false);
 
-    this.rng = createRng(mode === "daily" ? `daily-run:${getUtcYyyymmdd()}` : `run:${Date.now()}`);
+    this.rng = createRng(
+      mode === "daily" ? `daily-run:${getUtcYyyymmdd()}` : mode === "tutorial" ? `tutorial:${Date.now()}` : `run:${Date.now()}`
+    );
 
     this.state = {
       mode,
@@ -163,7 +167,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.registry.set("runState", this.state);
-    this.visualSeed = mode === "daily" ? `daily:${this.state.daily?.dateUtc ?? getUtcYyyymmdd()}` : `run:${this.state.startedAtMs}`;
+    this.visualSeed =
+      mode === "daily"
+        ? `daily:${this.state.daily?.dateUtc ?? getUtcYyyymmdd()}`
+        : mode === "tutorial"
+          ? `tutorial:${this.state.startedAtMs}`
+          : `run:${this.state.startedAtMs}`;
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     const pref = save?.settings?.visualQuality ?? "auto";
     if (pref === "low" || pref === "medium" || pref === "high") {
@@ -197,7 +206,6 @@ export class GameScene extends Phaser.Scene {
     this.createCollisions();
     this.createVfxSystem();
     this.startWave(1);
-    this.notifyPlatformGameplayStart();
 
     this.track(ANALYTICS_EVENTS.RUN_START, {
       mode,
@@ -207,9 +215,15 @@ export class GameScene extends Phaser.Scene {
 
     this.game.events.on(GAME_EVENTS.REVIVE_ACCEPTED, this.onReviveAccepted, this);
     this.game.events.on(GAME_EVENTS.REVIVE_DECLINED, this.onReviveDeclined, this);
+    this.game.events.on(GAME_EVENTS.TUTORIAL_STEP_CHANGED, this.onTutorialStepChanged, this);
+    this.game.events.on(GAME_EVENTS.TUTORIAL_FINISHED, this.onTutorialFinished, this);
+    this.game.events.on(GAME_EVENTS.TUTORIAL_EXITED, this.onTutorialExited, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.REVIVE_ACCEPTED, this.onReviveAccepted, this);
       this.game.events.off(GAME_EVENTS.REVIVE_DECLINED, this.onReviveDeclined, this);
+      this.game.events.off(GAME_EVENTS.TUTORIAL_STEP_CHANGED, this.onTutorialStepChanged, this);
+      this.game.events.off(GAME_EVENTS.TUTORIAL_FINISHED, this.onTutorialFinished, this);
+      this.game.events.off(GAME_EVENTS.TUTORIAL_EXITED, this.onTutorialExited, this);
     });
 
     this.events.on(Phaser.Scenes.Events.RESUME, () => {
@@ -526,6 +540,17 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.game.events.emit(GAME_EVENTS.WAVE_START, { waveIndex });
+
+    if (this.state.mode === "tutorial") {
+      this.wavePlan.durationSec = 60 * 60;
+      this.wavePlan.spawns.length = 0;
+      this.scrapGroup.clear(true, true);
+      this.tutorialEnemySpawned = false;
+      for (let i = 0; i < TRAINING_STARTING_SCRAP; i++) {
+        this.spawnScrapAt(this.player.x + (i - 1) * 18, this.player.y - 10, "common");
+      }
+      return;
+    }
 
     if (import.meta.env.VITE_E2E === "1") {
       this.wavePlan.durationSec = Math.min(this.wavePlan.durationSec, 6);
@@ -886,6 +911,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onWaveComplete(): void {
+    if (this.state.mode === "tutorial") return;
     this.awaitingUpgrade = true;
     this.waveTime = 0;
     this.spawnCursor = 0;
@@ -1106,12 +1132,6 @@ export class GameScene extends Phaser.Scene {
     if (this.state.deathReason) return;
     this.state.deathReason = reason;
     this.game.events.emit(GAME_EVENTS.RUN_END, { waveIndex: this.state.waveIndex, bolts: this.state.bolts });
-    this.notifyPlatformGameplayStop();
-    this.scene.stop("upgrade");
-    this.scene.stop("ui");
-    this.scene.launch("results");
-    this.scene.stop();
-
     const durationMs = Math.max(0, Date.now() - this.state.startedAtMs);
     this.track(ANALYTICS_EVENTS.RUN_END, {
       mode: this.state.mode,
@@ -1124,6 +1144,16 @@ export class GameScene extends Phaser.Scene {
       dateUtc: this.state.daily?.dateUtc ?? null,
       variantId: this.state.daily?.variantId ?? null,
     });
+
+    if (this.state.mode === "tutorial") {
+      this.finishTutorialMode(`end:${reason}`);
+      return;
+    }
+
+    this.scene.stop("upgrade");
+    this.scene.stop("ui");
+    this.scene.launch("results");
+    this.scene.stop();
   }
 
   private canOfferRevive(): boolean {
@@ -1184,6 +1214,35 @@ export class GameScene extends Phaser.Scene {
     this.endRun("hp");
   }
 
+  private onTutorialStepChanged(payload?: { step?: number }): void {
+    if (this.state.mode !== "tutorial") return;
+    const step = payload?.step;
+    if (step === 2 && !this.tutorialEnemySpawned) {
+      this.tutorialEnemySpawned = true;
+      this.spawnEnemy("chaser", this.player.x + this.state.config.flip.radius * 0.7, this.player.y);
+      return;
+    }
+
+    if (step === 3) {
+      this.clearThreats();
+      if (this.tail.length <= 0) {
+        for (let i = 0; i < TRAINING_STARTING_SCRAP; i++) {
+          this.tail.addSegment("common", this.player.x, this.player.y);
+        }
+      }
+    }
+  }
+
+  private onTutorialFinished(): void {
+    if (this.state.mode !== "tutorial") return;
+    this.finishTutorialMode("completed");
+  }
+
+  private onTutorialExited(): void {
+    if (this.state.mode !== "tutorial") return;
+    this.finishTutorialMode("exit");
+  }
+
   private clearThreats(): void {
     for (const e of this.enemies) {
       try {
@@ -1206,6 +1265,13 @@ export class GameScene extends Phaser.Scene {
     this.projectileGroup.clear(true, true);
 
     this.pendingTelegraphs = [];
+  }
+
+  private finishTutorialMode(_reason: string): void {
+    this.scene.stop("upgrade");
+    this.scene.stop("ui");
+    this.scene.start("menu");
+    this.scene.stop();
   }
 
   private track(eventName: string, payload?: Record<string, unknown>): void {
@@ -1232,6 +1298,7 @@ export class GameScene extends Phaser.Scene {
       } catch {
         // ignore
       }
+      this.e2eWindowBound = false;
     });
   }
 
@@ -1268,24 +1335,6 @@ export class GameScene extends Phaser.Scene {
 
     for (let i = 0; i < addTailSegments; i++) {
       this.tail.addSegment("common", this.player.x, this.player.y);
-    }
-  }
-
-  private notifyPlatformGameplayStart(): void {
-    const cg = getCrazyGamesGameApi();
-    try {
-      cg?.sdkGameplayStart?.();
-    } catch {
-      // ignore
-    }
-  }
-
-  private notifyPlatformGameplayStop(): void {
-    const cg = getCrazyGamesGameApi();
-    try {
-      cg?.sdkGameplayStop?.();
-    } catch {
-      // ignore
     }
   }
 

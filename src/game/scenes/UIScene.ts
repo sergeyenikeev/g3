@@ -140,7 +140,12 @@ export class UIScene extends Phaser.Scene {
     const hp = Math.max(0, this.runState.hp);
     const wave = this.runState.waveIndex;
     const bolts = this.runState.bolts;
-    const daily = this.runState.mode === "daily" ? `| Daily: ${this.runState.daily?.variantId ?? "?"}` : "";
+    const daily =
+      this.runState.mode === "daily"
+        ? `| Daily: ${this.runState.daily?.variantId ?? "?"}`
+        : this.runState.mode === "tutorial"
+          ? "| Training"
+          : "";
 
     this.hudText.setText(`HP ${Math.ceil(hp)}/${Math.ceil(hpMax)} | Wave ${wave} |`);
     this.boltsText.setText(`Bolts ${bolts}`);
@@ -347,7 +352,8 @@ export class UIScene extends Phaser.Scene {
 
   private createTutorial(): void {
     const s = this.saveData;
-    this.tutorialActive = !(s?.tutorial?.completed || s?.tutorial?.skipped);
+    const tutorialMode = this.isTrainingMode();
+    this.tutorialActive = tutorialMode || !(s?.tutorial?.completed || s?.tutorial?.skipped);
 
     const bg = this.add.rectangle(0, 0, 520, 64, 0x0f1720, 0.92).setStrokeStyle(2, 0x3aa4d4, 0.8);
     this.tutorialText = this.add
@@ -357,24 +363,28 @@ export class UIScene extends Phaser.Scene {
       .rectangle(220, 0, 70, 34, 0x1b2635, 0.95)
       .setStrokeStyle(2, 0x5cc8ff, 0.8)
       .setInteractive({ useHandCursor: true });
-    const btnTxt = this.add.text(220, 0, "SKIP", { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" }).setOrigin(0.5);
+    const btnTxt = this.add
+      .text(220, 0, tutorialMode ? "EXIT" : "SKIP", { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
 
-    btn.on("pointerdown", () => void this.skipTutorial());
+    btn.on("pointerdown", () => void (tutorialMode ? this.exitTrainingMode() : this.skipTutorial()));
 
     this.tutorialBox = this.add.container(0, 0, [bg, this.tutorialText, btn, btnTxt]).setDepth(1200).setScrollFactor(0);
     this.tutorialBox.setVisible(this.tutorialActive);
     this.refreshTutorialText();
 
     if (this.tutorialActive) {
-      this.track(ANALYTICS_EVENTS.TUTORIAL_START, { step: this.tutorialStep });
+      this.track(ANALYTICS_EVENTS.TUTORIAL_START, { step: this.tutorialStep, mode: this.runState?.mode ?? "run" });
+      if (tutorialMode) this.game.events.emit(GAME_EVENTS.TUTORIAL_STEP_CHANGED, { step: this.tutorialStep });
     }
   }
 
   private refreshTutorialText(): void {
     if (!this.tutorialActive) return;
-    if (this.tutorialStep === 1) this.tutorialText.setText(`Step 1/3: Move and collect 3 scrap (${this.tutorialScrap}/3).`);
-    if (this.tutorialStep === 2) this.tutorialText.setText("Step 2/3: Use FLIP to repel enemies / deflect shots.");
-    if (this.tutorialStep === 3) this.tutorialText.setText("Step 3/3: Bank your tail in the Recycler Zone.");
+    const label = this.isTrainingMode() ? "Training" : "Step";
+    if (this.tutorialStep === 1) this.tutorialText.setText(`${label} 1/3: Move and collect 3 scrap (${this.tutorialScrap}/3).`);
+    if (this.tutorialStep === 2) this.tutorialText.setText(`${label} 2/3: Use FLIP to repel enemies / deflect shots.`);
+    if (this.tutorialStep === 3) this.tutorialText.setText(`${label} 3/3: Bank your tail in the Recycler Zone.`);
   }
 
   private bindTutorialEvents(): void {
@@ -485,7 +495,8 @@ export class UIScene extends Phaser.Scene {
     this.tutorialScrap += 1;
     if (this.tutorialScrap >= 3) {
       this.tutorialStep = 2;
-      this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 1 });
+      this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 1, mode: this.runState?.mode ?? "run" });
+      if (this.isTrainingMode()) this.game.events.emit(GAME_EVENTS.TUTORIAL_STEP_CHANGED, { step: this.tutorialStep });
     }
     this.refreshTutorialText();
   }
@@ -493,34 +504,51 @@ export class UIScene extends Phaser.Scene {
   private onTutorialFlip(): void {
     if (!this.tutorialActive || this.tutorialStep !== 2) return;
     this.tutorialStep = 3;
-    this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 2 });
+    this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 2, mode: this.runState?.mode ?? "run" });
+    if (this.isTrainingMode()) this.game.events.emit(GAME_EVENTS.TUTORIAL_STEP_CHANGED, { step: this.tutorialStep });
     this.refreshTutorialText();
   }
 
   private onTutorialBank(): void {
     if (!this.tutorialActive || this.tutorialStep !== 3) return;
-    this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 3 });
+    this.track(ANALYTICS_EVENTS.TUTORIAL_STEP, { step: 3, mode: this.runState?.mode ?? "run" });
     void this.completeTutorial();
   }
 
   private async completeTutorial(): Promise<void> {
     this.tutorialActive = false;
     this.tutorialBox.setVisible(false);
-    this.track(ANALYTICS_EVENTS.TUTORIAL_COMPLETE, {});
-    if (!this.saveManager) return;
-    const s = this.saveManager.get();
-    await this.saveManager.save({ ...s, tutorial: { ...s.tutorial, completed: true } });
-    this.registry.set("saveData", this.saveManager.get());
+    const tutorialMode = this.isTrainingMode();
+    this.track(ANALYTICS_EVENTS.TUTORIAL_COMPLETE, { mode: this.runState?.mode ?? "run" });
+    if (this.saveManager) {
+      const s = this.saveManager.get();
+      await this.saveManager.save({ ...s, tutorial: { ...s.tutorial, completed: true } });
+      this.registry.set("saveData", this.saveManager.get());
+    }
+    if (tutorialMode) {
+      this.time.delayedCall(180, () => this.game.events.emit(GAME_EVENTS.TUTORIAL_FINISHED, {}));
+    }
   }
 
   private async skipTutorial(): Promise<void> {
     this.tutorialActive = false;
     this.tutorialBox.setVisible(false);
-    this.track(ANALYTICS_EVENTS.TUTORIAL_SKIP, {});
+    this.track(ANALYTICS_EVENTS.TUTORIAL_SKIP, { mode: this.runState?.mode ?? "run" });
     if (!this.saveManager) return;
     const s = this.saveManager.get();
     await this.saveManager.save({ ...s, tutorial: { ...s.tutorial, skipped: true } });
     this.registry.set("saveData", this.saveManager.get());
+  }
+
+  private async exitTrainingMode(): Promise<void> {
+    this.tutorialActive = false;
+    this.tutorialBox.setVisible(false);
+    this.track(ANALYTICS_EVENTS.TUTORIAL_SKIP, { mode: "tutorial", action: "exit" });
+    this.game.events.emit(GAME_EVENTS.TUTORIAL_EXITED, {});
+  }
+
+  private isTrainingMode(): boolean {
+    return this.runState?.mode === "tutorial";
   }
 
   private enableAudio(): void {

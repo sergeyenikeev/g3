@@ -3,7 +3,7 @@ import type { Rarity } from "../../data/types";
 import type { Rng } from "../../core/prng";
 import type { PerkState } from "../effects/applyEffects";
 
-export type RunMode = "run" | "daily";
+export type RunMode = "run" | "daily" | "tutorial";
 
 export type RunState = {
   mode: RunMode;

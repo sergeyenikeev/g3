@@ -1,22 +1,11 @@
-type PlatformMode = "auto" | "mock" | "local" | "crazygames" | "poki" | "yandex" | "vk";
+type PlatformMode = "auto" | "mock" | "local" | "web" | "generic" | "yandex" | "vk";
 
 type SdkScript = {
   url: string;
   isPresent: () => boolean;
 };
 
-const SCRIPTS: Record<Exclude<PlatformMode, "auto" | "mock" | "local">, SdkScript> = {
-  crazygames: {
-    url: "https://sdk.crazygames.com/crazygames-sdk-v2.js",
-    isPresent: () => {
-      const w = window as any;
-      return Boolean(w?.CrazyGames?.SDK || w?.CrazyGamesSDK);
-    },
-  },
-  poki: {
-    url: "https://game-cdn.poki.com/scripts/v2/poki-sdk.js",
-    isPresent: () => Boolean((window as any)?.PokiSDK),
-  },
+const SCRIPTS: Record<Exclude<PlatformMode, "auto" | "mock" | "local" | "web" | "generic">, SdkScript> = {
   yandex: {
     url: "https://yandex.ru/games/sdk/v2",
     isPresent: () => Boolean((window as any)?.YaGames?.init),
@@ -30,7 +19,7 @@ const SCRIPTS: Record<Exclude<PlatformMode, "auto" | "mock" | "local">, SdkScrip
 export async function ensurePlatformSdkLoaded(): Promise<void> {
   const raw = (import.meta as any).env?.VITE_PLATFORM_ADAPTER ?? (import.meta as any).env?.VITE_PLATFORM ?? "auto";
   const mode = String(raw).toLowerCase() as PlatformMode;
-  if (mode === "auto" || mode === "mock" || mode === "local") return;
+  if (mode === "auto" || mode === "mock" || mode === "local" || mode === "web" || mode === "generic") return;
 
   const script = (SCRIPTS as any)[mode] as SdkScript | undefined;
   if (!script) return;
@@ -75,4 +64,3 @@ function withTimeout<T>(p: Promise<T>, timeoutMs: number): Promise<T> {
     );
   });
 }
-

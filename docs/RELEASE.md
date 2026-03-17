@@ -7,12 +7,21 @@
 Последовательность:
 1) `bom-check`, `lint`, `typecheck`
 2) `test:unit` + `test:integration`
-3) `vite build` (production) отдельно под каждую платформу (`VITE_PLATFORM_ADAPTER=crazygames|poki|yandex|vk`) в `dist/platform_builds/<platform>/`
+3) `vite build` (production) отдельно для активных целей:
+   - `web` (`VITE_PLATFORM_ADAPTER=local`)
+   - `yandex`
+   - `vk`
+   в `dist/platform_builds/<target>/`
 4) упаковка каждого билда в ZIP под платформы:
-   - `dist/releases/magnet-caravan_crazygames.zip`
-   - `dist/releases/magnet-caravan_poki.zip`
+   - `dist/releases/magnet-caravan_web.zip`
    - `dist/releases/magnet-caravan_yandex.zip`
    - `dist/releases/magnet-caravan_vk.zip`
+
+Неподдерживаемые release-режимы:
+- `crazygames`
+- `poki`
+- `itchio`
+- `newgrounds`
 
 ## Чеклист релиза
 

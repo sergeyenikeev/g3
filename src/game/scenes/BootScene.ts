@@ -6,7 +6,6 @@ import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
 import { AdsManager } from "../../platform/ads/adsManager";
 import { createPlatformAdapter } from "../../platform/platformFactory";
 import { SaveManager } from "../../platform/save/saveManager";
-import { getCrazyGamesGameApi } from "../../platform/sdk/crazyGamesSdk";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -14,13 +13,6 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    const cgGame = getCrazyGamesGameApi();
-    try {
-      cgGame?.sdkGameLoadingStart?.();
-    } catch {
-      // ignore
-    }
-
     this.load.setPath("assets");
     this.load.json("balances", "data/balances.json");
     this.load.json("enemies", "data/enemies.json");
@@ -70,19 +62,6 @@ export class BootScene extends Phaser.Scene {
 
     this.load.on("progress", (p: number) => {
       bar.width = barBg.width * Phaser.Math.Clamp(p, 0, 1);
-      try {
-        cgGame?.sdkGameLoadingProgress?.(Math.round(Phaser.Math.Clamp(p, 0, 1) * 100));
-      } catch {
-        // ignore
-      }
-    });
-
-    this.load.on("complete", () => {
-      try {
-        cgGame?.sdkGameLoadingStop?.();
-      } catch {
-        // ignore
-      }
     });
   }
 

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("smoke: daily, tutorial, upgrade, results x2", async ({ page }) => {
+test("smoke: training, daily, tutorial, upgrade, results x2", async ({ page }) => {
   const errors: Error[] = [];
   page.on("pageerror", (e) => errors.push(e));
 
@@ -18,8 +18,21 @@ test("smoke: daily, tutorial, upgrade, results x2", async ({ page }) => {
   const width = vp!.width;
   const height = vp!.height;
 
+  // TRAINING
+  await page.mouse.click(width / 2, height * 0.65);
+
+  await page.waitForFunction(() => {
+    const g = (window as any).__MC_GAME__;
+    const s = g?.registry?.get("runState");
+    return s?.mode === "tutorial";
+  });
+
+  await page.mouse.click(width / 2 + 220, 78);
+
+  await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("menu") === true);
+
   // DAILY
-  await page.mouse.click(width / 2, height * 0.72);
+  await page.mouse.click(width / 2, height * 0.75);
 
   await page.waitForFunction(() => {
     const g = (window as any).__MC_GAME__;

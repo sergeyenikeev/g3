@@ -500,8 +500,7 @@ EPIC 15 — BUILD SCRIPTS (mock test build + release zips)
 - production build (без моков)
 - сформировать папки dist/releases/
 - сформировать zip:
-  - magnet-caravan_crazygames.zip
-  - magnet-caravan_poki.zip
+  - magnet-caravan_web.zip
   - magnet-caravan_yandex.zip
   - magnet-caravan_vk.zip
 
@@ -530,7 +529,7 @@ EPIC 15 — BUILD SCRIPTS (mock test build + release zips)
   - runId
   - mode: "normal" | "daily"
   - waveIndex (если применимо)
-  - platformId (crazygames/poki/yandex/vk/unknown)
+  - platformId (web/yandex/vk/unknown)
 
 ОБЯЗАТЕЛЬНЫЕ СОБЫТИЯ (core):
 1) session_start
@@ -675,18 +674,13 @@ C) РЕКЛАМА
 [ ] Не показывается interstitial сразу после rewarded
 [ ] При отсутствии SDK реклама “молча” отключается и игра работает
 
-D) ПЛАТФОРМА: CrazyGames
-[ ] Используется CrazyGames SDK через адаптер (если доступен)
-[ ] Фоллбек работает, если SDK не загрузился
-[ ] Проверить требования CrazyGames к index.html и путям ассетов
+D) ПЛАТФОРМА: Web
+[ ] Локальный web build запускается без SDK
+[ ] Архив: magnet-caravan_web.zip
 [ ] В архиве: index.html + assets + js bundles
-[ ] Тексты: docs/platform_texts/crazygames_ru.md и _en.md готовы
 
-E) ПЛАТФОРМА: Poki
-[ ] Используется PokiSDK (если доступен)
-[ ] Проверить, что игра корректно “пауза/резюм” по сигналам SDK (если требуется)
-[ ] Архив: magnet-caravan_poki.zip
-[ ] Тексты: docs/platform_texts/poki_ru.md и _en.md готовы
+E) НЕ ПОДДЕРЖИВАЕТСЯ
+[ ] Отдельные сборки для CrazyGames / Poki / itch.io / Newgrounds не выпускаются
 
 F) ПЛАТФОРМА: Яндекс Игры
 [ ] Инициализация YaGames (если доступен)

@@ -19,7 +19,7 @@
 - [x] `npm run typecheck`
 - [x] Unit (Vitest): PRNG, modifiers, rarity+pity, upgrade selection, pressure
 - [x] Integration (Vitest): RuntimeConfig из JSON, WaveDirector, SaveManager, Daily attempts, Ads guards/AdsManager
-- [x] E2E (Playwright): daily enter, tutorial skip, bank, upgrade, results x2
+- [x] E2E (Playwright): training enter/exit, daily enter, tutorial skip, bank, upgrade, results x2
 - [x] CI (GitHub Actions): lint + bom-check + typecheck + unit+integration + Playwright
 
 ## 4) Gameplay (core)
@@ -30,6 +30,7 @@
 - [x] Recycler Zone: bank time, heal, начисление bolts
 - [x] Враги: chaser / shooter / cutter
 - [x] Tutorial ≤ 30 секунд (3 шага) + skip
+- [x] Отдельный режим обучения (`TRAINING`) с безопасным выходом обратно в меню
 - [x] UI mobile-first (landscape), виртуальный джойстик + Flip (+ Dash по условию)
 - [x] Resize + safe areas (viewport-fit=cover)
 
@@ -65,16 +66,16 @@
 - [x] Запрет interstitial сразу после rewarded (из `balances.json`)
 
 ## 9) Analytics
-- [x] Единый `AnalyticsAdapter` (mock + platform autodetect)
+- [x] Единый `AnalyticsAdapter` (mock + Yandex/VK autodetect)
 - [x] События: session_start/end, tutorial*, run_start/end, upgrade_offer, bank/flip, ads rewarded/interstitial, daily*
 - [x] SDK-интеграции best-effort (CrazyGames loading/gameplay hooks, VK trackEvent если доступен)
 
 ## 10) Платформы/релизы
-- [x] PlatformAdapter слой (mock/local + CrazyGames/Poki/Yandex/VK) с безопасной деградацией
+- [x] PlatformAdapter слой (mock/local + Yandex/VK) с безопасной деградацией
 - [x] `scripts/build_test_mock.mjs` (моки + проверки + тесты + dist-mock)
 - [x] `scripts/build_release.mjs` (unit+integration + prod build + zip релизы)
-- [x] ZIP: `dist/releases/magnet-caravan_{crazygames,poki,yandex,vk}.zip`
-- [x] SDK loader + platform builds: `src/platform/sdk/loadPlatformSdk.ts` + release-сборка по платформам
+- [x] ZIP: `dist/releases/magnet-caravan_{web,yandex,vk}.zip`
+- [x] SDK loader + platform builds: `src/platform/sdk/loadPlatformSdk.ts` + release-сборка по активным целям
 
 ## 11) Аудио
 - [x] Реальные `.mp3` в `public/assets/audio/`

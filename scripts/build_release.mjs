@@ -19,18 +19,19 @@ const releasesDir = join(distDir, "releases");
 await mkdir(buildsDir, { recursive: true });
 await mkdir(releasesDir, { recursive: true });
 
-const platforms = ["crazygames", "poki", "yandex", "vk"];
-for (const p of platforms) {
-  const zipPath = join(releasesDir, `magnet-caravan_${p}.zip`);
-  const outDir = join(buildsDir, p);
-  await run(
-    "npx",
-    ["vite", "build", "--outDir", outDir],
-    {
-      ...process.env,
-      VITE_PLATFORM_ADAPTER: p,
-    }
-  );
+const builds = [
+  { id: "web", envValue: "local" },
+  { id: "yandex", envValue: "yandex" },
+  { id: "vk", envValue: "vk" },
+];
+
+for (const build of builds) {
+  const zipPath = join(releasesDir, `magnet-caravan_${build.id}.zip`);
+  const outDir = join(buildsDir, build.id);
+  await run("npx", ["vite", "build", "--outDir", outDir], {
+    ...process.env,
+    VITE_PLATFORM_ADAPTER: build.envValue,
+  });
   await zipDist(outDir, zipPath);
   console.log(`release: ${zipPath}`);
 }
