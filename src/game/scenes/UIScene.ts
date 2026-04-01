@@ -24,6 +24,8 @@ export class UIScene extends Phaser.Scene {
   private hudText!: Phaser.GameObjects.Text;
   private boltsText!: Phaser.GameObjects.Text;
   private dailyText!: Phaser.GameObjects.Text;
+  private waveText!: Phaser.GameObjects.Text;
+  private statusText!: Phaser.GameObjects.Text;
 
   private joyBase!: Phaser.GameObjects.Arc;
   private joyKnob!: Phaser.GameObjects.Arc;
@@ -99,6 +101,11 @@ export class UIScene extends Phaser.Scene {
     this.hudText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
     this.boltsText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
     this.dailyText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
+    this.waveText = this.add.text(16, 36, "", { fontSize: "14px", color: "#98b7c7", fontStyle: "700" }).setDepth(1000).setScrollFactor(0);
+    this.statusText = this.add
+      .text(16, 56, "", { fontSize: "13px", color: "#7fdfff", fontStyle: "700", wordWrap: { width: 520 } })
+      .setDepth(1000)
+      .setScrollFactor(0);
 
     this.createControls();
     this.createTutorial();
@@ -151,6 +158,12 @@ export class UIScene extends Phaser.Scene {
     this.boltsText.setText(`Bolts ${bolts}`);
     this.dailyText.setText(daily);
     this.dailyText.setVisible(Boolean(daily));
+    const waveLabel = ((this.registry.get("uiStatusPrimary") as string | undefined) ?? "").trim();
+    const statusLabel = ((this.registry.get("uiStatusSecondary") as string | undefined) ?? "").trim();
+    this.waveText.setText(waveLabel);
+    this.waveText.setVisible(Boolean(waveLabel));
+    this.statusText.setText(statusLabel);
+    this.statusText.setVisible(Boolean(statusLabel));
     this.layoutHud();
 
     const dashEnabled = Boolean(this.runState.config.dash.enabledByDefault) || Boolean((this.runState.perks as any).dash_module);
@@ -301,6 +314,9 @@ export class UIScene extends Phaser.Scene {
     if (this.dailyText.visible) {
       this.dailyText.setPosition(this.boltsText.x + this.boltsText.width + gap, y);
     }
+    this.waveText.setPosition(x, y + 22);
+    this.statusText.setPosition(x, y + 42);
+    this.statusText.setWordWrapWidth(Math.max(260, this.scale.width - 32), true);
 
     const bounds = this.boltsText.getBounds();
     const bx = bounds.centerX;

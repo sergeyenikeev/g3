@@ -51,13 +51,18 @@ export class ResultsScene extends Phaser.Scene {
 
     const x2Cfg = this.state.config.ads?.rewarded?.x2Results;
     if (x2Cfg?.enabled) {
+      const boostedMult = this.getRewardedResultsMult();
       const btnX2 = this.add
         .rectangle(width / 2, height * 0.52, 280, 52, 0x1b2635, 0.95)
         .setStrokeStyle(2, 0x57c27d, 0.9)
         .setInteractive({ useHandCursor: true })
         .setDepth(2001);
       const labelX2 = this.add
-        .text(btnX2.x, btnX2.y, "X2 BOLTS (Rewarded)", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
+        .text(btnX2.x, btnX2.y, `BOOST RESULTS x${formatMult(boostedMult)} (Rewarded)`, {
+          fontSize: "16px",
+          color: "#d9f2ff",
+          fontStyle: "700",
+        })
         .setOrigin(0.5)
         .setDepth(2001);
       btnX2.on("pointerdown", () => void this.handleX2());
@@ -103,7 +108,7 @@ export class ResultsScene extends Phaser.Scene {
 
     const res = await this.ads.showRewarded(AD_PLACEMENTS.X2_RESULTS);
     if (res.ok && res.rewarded) {
-      const mult = typeof cfg.mult === "number" && Number.isFinite(cfg.mult) ? cfg.mult : 2;
+      const mult = this.getRewardedResultsMult();
       this.state.bolts = Math.floor(this.state.bolts * mult);
       this.x2Used = true;
       this.x2Btn?.setVisible(false);
@@ -111,6 +116,12 @@ export class ResultsScene extends Phaser.Scene {
       this.refreshStatsText();
       await this.persistScoresOnly();
     }
+  }
+
+  private getRewardedResultsMult(): number {
+    const adMult = this.state.config.ads?.rewarded?.x2Results?.mult;
+    const perkMult = this.state.perks.results_bonus?.params?.baseMult;
+    return positiveNum(adMult, 2) * positiveNum(perkMult, 1);
   }
 
   private async recordRunOnceAndPersistScores(): Promise<void> {
@@ -176,4 +187,13 @@ export class ResultsScene extends Phaser.Scene {
     this.scene.start("menu");
     this.scene.stop();
   }
+}
+
+function positiveNum(v: unknown, fallback: number): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  return n > 0 ? n : fallback;
+}
+
+function formatMult(v: number): string {
+  return Number.isInteger(v) ? `${v}` : v.toFixed(2).replace(/\.?0+$/, "");
 }

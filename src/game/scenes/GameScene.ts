@@ -33,6 +33,27 @@ type ProjectileEntity = {
   lifetimeSec: number;
 };
 
+type FlipPulseState = {
+  tLeft: number;
+  radius: number;
+  pushForce: number;
+  deflectProjectiles: boolean;
+};
+
+type DroneState = {
+  obj: Phaser.GameObjects.Image;
+  fireCooldown: number;
+  bobPhase: number;
+};
+
+type ScrapMineState = {
+  obj: Phaser.GameObjects.Image;
+  tLeft: number;
+  damage: number;
+  pushForce: number;
+  triggerRadius: number;
+};
+
 type ArcadeImage = Phaser.Physics.Arcade.Image & { body: Phaser.Physics.Arcade.Body };
 type ArcadeStaticImage = Phaser.Physics.Arcade.Image & { body: Phaser.Physics.Arcade.StaticBody };
 
@@ -102,9 +123,20 @@ export class GameScene extends Phaser.Scene {
 
   private playerInvuln = 0;
   private flipCooldown = 0;
-  private flipPulse = 0;
+  private flipPulses: FlipPulseState[] = [];
+  private flipCount = 0;
   private dashCooldown = 0;
   private dashTime = 0;
+  private shieldHp = 0;
+  private shieldTime = 0;
+  private clampCharges = 0;
+  private anchorTime = 0;
+  private anchorCooldown = 0;
+  private vacuumBurstTime = 0;
+  private vacuumBurstCooldown = 0;
+  private drone: DroneState | null = null;
+  private scrapMines: ScrapMineState[] = [];
+  private waveHudLabel = "";
 
   private captureCooldown = 0;
   private banking = { active: false, t: 0 };
@@ -247,14 +279,17 @@ export class GameScene extends Phaser.Scene {
 
     this.updateTimers(dt);
     this.updateMovement(dt);
+    this.updatePerkSystems(dt);
     this.updatePlayerGlow(dt);
     this.updateTail(dt);
     this.updateMagnet(dt);
     this.updateFlipPulse(dt);
     this.updateEnemyAI(dt);
     this.updateProjectiles();
+    this.updateScrapMines(dt);
     this.updateBanking(dt);
     this.updateWave(dt);
+    this.updateHudStatus();
     this.updateBackgroundLayers(dt);
     this.vfx?.update(dt);
     this.updateFpsProbe(dt);
@@ -263,10 +298,15 @@ export class GameScene extends Phaser.Scene {
   private updateTimers(dt: number): void {
     this.playerInvuln = Math.max(0, this.playerInvuln - dt);
     this.flipCooldown = Math.max(0, this.flipCooldown - dt);
-    this.flipPulse = Math.max(0, this.flipPulse - dt);
     this.dashCooldown = Math.max(0, this.dashCooldown - dt);
     this.dashTime = Math.max(0, this.dashTime - dt);
     this.captureCooldown = Math.max(0, this.captureCooldown - dt);
+    this.shieldTime = Math.max(0, this.shieldTime - dt);
+    if (this.shieldTime <= 0) this.shieldHp = 0;
+    this.anchorTime = Math.max(0, this.anchorTime - dt);
+    this.anchorCooldown = Math.max(0, this.anchorCooldown - dt);
+    this.vacuumBurstTime = Math.max(0, this.vacuumBurstTime - dt);
+    this.vacuumBurstCooldown = Math.max(0, this.vacuumBurstCooldown - dt);
 
     this.registry.set("flipCooldown", this.flipCooldown);
     this.registry.set("dashCooldown", this.dashCooldown);
@@ -276,6 +316,76 @@ export class GameScene extends Phaser.Scene {
     while (this.state.recentHits.length > 0 && now - this.state.recentHits[0]!.t > windowSec) {
       this.state.recentHits.shift();
     }
+  }
+
+  private updatePerkSystems(dt: number): void {
+    this.updateVacuumBurst();
+    this.updateDrone(dt);
+  }
+
+  private updateVacuumBurst(): void {
+    const perk = this.state.perks.vacuum_burst?.params;
+    if (!perk) {
+      this.vacuumBurstTime = 0;
+      this.vacuumBurstCooldown = 0;
+      return;
+    }
+
+    if (this.vacuumBurstTime > 0 || this.vacuumBurstCooldown > 0) return;
+    const period = positiveNum(perk.periodSec, 8);
+    const duration = clamp(positiveNum(perk.durationSec, 1), 0.15, period);
+    this.vacuumBurstTime = duration;
+    this.vacuumBurstCooldown = period;
+  }
+
+  private updateDrone(dt: number): void {
+    const perk = this.state.perks.drone_buddy?.params;
+    if (!perk) {
+      this.destroyDrone();
+      return;
+    }
+
+    if (!this.drone) this.createDrone();
+    if (!this.drone) return;
+
+    const drone = this.drone;
+    drone.fireCooldown = Math.max(0, drone.fireCooldown - dt);
+    drone.bobPhase += dt * 4;
+
+    const orbitAngle = this.player.rotation + Math.PI * 0.72;
+    const targetX = this.player.x + Math.cos(orbitAngle) * 42;
+    const targetY = this.player.y + Math.sin(orbitAngle) * 42 - 10 + Math.sin(drone.bobPhase) * 6;
+    const followAlpha = 1 - Math.pow(1 - 0.16, dt * 60);
+    drone.obj.x = Phaser.Math.Linear(drone.obj.x, targetX, followAlpha);
+    drone.obj.y = Phaser.Math.Linear(drone.obj.y, targetY, followAlpha);
+    drone.obj.setRotation(orbitAngle + Math.PI * 0.5);
+
+    const target = this.findNearestEnemy(drone.obj.x, drone.obj.y, 520);
+    if (!target || drone.fireCooldown > 0) return;
+
+    const dx = target.sprite.x - drone.obj.x;
+    const dy = target.sprite.y - drone.obj.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= 0.001) return;
+
+    const fireCooldown = positiveNum(perk.fireCooldownSec, 1.4);
+    const damage = positiveNum(perk.damage, 6);
+    const projectileSpeed = positiveNum(perk.projectileSpeed, 420);
+    drone.fireCooldown = fireCooldown;
+    this.spawnProjectile("player", drone.obj.x, drone.obj.y, dx / dist, dy / dist, projectileSpeed, damage, 1.5);
+  }
+
+  private createDrone(): void {
+    if (this.drone) return;
+    const obj = this.add.image(this.player.x, this.player.y, "drone_buddy").setDepth(32).setAlpha(0.92).setScale(0.92);
+    obj.setBlendMode(Phaser.BlendModes.ADD);
+    this.drone = { obj, fireCooldown: 0.15, bobPhase: 0 };
+  }
+
+  private destroyDrone(): void {
+    if (!this.drone) return;
+    this.drone.obj.destroy();
+    this.drone = null;
   }
 
   private updateMovement(dt: number): void {
@@ -320,6 +430,8 @@ export class GameScene extends Phaser.Scene {
     const radius = clamp(magnet.radiusBase, 0, magnet.radiusMax);
     const r2 = radius * radius;
     const enabled = radius > 0;
+    const corePullMult = this.getCorePullMult();
+    const perkPullMult = this.vacuumBurstTime > 0 ? this.getVacuumPullMult() : 1;
 
     const candidates: Array<{ x: number; y: number; d2: number }> = [];
 
@@ -350,7 +462,7 @@ export class GameScene extends Phaser.Scene {
       if (d < 0.001) return null;
       const nx = dx / d;
       const ny = dy / d;
-      const pull = magnet.pullAccelBase * (1 - d / radius);
+      const pull = magnet.pullAccelBase * corePullMult * perkPullMult * (1 - d / radius);
       spr.body.velocity.x += nx * pull * dt;
       spr.body.velocity.y += ny * pull * dt;
       const spd = spr.body.velocity.length();
@@ -366,48 +478,53 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateFlipPulse(dt: number): void {
-    if (this.flipPulse <= 0) return;
-    const cfg = this.state.config.flip;
-    const radius = cfg.radius;
+    if (this.flipPulses.length <= 0) return;
+    for (let i = this.flipPulses.length - 1; i >= 0; i--) {
+      const pulse = this.flipPulses[i]!;
+      pulse.tLeft -= dt;
 
-    this.enemyGroup.children.iterate((o) => {
-      const e = o as ArcadeImage | null;
-      if (!e) return null;
-      const dx = e.x - this.player.x;
-      const dy = e.y - this.player.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 > radius * radius || d2 < 0.001) return null;
-      const d = Math.sqrt(d2);
-      const nx = dx / d;
-      const ny = dy / d;
-      e.body.velocity.x += nx * cfg.pushForce * dt;
-      e.body.velocity.y += ny * cfg.pushForce * dt;
-      return null;
-    });
+      this.enemyGroup.children.iterate((o) => {
+        const e = o as ArcadeImage | null;
+        if (!e) return null;
+        const dx = e.x - this.player.x;
+        const dy = e.y - this.player.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > pulse.radius * pulse.radius || d2 < 0.001) return null;
+        const d = Math.sqrt(d2);
+        const nx = dx / d;
+        const ny = dy / d;
+        e.body.velocity.x += nx * pulse.pushForce * dt;
+        e.body.velocity.y += ny * pulse.pushForce * dt;
+        return null;
+      });
 
-    if (!cfg.deflectProjectiles) return;
-    this.projectileGroup.children.iterate((o) => {
-      const p = o as ArcadeImage | null;
-      if (!p) return null;
-      const dx = p.x - this.player.x;
-      const dy = p.y - this.player.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 > radius * radius || d2 < 0.001) return null;
-      const d = Math.sqrt(d2);
-      const nx = dx / d;
-      const ny = dy / d;
-      const speed = Math.max(this.state.config.tuning.projectile.deflectMinSpeed, p.body.velocity.length());
-      p.body.velocity.x = nx * speed;
-      p.body.velocity.y = ny * speed;
-      const ent = this.projectiles.find((pp) => pp.sprite === p);
-      if (ent && ent.owner === "enemy") {
-        ent.owner = "player";
-        this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: p.x, y: p.y });
-      } else if (ent) {
-        ent.owner = "player";
+      if (pulse.deflectProjectiles) {
+        this.projectileGroup.children.iterate((o) => {
+          const p = o as ArcadeImage | null;
+          if (!p) return null;
+          const dx = p.x - this.player.x;
+          const dy = p.y - this.player.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 > pulse.radius * pulse.radius || d2 < 0.001) return null;
+          const d = Math.sqrt(d2);
+          const nx = dx / d;
+          const ny = dy / d;
+          const speed = Math.max(this.state.config.tuning.projectile.deflectMinSpeed, p.body.velocity.length());
+          p.body.velocity.x = nx * speed;
+          p.body.velocity.y = ny * speed;
+          const ent = this.projectiles.find((pp) => pp.sprite === p);
+          if (ent && ent.owner === "enemy") {
+            ent.owner = "player";
+            this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: p.x, y: p.y });
+          } else if (ent) {
+            ent.owner = "player";
+          }
+          return null;
+        });
       }
-      return null;
-    });
+
+      if (pulse.tLeft <= 0) this.flipPulses.splice(i, 1);
+    }
   }
 
   private updateEnemyAI(_dt: number): void {
@@ -472,6 +589,35 @@ export class GameScene extends Phaser.Scene {
     this.projectiles = this.projectiles.filter((p) => p.sprite.active);
   }
 
+  private updateScrapMines(dt: number): void {
+    for (let i = this.scrapMines.length - 1; i >= 0; i--) {
+      const mine = this.scrapMines[i]!;
+      mine.tLeft -= dt;
+      if (mine.tLeft <= 0 || !mine.obj.active) {
+        mine.obj.destroy();
+        this.scrapMines.splice(i, 1);
+        continue;
+      }
+
+      const pulse = 0.84 + Math.sin((this.time.now / 1000) * 9 + i * 0.7) * 0.08;
+      mine.obj.setScale(pulse);
+
+      const triggerR2 = mine.triggerRadius * mine.triggerRadius;
+      let shouldDetonate = false;
+      for (const enemy of this.enemies) {
+        if (!enemy.sprite.active) continue;
+        const dx = enemy.sprite.x - mine.obj.x;
+        const dy = enemy.sprite.y - mine.obj.y;
+        if (dx * dx + dy * dy <= triggerR2) {
+          shouldDetonate = true;
+          break;
+        }
+      }
+
+      if (shouldDetonate) this.detonateScrapMine(i);
+    }
+  }
+
   private updateWave(dt: number): void {
     if (this.awaitingUpgrade) return;
     this.waveTime += dt;
@@ -522,6 +668,8 @@ export class GameScene extends Phaser.Scene {
     this.waveTime = 0;
     this.spawnCursor = 0;
     this.pendingTelegraphs = [];
+    this.flipPulses = [];
+    this.clampCharges = this.getChainClampCharges();
 
     const waveSet = this.state.config.waveSets.default;
     if (!waveSet) throw new Error("wave_sets.json: missing 'default'");
@@ -538,10 +686,14 @@ export class GameScene extends Phaser.Scene {
       ctx,
       this.rng
     );
+    this.waveHudLabel = describeWavePlan(this.wavePlan);
+    this.registry.set("uiStatusPrimary", this.waveHudLabel);
 
     this.game.events.emit(GAME_EVENTS.WAVE_START, { waveIndex });
 
     if (this.state.mode === "tutorial") {
+      this.waveHudLabel = "Training: learn the salvage loop";
+      this.registry.set("uiStatusPrimary", this.waveHudLabel);
       this.wavePlan.durationSec = 60 * 60;
       this.wavePlan.spawns.length = 0;
       this.scrapGroup.clear(true, true);
@@ -553,6 +705,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (import.meta.env.VITE_E2E === "1") {
+      this.waveHudLabel = "Quick test wave";
+      this.registry.set("uiStatusPrimary", this.waveHudLabel);
       this.wavePlan.durationSec = Math.min(this.wavePlan.durationSec, 6);
       this.wavePlan.spawns.length = 0;
       this.scrapGroup.clear(true, true);
@@ -759,6 +913,8 @@ export class GameScene extends Phaser.Scene {
     makeCircle("projectile", 4, 0xffffff);
     makeCircle("shrapnel", 3, VISUAL_PALETTE.neonCyan);
     makeCircle("telegraph", 14, 0x000000, { color: VISUAL_PALETTE.neonCyan, width: 2, alpha: 0.8 });
+    makeCircle("drone_buddy", 7, VISUAL_PALETTE.neonBlue, { color: VISUAL_PALETTE.neonCyan, width: 2, alpha: 0.95 });
+    makeCircle("scrap_mine", 6, VISUAL_PALETTE.warningAmber, { color: VISUAL_PALETTE.neonMagenta, width: 2, alpha: 0.95 });
   }
 
   private createWorld(): void {
@@ -818,6 +974,8 @@ export class GameScene extends Phaser.Scene {
     this.scale.on("resize", this.onResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off("resize", this.onResize, this);
+      this.destroyDrone();
+      this.clearScrapMines();
     });
     this.onResize();
   }
@@ -840,12 +998,53 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  private queueFlipPulse(forceMult: number, radiusMult: number, deflectProjectiles: boolean, emitGameEvent: boolean): void {
+    const cfg = this.state.config.flip;
+    this.flipPulses.push({
+      tLeft: cfg.pulseDurationSec,
+      radius: cfg.radius * radiusMult,
+      pushForce: cfg.pushForce * forceMult,
+      deflectProjectiles: deflectProjectiles && cfg.deflectProjectiles,
+    });
+
+    if (emitGameEvent) {
+      this.game.events.emit(GAME_EVENTS.FLIP_USED, {
+        x: this.player.x,
+        y: this.player.y,
+        radius: cfg.radius * radiusMult,
+      });
+    }
+  }
+
+  private applyFlipShield(): void {
+    const perk = this.state.perks.flip_shield?.params;
+    if (!perk) return;
+    const shieldAmount = positiveNum(perk.shieldAmount, 15);
+    const durationSec = positiveNum(perk.durationSec, 3);
+    this.shieldHp = Math.max(this.shieldHp, shieldAmount);
+    this.shieldTime = Math.max(this.shieldTime, durationSec);
+  }
+
   private doFlip(): void {
     const cfg = this.state.config.flip;
     this.flipCooldown = cfg.cooldownBaseSec;
-    this.flipPulse = cfg.pulseDurationSec;
+    this.queueFlipPulse(1, 1, true, true);
     this.playerInvuln = Math.max(this.playerInvuln, cfg.postFlipInvulnSec);
-    this.game.events.emit(GAME_EVENTS.FLIP_USED, { x: this.player.x, y: this.player.y, radius: cfg.radius });
+    this.flipCount += 1;
+    this.applyFlipShield();
+
+    const echo = this.state.perks.polarity_echo?.params;
+    const everyN = Math.max(1, Math.floor(numOrDefault(echo?.everyN, 0)));
+    if (echo && everyN > 0 && this.flipCount % everyN === 0) {
+      const delaySec = clamp(numOrDefault(echo?.delaySec, 0.15), 0.05, 0.6);
+      const forceMult = clamp(numOrDefault(echo?.forceMult, 0.65), 0.2, 1);
+      const radiusMult = clamp(numOrDefault(echo?.radiusMult, 0.9), 0.3, 1);
+      this.time.delayedCall(delaySec * 1000, () => {
+        if (!this.scene.isActive()) return;
+        this.queueFlipPulse(forceMult, radiusMult, true, false);
+        this.vfx?.emit(GAME_EVENTS.FLIP_USED, { x: this.player.x, y: this.player.y, radius: cfg.radius * radiusMult });
+      });
+    }
 
     if (!cfg.shrapnel.enabled) return;
     const count = Math.max(0, cfg.shrapnel.count);
@@ -916,13 +1115,17 @@ export class GameScene extends Phaser.Scene {
     this.waveTime = 0;
     this.spawnCursor = 0;
     this.pendingTelegraphs = [];
+    this.flipPulses = [];
 
     this.enemyGroup.clear(true, true);
     this.projectileGroup.clear(true, true);
     this.shrapnelGroup.clear(true, true);
     this.enemies = [];
     this.projectiles = [];
+    this.clearScrapMines();
 
+    this.registry.set("uiStatusPrimary", "Upgrade pick");
+    this.registry.set("uiStatusSecondary", "");
     this.game.events.emit(GAME_EVENTS.WAVE_COMPLETE, { waveIndex: this.state.waveIndex });
     this.scene.launch("upgrade");
     this.scene.pause();
@@ -952,7 +1155,7 @@ export class GameScene extends Phaser.Scene {
     if (this.tail.length < this.state.config.tail.maxLenCap) {
       this.tail.addSegment(type, this.player.x, this.player.y);
     } else {
-      if (type === "heavy") this.state.bolts += this.state.config.recycler.boltsPerScrapHeavy;
+      if (type === "heavy") this.state.bolts += this.getHeavyScrapBoltValue();
       else this.state.bolts += this.state.config.recycler.boltsPerScrapCommon;
     }
 
@@ -979,7 +1182,7 @@ export class GameScene extends Phaser.Scene {
 
     const boltsBase =
       counts.common * this.state.config.recycler.boltsPerScrapCommon +
-      counts.heavy * this.state.config.recycler.boltsPerScrapHeavy;
+      counts.heavy * this.getHeavyScrapBoltValue();
     const bolts = Math.floor(boltsBase * m);
     this.state.bolts += bolts;
 
@@ -1009,12 +1212,7 @@ export class GameScene extends Phaser.Scene {
     const kb = def.knockback;
     this.player.body.velocity.x += nx * kb;
     this.player.body.velocity.y += ny * kb;
-
-    const removed = this.tail.removeLast(this.state.config.tail.lossOnObstacle);
-    if (removed.length > 0) {
-      this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length, segments: removed });
-      this.spawnTailDebris(removed);
-    }
+    this.loseTailSegments(this.state.config.tail.lossOnObstacle, enemySpr.x, enemySpr.y);
   }
 
   private onPlayerHitByProjectile(pr: Phaser.Physics.Arcade.Image): void {
@@ -1022,22 +1220,14 @@ export class GameScene extends Phaser.Scene {
     const ent = this.projectiles.find((p) => p.sprite === pr);
     if (!ent || ent.owner !== "enemy") return;
     this.applyDamage(ent.damage);
-    const removed = this.tail.removeLast(this.state.config.tail.lossOnProjectile);
-    if (removed.length > 0) {
-      this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length, segments: removed });
-      this.spawnTailDebris(removed);
-    }
+    this.loseTailSegments(this.state.config.tail.lossOnProjectile, pr.x, pr.y);
     pr.destroy();
   }
 
   private onTailHitByProjectile(_tail: any, pr: Phaser.Physics.Arcade.Image): void {
     const ent = this.projectiles.find((p) => p.sprite === pr);
     if (!ent || ent.owner !== "enemy") return;
-    const removed = this.tail.removeLast(this.state.config.tail.lossOnProjectile);
-    if (removed.length > 0) {
-      this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: pr.x, y: pr.y, segmentsLost: removed.length, segments: removed });
-      this.spawnTailDebris(removed);
-    }
+    this.loseTailSegments(this.state.config.tail.lossOnProjectile, pr.x, pr.y);
     pr.destroy();
   }
 
@@ -1048,11 +1238,92 @@ export class GameScene extends Phaser.Scene {
     if (now < ent.cutReadyAt) return;
     ent.cutReadyAt = now + this.state.config.enemies.cutter.cooldownAfterCutSec;
     const cut = Math.max(1, this.state.config.enemies.cutter.tailCut);
-    const removed = this.tail.removeLast(cut);
-    if (removed.length > 0) {
-      this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x: enemySpr.x, y: enemySpr.y, segmentsLost: removed.length, segments: removed });
-      this.spawnTailDebris(removed);
+    this.loseTailSegments(cut, enemySpr.x, enemySpr.y);
+  }
+
+  private loseTailSegments(count: number, x: number, y: number): void {
+    if (count <= 0) return;
+    if (this.tryPreventTailLoss()) return;
+
+    const removed = this.tail.removeLast(count);
+    if (removed.length <= 0) return;
+
+    this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x, y, segmentsLost: removed.length, segments: removed });
+    this.spawnTailDebris(removed);
+    this.spawnScrapMines(removed);
+  }
+
+  private tryPreventTailLoss(): boolean {
+    if (this.anchorTime > 0) return true;
+
+    const anchor = this.state.perks.magnet_anchor?.params;
+    if (anchor && this.anchorCooldown <= 0) {
+      this.anchorTime = positiveNum(anchor.durationSec, 0.6);
+      this.anchorCooldown = positiveNum(anchor.cooldownSec, 10);
+      return true;
     }
+
+    if (this.clampCharges > 0) {
+      this.clampCharges -= 1;
+      return true;
+    }
+
+    return false;
+  }
+
+  private spawnScrapMines(segments: Array<{ x: number; y: number; type: ScrapType }>): void {
+    const perk = this.state.perks.scrap_mine?.params;
+    if (!perk || segments.length <= 0) return;
+
+    const limit = this.visualQuality === "low" ? 4 : this.visualQuality === "high" ? 10 : 7;
+    while (this.scrapMines.length >= limit) {
+      const old = this.scrapMines.shift();
+      old?.obj.destroy();
+    }
+
+    const spawnCount = Math.min(segments.length, 3);
+    const damage = positiveNum(perk.damage, 14);
+    const pushForce = positiveNum(perk.pushForce, 520);
+    const triggerRadius = positiveNum(perk.triggerRadius, 28);
+    const durationSec = positiveNum(perk.durationSec, 3);
+
+    for (let i = 0; i < spawnCount; i++) {
+      const seg = segments[Math.floor((i / spawnCount) * segments.length)] ?? segments[i];
+      if (!seg) continue;
+      const obj = this.add.image(seg.x, seg.y, "scrap_mine").setDepth(23).setAlpha(0.95).setScale(0.82);
+      obj.setBlendMode(Phaser.BlendModes.ADD);
+      this.scrapMines.push({ obj, tLeft: durationSec, damage, pushForce, triggerRadius });
+    }
+  }
+
+  private detonateScrapMine(index: number): void {
+    const mine = this.scrapMines[index];
+    if (!mine) return;
+
+    const blastRadius = mine.triggerRadius * 1.8;
+    const blastR2 = blastRadius * blastRadius;
+    const victims = this.enemies.filter((enemy) => {
+      if (!enemy.sprite.active) return false;
+      const dx = enemy.sprite.x - mine.obj.x;
+      const dy = enemy.sprite.y - mine.obj.y;
+      return dx * dx + dy * dy <= blastR2;
+    });
+
+    for (const enemy of victims) {
+      const dx = enemy.sprite.x - mine.obj.x;
+      const dy = enemy.sprite.y - mine.obj.y;
+      const dist = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
+      const nx = dx / dist;
+      const ny = dy / dist;
+      enemy.sprite.body.velocity.x += nx * mine.pushForce;
+      enemy.sprite.body.velocity.y += ny * mine.pushForce;
+      enemy.hp -= mine.damage;
+      if (enemy.hp <= 0) this.killEnemy(enemy);
+    }
+
+    this.vfx?.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: mine.obj.x, y: mine.obj.y });
+    mine.obj.destroy();
+    this.scrapMines.splice(index, 1);
   }
 
   private spawnTailDebris(segments: Array<{ x: number; y: number; type: ScrapType }>): void {
@@ -1116,7 +1387,18 @@ export class GameScene extends Phaser.Scene {
   private applyDamage(damage: number): void {
     const mult = (this.state.perks as any).damage_taken_mult?.params?.mult;
     const dmgMult = typeof mult === "number" ? mult : 1;
-    const dmg = Math.max(1, Math.floor(damage * dmgMult));
+    let dmg = Math.max(1, Math.floor(damage * dmgMult));
+
+    if (this.shieldHp > 0) {
+      const absorbed = Math.min(this.shieldHp, dmg);
+      this.shieldHp -= absorbed;
+      dmg -= absorbed;
+      if (this.shieldHp <= 0) {
+        this.shieldHp = 0;
+        this.shieldTime = 0;
+      }
+    }
+    if (dmg <= 0) return;
 
     this.state.hp -= dmg;
     this.playerInvuln = Math.max(this.playerInvuln, this.state.config.player.invulnOnHitSec);
@@ -1265,6 +1547,53 @@ export class GameScene extends Phaser.Scene {
     this.projectileGroup.clear(true, true);
 
     this.pendingTelegraphs = [];
+    this.clearScrapMines();
+  }
+
+  private clearScrapMines(): void {
+    for (const mine of this.scrapMines) {
+      try {
+        mine.obj.destroy();
+      } catch {
+        // ignore
+      }
+    }
+    this.scrapMines = [];
+  }
+
+  private findNearestEnemy(x: number, y: number, maxDistance: number): EnemyEntity | null {
+    let best: EnemyEntity | null = null;
+    let bestD2 = maxDistance * maxDistance;
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active) continue;
+      const dx = enemy.sprite.x - x;
+      const dy = enemy.sprite.y - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= bestD2) continue;
+      best = enemy;
+      bestD2 = d2;
+    }
+    return best;
+  }
+
+  private updateHudStatus(): void {
+    const waveStatus = this.awaitingUpgrade ? "Upgrade pick" : this.waveHudLabel;
+    const buffs: string[] = [];
+
+    if (this.shieldHp > 0) buffs.push(`Shield ${Math.ceil(this.shieldHp)}`);
+    if (this.clampCharges > 0) buffs.push(`Clamp x${this.clampCharges}`);
+    if (this.anchorTime > 0) buffs.push(`Anchor ${this.anchorTime.toFixed(1)}s`);
+    else if (this.state.perks.magnet_anchor) buffs.push(this.anchorCooldown > 0 ? `Anchor ${Math.ceil(this.anchorCooldown)}s` : "Anchor ready");
+
+    if (this.vacuumBurstTime > 0) buffs.push(`Vacuum ${this.vacuumBurstTime.toFixed(1)}s`);
+    else if (this.state.perks.vacuum_burst) buffs.push(this.vacuumBurstCooldown > 0 ? `Vacuum ${Math.ceil(this.vacuumBurstCooldown)}s` : "Vacuum ready");
+
+    if (this.drone) buffs.push("Drone online");
+    if (this.scrapMines.length > 0) buffs.push(`Mines ${this.scrapMines.length}`);
+    if (this.state.cores > 0) buffs.push(`Core pull x${this.getCorePullMult().toFixed(2)}`);
+
+    this.registry.set("uiStatusPrimary", waveStatus);
+    this.registry.set("uiStatusSecondary", buffs.join(" | "));
   }
 
   private finishTutorialMode(_reason: string): void {
@@ -1320,6 +1649,25 @@ export class GameScene extends Phaser.Scene {
     if ((r -= Math.max(0, wCommon)) < 0) return "common";
     if ((r -= Math.max(0, wHeavy)) < 0) return "heavy";
     return "rareShard";
+  }
+
+  private getChainClampCharges(): number {
+    const charges = this.state.perks.chain_clamp?.params?.negateLossPerWave;
+    return Math.max(0, Math.floor(numOrDefault(charges, 0)));
+  }
+
+  private getHeavyScrapBoltValue(): number {
+    const bonus = this.state.perks.heavy_haul?.params?.heavyBonusBolts;
+    return this.state.config.recycler.boltsPerScrapHeavy + Math.max(0, Math.floor(numOrDefault(bonus, 0)));
+  }
+
+  private getVacuumPullMult(): number {
+    const perk = this.state.perks.vacuum_burst?.params?.pullMult;
+    return positiveNum(perk, 1.3);
+  }
+
+  private getCorePullMult(): number {
+    return Math.pow(this.state.config.magnet.pullAccelCoreScale, Math.max(0, this.state.cores));
   }
 
   private applyStartBooster(): void {
@@ -1613,7 +1961,18 @@ export class GameScene extends Phaser.Scene {
     if (!this.playerGlow) return;
     this.playerGlowPhase += dt;
     const pulse = 1 + Math.sin(this.playerGlowPhase * Math.PI * 2 * 1.15) * 0.06;
+    const tint =
+      this.anchorTime > 0
+        ? VISUAL_PALETTE.warningAmber
+        : this.shieldHp > 0
+          ? VISUAL_PALETTE.successGreen
+          : this.vacuumBurstTime > 0
+            ? VISUAL_PALETTE.neonBlue
+            : VISUAL_PALETTE.neonCyan;
+    const alpha = this.anchorTime > 0 ? 0.42 : this.shieldHp > 0 ? 0.4 : this.vacuumBurstTime > 0 ? 0.38 : 0.32;
     this.playerGlow.setPosition(this.player.x, this.player.y);
+    this.playerGlow.setTint(tint);
+    this.playerGlow.setAlpha(alpha);
     this.playerGlow.setScale(0.9 * pulse);
   }
 
@@ -1703,4 +2062,33 @@ function downgradeQuality(q: VfxQuality): VfxQuality {
   if (q === "high") return "medium";
   if (q === "medium") return "low";
   return "low";
+}
+
+function positiveNum(v: unknown, fallback: number): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  return n > 0 ? n : fallback;
+}
+
+function numOrDefault(v: unknown, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
+function describeWavePlan(plan: WavePlan): string {
+  if (plan.special?.type === "breather") return "Breather wave: harvest and reset";
+
+  const counts: Record<EnemyType, number> = { chaser: 0, shooter: 0, cutter: 0 };
+  for (const spawn of plan.spawns) counts[spawn.type] += spawn.count;
+
+  const details = [
+    counts.chaser > 0 ? `${counts.chaser}x Chaser` : null,
+    counts.shooter > 0 ? `${counts.shooter}x Shooter` : null,
+    counts.cutter > 0 ? `${counts.cutter}x Cutter` : null,
+  ].filter(Boolean);
+
+  const title = plan.patternId ? titleCase(plan.patternId.replace(/_/g, " ")) : "Pressure wave";
+  return details.length > 0 ? `${title} | ${details.join(", ")}` : title;
+}
+
+function titleCase(value: string): string {
+  return value.replace(/\b\w/g, (s) => s.toUpperCase());
 }

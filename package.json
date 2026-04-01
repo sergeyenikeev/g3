@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --dir tests/unit",
     "test:integration": "vitest run --dir tests/integration",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run_playwright_e2e.mjs",
     "audio:generate": "node scripts/generate_audio_assets.mjs",
     "visual:generate": "node scripts/generate_visual_assets.mjs",
     "build:test-mock": "node scripts/build_test_mock.mjs",

@@ -307,6 +307,7 @@ export type RunUpgradeDef = {
   weight: number;
   maxStacks: number;
   tags?: string[];
+  synergy?: { worksWith?: string[] };
   ui?: { title?: string; desc?: string };
   effects: Effect[];
 };

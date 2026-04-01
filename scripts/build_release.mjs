@@ -40,13 +40,30 @@ console.log("build_release: OK");
 
 function run(cmd, args, env = process.env) {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { stdio: "inherit", shell: process.platform === "win32", env });
+    const p = spawnCommand(cmd, args, env);
     p.on("error", reject);
     p.on("exit", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`${cmd} exited with code ${code}`));
     });
   });
+}
+
+function spawnCommand(cmd, args, env) {
+  if (process.platform !== "win32") {
+    return spawn(cmd, args, { stdio: "inherit", env });
+  }
+
+  const shell = process.env.ComSpec ?? "cmd.exe";
+  const commandLine = [cmd, ...args].map(escapeForCmd).join(" ");
+  return spawn(shell, ["/d", "/s", "/c", commandLine], { stdio: "inherit", env });
+}
+
+function escapeForCmd(arg) {
+  const text = String(arg);
+  if (text.length === 0) return '""';
+  if (!/[\s"&<>|^%]/.test(text)) return text;
+  return `"${text.replace(/[%"]/g, (m) => (m === "%" ? "%%" : '\\"'))}"`;
 }
 
 function zipDist(distDir, zipPath) {

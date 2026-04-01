@@ -35,7 +35,7 @@
     "lossOnObstacle": 2
   },
   "flip": {
-    "cooldownBaseSec": 6.0,
+    "cooldownBaseSec": 5.4,
     "pulseDurationSec": 0.22,
     "radius": 160,
     "pushForce": 980,
@@ -90,12 +90,12 @@
     "scrapMultCap": 1.6,
 
     "budgetBase": 6,
-    "budgetPerWave": 1.6
+    "budgetPerWave": 1.8
   },
   "director": {
     "safeSpawnDist": 220,
     "recyclerSafeDist": 180,
-    "telegraphSec": 0.55,
+    "telegraphSec": 0.5,
 
     "caps": {
       "maxShootersBase": 3,
@@ -106,8 +106,8 @@
     },
 
     "breather": {
-      "everyWaves": 3,
-      "durationSec": 7.0,
+      "everyWaves": 4,
+      "durationSec": 6.5,
       "enemyRateMult": 0.55,
       "extraScrapClusters": 1
     },
