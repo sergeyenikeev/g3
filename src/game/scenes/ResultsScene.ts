@@ -1,9 +1,10 @@
 import Phaser from "phaser";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import type { AdsManager } from "../../platform/ads/adsManager";
-import type { SaveManager } from "../../platform/save/saveManager";
+import type { SaveData, SaveManager } from "../../platform/save/saveManager";
 import type { RunState } from "../run/runState";
 import { normalizeDailySave } from "../daily/dailyAttempts";
+import { grantMetaWallet } from "../meta/metaProgression";
 
 export class ResultsScene extends Phaser.Scene {
   private ads!: AdsManager;
@@ -15,6 +16,7 @@ export class ResultsScene extends Phaser.Scene {
   private x2Btn: Phaser.GameObjects.Rectangle | null = null;
   private x2Label: Phaser.GameObjects.Text | null = null;
   private runRecorded = false;
+  private grantedRewards = { bolts: 0, cores: 0 };
 
   constructor() {
     super("results");
@@ -27,6 +29,7 @@ export class ResultsScene extends Phaser.Scene {
     this.exitBusy = false;
     this.x2Used = false;
     this.runRecorded = false;
+    this.grantedRewards = { bolts: 0, cores: 0 };
     this.x2Btn = null;
     this.x2Label = null;
     this.input.enabled = true;
@@ -97,7 +100,10 @@ export class ResultsScene extends Phaser.Scene {
   }
 
   private refreshStatsText(): void {
-    this.statsText.setText(`Wave: ${this.state.waveIndex}\nBolts: ${this.state.bolts}\nCores: ${this.state.cores}`);
+    const rewardPreview = this.computeCurrentRunRewards(this.saveManager?.get?.() ?? null);
+    this.statsText.setText(
+      `Wave: ${this.state.waveIndex}\nBolts: ${this.state.bolts}\nCores: ${this.state.cores}\nWorkshop: +${rewardPreview.bolts} bolts | +${rewardPreview.cores} cores`
+    );
   }
 
   private async handleX2(): Promise<void> {
@@ -129,7 +135,8 @@ export class ResultsScene extends Phaser.Scene {
     this.runRecorded = true;
 
     const s0 = this.saveManager.get();
-    const s = this.state.mode === "daily" && this.state.daily?.dateUtc ? normalizeDailySave(s0, this.state.daily.dateUtc) : s0;
+    const s1 = this.state.mode === "daily" && this.state.daily?.dateUtc ? normalizeDailySave(s0, this.state.daily.dateUtc) : s0;
+    const s = this.syncRunRewards(s1);
 
     const bestWave = Math.max(s.stats.bestWave, this.state.waveIndex);
     const bestBolts = Math.max(s.stats.bestBolts, this.state.bolts);
@@ -150,7 +157,8 @@ export class ResultsScene extends Phaser.Scene {
 
   private async persistScoresOnly(): Promise<void> {
     const s0 = this.saveManager.get();
-    const s = this.state.mode === "daily" && this.state.daily?.dateUtc ? normalizeDailySave(s0, this.state.daily.dateUtc) : s0;
+    const s1 = this.state.mode === "daily" && this.state.daily?.dateUtc ? normalizeDailySave(s0, this.state.daily.dateUtc) : s0;
+    const s = this.syncRunRewards(s1);
 
     const bestWave = Math.max(s.stats.bestWave, this.state.waveIndex);
     const bestBolts = Math.max(s.stats.bestBolts, this.state.bolts);
@@ -166,6 +174,32 @@ export class ResultsScene extends Phaser.Scene {
 
     await this.saveManager.save({ ...s, stats: { ...s.stats, bestWave, bestBolts }, daily });
     this.registry.set("saveData", this.saveManager.get());
+  }
+
+  private syncRunRewards(save: SaveData): SaveData {
+    const total = this.computeCurrentRunRewards(save);
+    const delta = {
+      bolts: Math.max(0, total.bolts - this.grantedRewards.bolts),
+      cores: Math.max(0, total.cores - this.grantedRewards.cores),
+    };
+
+    this.grantedRewards = total;
+    return grantMetaWallet(save, delta);
+  }
+
+  private computeCurrentRunRewards(save: SaveData | null): { bolts: number; cores: number } {
+    const dailyMult = this.getDailyRewardMultiplier(save);
+    return {
+      bolts: Math.max(0, Math.floor(this.state.bolts * dailyMult)),
+      cores: Math.max(0, Math.floor(this.state.cores)),
+    };
+  }
+
+  private getDailyRewardMultiplier(save: SaveData | null): number {
+    if (this.state.mode !== "daily" || !this.state.daily?.dateUtc || !save) return 1;
+    if (save.daily.lastDateUtc !== this.state.daily.dateUtc) return 1;
+    if (save.daily.attemptsUsed !== 1) return 1;
+    return positiveNum(this.state.config.daily.dailyRewards.firstRunBonusBoltsMult, 1);
   }
 
   private async exitTo(target: "restart" | "menu"): Promise<void> {

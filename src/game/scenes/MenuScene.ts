@@ -4,6 +4,7 @@ import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { StaticGameData } from "../../data/staticGameData";
 import { getUtcYyyymmdd, pickDailyVariant } from "../daily/daily";
 import { consumeDailyAttempt, getDailyAttemptsInfo, normalizeDailySave, planDailyStart, type DailyAttemptsInfo } from "../daily/dailyAttempts";
+import { getMetaNodeCost, getMetaNodeLevel, getMetaWalletAmount, purchaseMetaNode } from "../meta/metaProgression";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import type { SaveData } from "../../platform/save/saveManager";
@@ -18,6 +19,14 @@ export class MenuScene extends Phaser.Scene {
   private saveManager!: SaveManager;
   private saveData: SaveData | null = null;
   private toastText: Phaser.GameObjects.Text | null = null;
+  private walletText: Phaser.GameObjects.Text | null = null;
+  private workshopDim!: Phaser.GameObjects.Rectangle;
+  private workshopBox!: Phaser.GameObjects.Container;
+  private workshopWalletText!: Phaser.GameObjects.Text;
+  private workshopHintText!: Phaser.GameObjects.Text;
+  private workshopFooterText!: Phaser.GameObjects.Text;
+  private workshopCards: Phaser.GameObjects.Container[] = [];
+  private workshopBusy = false;
 
   constructor() {
     super("menu");
@@ -46,6 +55,27 @@ export class MenuScene extends Phaser.Scene {
       .text(0, 0, `Best wave: ${stats.bestWave} | Best bolts: ${stats.bestBolts}`, {
         fontSize: "16px",
         color: "#98b7c7",
+      })
+      .setOrigin(0.5);
+
+    this.walletText = this.add
+      .text(0, 0, "", {
+        fontSize: "14px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0, 0);
+
+    const btnWorkshop = this.add
+      .rectangle(0, 0, 196, 40, 0x0f1720, 0.95)
+      .setOrigin(0, 0)
+      .setStrokeStyle(2, 0xffd166, 0.82)
+      .setInteractive({ useHandCursor: true });
+    const labelWorkshop = this.add
+      .text(0, 0, "WORKSHOP", {
+        fontSize: "16px",
+        color: "#d9f2ff",
+        fontStyle: "700",
       })
       .setOrigin(0.5);
 
@@ -178,6 +208,8 @@ export class MenuScene extends Phaser.Scene {
       this.scene.launch("ui");
     });
 
+    btnWorkshop.on("pointerdown", () => this.showWorkshop());
+
     const btnDaily = this.add
       .rectangle(0, 0, 280, 56, 0x121a24)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
@@ -247,10 +279,14 @@ export class MenuScene extends Phaser.Scene {
 
     btnDaily.on("pointerdown", () => void this.startDaily(false));
     btnDailyBoost.on("pointerdown", () => void this.startDaily(true));
+    this.createWorkshopUi();
 
     const layoutMenu = (s: { width: number; height: number }) => {
       title.setPosition(s.width / 2, s.height * 0.25);
       bestText.setPosition(s.width / 2, s.height * 0.36);
+      this.walletText?.setPosition(16, 16);
+      btnWorkshop.setPosition(16, 46);
+      labelWorkshop.setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
 
       btnQuality.setPosition(s.width - 16, 16);
       labelQuality.setPosition(btnQuality.x - btnQuality.width / 2, btnQuality.y + btnQuality.height / 2);
@@ -273,6 +309,7 @@ export class MenuScene extends Phaser.Scene {
       dailyInfo.setWordWrapWidth(Math.max(280, Math.min(580, s.width - 48)), true);
       controlsText.setPosition(s.width / 2, s.height * 0.975);
       if (this.toastText) this.toastText.setPosition(s.width / 2, s.height * 0.93);
+      this.layoutWorkshop();
     };
 
     const onResize = (s: Phaser.Structs.Size) => layoutMenu(s);
@@ -282,7 +319,164 @@ export class MenuScene extends Phaser.Scene {
     });
 
     layoutMenu(this.scale);
+    this.refreshWalletSummary();
     void this.ensureDailyNormalizedAndRefresh(dailyInfo).then((info) => refreshDailyButtons(info));
+  }
+
+  private createWorkshopUi(): void {
+    this.workshopDim = this.add
+      .rectangle(0, 0, 10, 10, 0x000000, 0.74)
+      .setOrigin(0, 0)
+      .setDepth(1400)
+      .setScrollFactor(0)
+      .setInteractive();
+    this.workshopDim.setVisible(false);
+    this.workshopDim.on("pointerdown", () => this.hideWorkshop());
+
+    const panel = this.add.rectangle(0, 0, 620, 760, 0x0f1720, 0.98).setStrokeStyle(2, 0x5cc8ff, 0.9);
+    const title = this.add
+      .text(0, -338, "WORKSHOP", { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
+    this.workshopWalletText = this.add
+      .text(-270, -304, "", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700", wordWrap: { width: 540 } })
+      .setOrigin(0, 0);
+    this.workshopHintText = this.add
+      .text(-270, -270, "Permanent upgrades apply to all future runs.", {
+        fontSize: "13px",
+        color: "#98b7c7",
+        wordWrap: { width: 540 },
+      })
+      .setOrigin(0, 0);
+
+    const btnClose = this.add
+      .rectangle(260, -338, 72, 34, 0x121a24, 0.95)
+      .setStrokeStyle(2, 0x3aa4d4, 0.75)
+      .setInteractive({ useHandCursor: true });
+    const labelClose = this.add
+      .text(260, -338, "CLOSE", { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
+    btnClose.on("pointerdown", () => this.hideWorkshop());
+
+    this.workshopFooterText = this.add
+      .text(-270, 332, "Buy upgrades with salvaged bolts and rare cores.", {
+        fontSize: "12px",
+        color: "#98b7c7",
+        wordWrap: { width: 540 },
+      })
+      .setOrigin(0, 0);
+
+    this.workshopBox = this.add
+      .container(0, 0, [panel, title, this.workshopWalletText, this.workshopHintText, btnClose, labelClose, this.workshopFooterText])
+      .setDepth(1401)
+      .setScrollFactor(0);
+    this.workshopBox.setVisible(false);
+  }
+
+  private layoutWorkshop(): void {
+    if (!this.workshopDim || !this.workshopBox) return;
+    const { width, height } = this.scale;
+    this.workshopDim.setSize(width, height);
+    this.workshopBox.setPosition(width / 2, height / 2);
+  }
+
+  private showWorkshop(): void {
+    this.refreshWorkshopSummary();
+    this.workshopDim.setVisible(true);
+    this.workshopBox.setVisible(true);
+    this.layoutWorkshop();
+  }
+
+  private hideWorkshop(): void {
+    this.workshopDim.setVisible(false);
+    this.workshopBox.setVisible(false);
+  }
+
+  private refreshWalletSummary(): void {
+    const save = this.saveManager.get();
+    this.saveData = save;
+    const wallet = save.meta.wallet;
+    this.walletText?.setText(`Wallet: ${formatCurrency(wallet.bolts ?? 0)} bolts | ${formatCurrency(wallet.cores ?? 0)} cores`);
+  }
+
+  private refreshWorkshopSummary(): void {
+    const save = this.saveManager.get();
+    this.saveData = save;
+    this.refreshWalletSummary();
+
+    this.workshopWalletText.setText(
+      `Stockpile: ${formatCurrency(getMetaWalletAmount(save, "bolts"))} bolts | ${formatCurrency(getMetaWalletAmount(save, "cores"))} cores`
+    );
+    this.workshopHintText.setText(buildInstalledMetaSummary(this.staticData.metaTree.nodes, save.meta.nodeLevels));
+
+    for (const card of this.workshopCards) card.destroy();
+    this.workshopCards = [];
+
+    this.staticData.metaTree.nodes.forEach((node, idx) => {
+      const level = getMetaNodeLevel(save, node.id);
+      const cost = getMetaNodeCost(this.staticData.metaTree, node.id, level);
+      const currencyAmount = cost ? getMetaWalletAmount(save, cost.currency) : 0;
+      const costAmount = cost?.amount ?? Number.POSITIVE_INFINITY;
+      const affordable = Boolean(cost) && currencyAmount >= costAmount;
+      const maxed = level >= node.maxLevel || !cost;
+      const y = -172 + idx * 104;
+
+      const bg = this.add.rectangle(0, 0, 548, 86, 0x121a24, 0.96).setStrokeStyle(2, maxed ? 0x57c27d : 0x3aa4d4, 0.74);
+      const title = this.add
+        .text(-256, -28, node.name, { fontSize: "17px", color: "#d9f2ff", fontStyle: "700", wordWrap: { width: 330 } })
+        .setOrigin(0, 0);
+      const desc = this.add
+        .text(-256, -2, describeMetaNode(node.id), { fontSize: "13px", color: "#98b7c7", wordWrap: { width: 330 } })
+        .setOrigin(0, 0);
+      const levelText = this.add
+        .text(-256, 24, `Level ${level}/${node.maxLevel}`, { fontSize: "12px", color: maxed ? "#57c27d" : "#7fdfff", fontStyle: "700" })
+        .setOrigin(0, 0);
+
+      const btn = this.add
+        .rectangle(180, 0, 130, 42, affordable ? 0x1b2635 : 0x0d131b, 0.98)
+        .setStrokeStyle(2, maxed ? 0x57c27d : affordable ? 0xffd166 : 0x5f6b76, 0.86);
+      const priceLabel = cost ? `${formatCurrency(cost.amount)} ${cost.currency.toUpperCase()}` : "MAXED";
+      const btnLabel = this.add
+        .text(
+          180,
+          -8,
+          maxed ? "INSTALLED" : affordable ? "BUY" : "LOCKED",
+          { fontSize: "13px", color: "#d9f2ff", fontStyle: "700" }
+        )
+        .setOrigin(0.5);
+      const costLabel = this.add
+        .text(180, 12, priceLabel, { fontSize: "11px", color: maxed ? "#57c27d" : affordable ? "#ffd166" : "#98b7c7", fontStyle: "700" })
+        .setOrigin(0.5);
+
+      if (!maxed && affordable) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on("pointerdown", () => void this.buyMetaNode(node.id));
+      }
+
+      const card = this.add.container(0, y, [bg, title, desc, levelText, btn, btnLabel, costLabel]).setDepth(1402);
+      this.workshopCards.push(card);
+      this.workshopBox.add(card);
+    });
+  }
+
+  private async buyMetaNode(nodeId: string): Promise<void> {
+    if (this.workshopBusy) return;
+    this.workshopBusy = true;
+    try {
+      const save = this.saveManager.get();
+      const result = purchaseMetaNode(this.staticData.metaTree, save, nodeId);
+      if (!result.ok) {
+        this.toast(result.reason === "insufficient_funds" ? "Not enough resources." : "Upgrade unavailable.");
+        return;
+      }
+
+      await this.saveManager.save(result.save);
+      this.registry.set("saveData", this.saveManager.get());
+      this.saveData = this.saveManager.get();
+      this.refreshWorkshopSummary();
+      this.toast(`Installed ${nodeId}: -${result.cost.amount} ${result.cost.currency}.`);
+    } finally {
+      this.workshopBusy = false;
+    }
   }
 
   private async ensureDailyNormalizedAndRefresh(dailyInfoText: Phaser.GameObjects.Text): Promise<DailyAttemptsInfo> {
@@ -452,4 +646,41 @@ function formatVolumeLabel(prefix: "SFX" | "MUSIC", value: number): string {
 
 function formatToastVolume(value: number): string {
   return value <= 0 ? "OFF" : `${Math.round(value * 100)}%`;
+}
+
+function formatCurrency(value: number): string {
+  return Math.max(0, Math.floor(value)).toLocaleString("en-US");
+}
+
+function describeMetaNode(nodeId: string): string {
+  switch (nodeId) {
+    case "meta_core_1":
+      return "Stronger magnet radius and pull. Great for smoother collection-heavy runs.";
+    case "meta_coil_1":
+      return "Shorter FLIP cooldown and stronger pulse. Improves control in high-pressure waves.";
+    case "meta_frame_1":
+      return "Permanent hull plating: more max HP and stronger heal when you bank at the recycler.";
+    case "meta_tail_1":
+      return "Longer caravan chain with a gentler speed penalty. Supports high-value hauling builds.";
+    case "meta_dash_unlock":
+      return "Unlocks Dash as a permanent default module for all future runs.";
+    case "meta_recycler_overdrive":
+      return "Faster banking, more heavy-scrap payout and stronger recycler healing for every run.";
+    default:
+      return "Permanent upgrade for future runs.";
+  }
+}
+
+function buildInstalledMetaSummary(
+  nodes: Array<{ id: string; name: string }>,
+  levels: Record<string, number>
+): string {
+  const active = nodes
+    .map((node) => ({ node, level: Math.max(0, Math.floor(levels[node.id] ?? 0)) }))
+    .filter((entry) => entry.level > 0)
+    .map((entry) => `${entry.node.name} Lv.${entry.level}`);
+
+  return active.length > 0
+    ? `Installed: ${active.join(" | ")}`
+    : "Installed: none yet. Buy permanent upgrades to shape future runs.";
 }

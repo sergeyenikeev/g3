@@ -17,6 +17,7 @@ export type SaveDataV1 = {
   };
   meta: {
     nodeLevels: Record<string, number>;
+    wallet: Record<string, number>;
   };
   stats: {
     bestWave: number;
@@ -49,7 +50,7 @@ export function makeDefaultSave(): SaveData {
       completed: false,
       skipped: false,
     },
-    meta: { nodeLevels: {} },
+    meta: { nodeLevels: {}, wallet: { bolts: 0, cores: 0 } },
     stats: { bestWave: 0, bestBolts: 0, runsCompleted: 0 },
     ads: { lastInterstitialAtMs: 0, lastRewardedAtMs: 0 },
     daily: { lastDateUtc: null, attemptsUsed: 0, bestWave: 0, bestBolts: 0 },
@@ -119,6 +120,7 @@ function sanitize(raw: unknown): SaveData | null {
   const skipped = Boolean((raw as any).tutorial?.skipped);
 
   const nodeLevels = isPlainObject((raw as any).meta?.nodeLevels) ? ((raw as any).meta.nodeLevels as Record<string, number>) : {};
+  const wallet = sanitizeWallet((raw as any).meta?.wallet);
 
   const lastDateUtc = typeof (raw as any).daily?.lastDateUtc === "string" ? ((raw as any).daily.lastDateUtc as string) : null;
   const attemptsUsed = clampNum((raw as any).daily?.attemptsUsed, 0, 0, 99);
@@ -132,7 +134,7 @@ function sanitize(raw: unknown): SaveData | null {
     v: SAVE_VERSION,
     settings: { sfxVolume, musicVolume, visualQuality },
     tutorial: { completed, skipped },
-    meta: { nodeLevels },
+    meta: { nodeLevels, wallet },
     stats: { bestWave, bestBolts, runsCompleted },
     ads: { lastInterstitialAtMs, lastRewardedAtMs },
     daily: { lastDateUtc, attemptsUsed, bestWave: dailyBestWave, bestBolts: dailyBestBolts },
@@ -151,6 +153,17 @@ function sanitizeVisualQuality(v: unknown): "auto" | "low" | "medium" | "high" {
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && Object.getPrototypeOf(v) === Object.prototype;
+}
+
+function sanitizeWallet(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = { bolts: 0, cores: 0 };
+  if (!isPlainObject(raw)) return out;
+
+  for (const [key, value] of Object.entries(raw)) {
+    out[key] = clampNum(value, out[key] ?? 0, 0, 1e12);
+  }
+
+  return out;
 }
 
 function readMirror(): unknown | null {

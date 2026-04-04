@@ -27,12 +27,43 @@
       ]
     },
     {
+      "id": "meta_frame_1",
+      "name": "Reinforced Frame I",
+      "maxLevel": 5,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "add", "path": "player.hpMax", "value": 8 },
+        { "op": "add", "path": "recycler.healOnBank", "value": 2 }
+      ]
+    },
+    {
+      "id": "meta_tail_1",
+      "name": "Caravan Linkage I",
+      "maxLevel": 5,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "add", "path": "tail.maxLenBase", "value": 2 },
+        { "op": "mul", "path": "player.tailSpeedPenaltyPerSegment", "value": 0.97 }
+      ]
+    },
+    {
       "id": "meta_dash_unlock",
       "name": "Dash Module (Unlock)",
       "maxLevel": 1,
       "cost": { "currency": "cores", "amount": 2 },
       "effects": [
         { "op": "set", "path": "dash.enabledByDefault", "value": true }
+      ]
+    },
+    {
+      "id": "meta_recycler_overdrive",
+      "name": "Recycler Overdrive",
+      "maxLevel": 1,
+      "cost": { "currency": "cores", "amount": 3 },
+      "effects": [
+        { "op": "mul", "path": "recycler.bankTimeSec", "value": 0.85 },
+        { "op": "add", "path": "recycler.boltsPerScrapHeavy", "value": 1 },
+        { "op": "add", "path": "recycler.healOnBank", "value": 6 }
       ]
     }
   ]
