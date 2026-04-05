@@ -9,6 +9,21 @@ import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import type { SaveData } from "../../platform/save/saveManager";
 import type { SaveManager } from "../../platform/save/saveManager";
+import {
+  type LanguageSetting,
+  type Locale,
+  formatNumber,
+  formatQualityLabel,
+  formatResource,
+  formatVolume,
+  getDailyVariantCopy,
+  getLanguageSettingLabel,
+  getMetaNodeDescription,
+  getMetaNodeName,
+  normalizeLanguageSetting,
+  resolveLocale,
+  t,
+} from "../../i18n/localization";
 
 const VOLUME_STEPS = [0, 0.3, 0.6, 0.8, 1] as const;
 
@@ -27,6 +42,8 @@ export class MenuScene extends Phaser.Scene {
   private workshopFooterText!: Phaser.GameObjects.Text;
   private workshopCards: Phaser.GameObjects.Container[] = [];
   private workshopBusy = false;
+  private locale: Locale = "en";
+  private languageSetting: LanguageSetting = "auto";
 
   constructor() {
     super("menu");
@@ -39,12 +56,16 @@ export class MenuScene extends Phaser.Scene {
     this.saveManager = this.registry.get("saveManager") as SaveManager;
     this.saveData = (this.registry.get("saveData") as SaveData | undefined) ?? this.saveManager.get();
     const save = this.saveData;
+    this.languageSetting = normalizeLanguageSetting(save?.settings?.language);
+    this.locale = resolveLocale(this.languageSetting);
+    this.registry.set("languageSetting", this.languageSetting);
+    this.registry.set("locale", this.locale);
     const stats = save?.stats ?? { bestWave: 0, bestBolts: 0 };
     const boosterCfg = this.staticData.balances.ads?.rewarded?.startBooster;
     const boosterEnabled = Boolean(boosterCfg?.enabled);
 
     const title = this.add
-      .text(0, 0, "MAGNET CARAVAN", {
+      .text(0, 0, t(this.locale, "app.title"), {
         fontSize: "42px",
         color: "#d9f2ff",
         fontStyle: "700",
@@ -52,10 +73,18 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const bestText = this.add
-      .text(0, 0, `Best wave: ${stats.bestWave} | Best bolts: ${stats.bestBolts}`, {
+      .text(
+        0,
+        0,
+        t(this.locale, "menu.best", {
+          bestWave: formatNumber(this.locale, stats.bestWave),
+          bestBolts: formatNumber(this.locale, stats.bestBolts),
+        }),
+        {
         fontSize: "16px",
         color: "#98b7c7",
-      })
+        }
+      )
       .setOrigin(0.5);
 
     this.walletText = this.add
@@ -72,7 +101,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0xffd166, 0.82)
       .setInteractive({ useHandCursor: true });
     const labelWorkshop = this.add
-      .text(0, 0, "WORKSHOP", {
+      .text(0, 0, t(this.locale, "menu.workshop"), {
         fontSize: "16px",
         color: "#d9f2ff",
         fontStyle: "700",
@@ -118,30 +147,50 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    const btnLanguage = this.add
+      .rectangle(0, 0, 168, 34, 0x121a24, 0.9)
+      .setOrigin(1, 0)
+      .setStrokeStyle(2, 0xffd166, 0.78)
+      .setInteractive({ useHandCursor: true });
+    const labelLanguage = this.add
+      .text(0, 0, "", {
+        fontSize: "14px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+
     const order: SaveData["settings"]["visualQuality"][] = ["auto", "low", "medium", "high"];
     let qualityPref: SaveData["settings"]["visualQuality"] = save?.settings?.visualQuality ?? "auto";
     let sfxVolume = snapVolumeStep(save?.settings?.sfxVolume ?? 0.8);
     let musicVolume = snapVolumeStep(save?.settings?.musicVolume ?? 0.6);
+    const languageOrder: LanguageSetting[] = ["auto", "ru", "en"];
 
     const applyQualityLabel = (q: SaveData["settings"]["visualQuality"]) => {
-      const label = q === "auto" ? "AUTO" : q === "medium" ? "MED" : q.toUpperCase();
-      labelQuality.setText(`GFX: ${label}`);
+      const label = formatQualityLabel(this.locale, q);
+      labelQuality.setText(`${t(this.locale, "settings.gfx")}: ${label}`);
       const stroke = q === "low" ? 0x6e7a86 : q === "medium" ? 0x2d7bff : q === "high" ? 0x3af2ff : 0x3aa4d4;
       btnQuality.setStrokeStyle(2, stroke, 0.8);
     };
     const applyVolumeLabel = (
       button: Phaser.GameObjects.Rectangle,
       label: Phaser.GameObjects.Text,
-      prefix: "SFX" | "MUSIC",
+      prefixKey: "settings.sfx" | "settings.music",
       value: number
     ) => {
-      label.setText(formatVolumeLabel(prefix, value));
-      const stroke = value <= 0 ? 0x5f6b76 : prefix === "SFX" ? 0x3aa4d4 : 0x57c27d;
+      label.setText(formatVolumeLabel(this.locale, prefixKey, value));
+      const stroke = value <= 0 ? 0x5f6b76 : prefixKey === "settings.sfx" ? 0x3aa4d4 : 0x57c27d;
       button.setStrokeStyle(2, stroke, value <= 0 ? 0.55 : 0.8);
     };
+    const applyLanguageLabel = (setting: LanguageSetting) => {
+      labelLanguage.setText(`${t(this.locale, "settings.language")}: ${getLanguageSettingLabel(this.locale, setting)}`);
+      const stroke = setting === "auto" ? 0xffd166 : setting === "ru" ? 0x57c27d : 0x5cc8ff;
+      btnLanguage.setStrokeStyle(2, stroke, 0.82);
+    };
     applyQualityLabel(qualityPref);
-    applyVolumeLabel(btnSfx, labelSfx, "SFX", sfxVolume);
-    applyVolumeLabel(btnMusic, labelMusic, "MUSIC", musicVolume);
+    applyVolumeLabel(btnSfx, labelSfx, "settings.sfx", sfxVolume);
+    applyVolumeLabel(btnMusic, labelMusic, "settings.music", musicVolume);
+    applyLanguageLabel(this.languageSetting);
 
     btnQuality.on("pointerdown", () => {
       const idx = order.indexOf(qualityPref);
@@ -149,7 +198,7 @@ export class MenuScene extends Phaser.Scene {
       void this.setVisualQuality(next).then(() => {
         qualityPref = next;
         applyQualityLabel(next);
-        this.toast(`Graphics: ${next.toUpperCase()}`);
+        this.toast(t(this.locale, "toast.graphics", { value: formatQualityLabel(this.locale, next) }));
       });
     });
 
@@ -157,8 +206,8 @@ export class MenuScene extends Phaser.Scene {
       const next = nextVolumeStep(sfxVolume);
       void this.setAudioVolume("sfxVolume", next).then(() => {
         sfxVolume = next;
-        applyVolumeLabel(btnSfx, labelSfx, "SFX", next);
-        this.toast(`SFX: ${formatToastVolume(next)}`);
+        applyVolumeLabel(btnSfx, labelSfx, "settings.sfx", next);
+        this.toast(t(this.locale, "toast.sfx", { value: formatVolume(this.locale, next) }));
       });
     });
 
@@ -166,8 +215,20 @@ export class MenuScene extends Phaser.Scene {
       const next = nextVolumeStep(musicVolume);
       void this.setAudioVolume("musicVolume", next).then(() => {
         musicVolume = next;
-        applyVolumeLabel(btnMusic, labelMusic, "MUSIC", next);
-        this.toast(`Music: ${formatToastVolume(next)}`);
+        applyVolumeLabel(btnMusic, labelMusic, "settings.music", next);
+        this.toast(t(this.locale, "toast.music", { value: formatVolume(this.locale, next) }));
+      });
+    });
+
+    btnLanguage.on("pointerdown", () => {
+      const idx = languageOrder.indexOf(this.languageSetting);
+      const next = languageOrder[(idx + 1) % languageOrder.length]!;
+      void this.setLanguage(next).then(() => {
+        this.languageSetting = next;
+        this.locale = resolveLocale(next);
+        this.registry.set("languageSetting", next);
+        this.registry.set("locale", this.locale);
+        this.scene.restart();
       });
     });
 
@@ -176,7 +237,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x5cc8ff, 0.9)
       .setInteractive({ useHandCursor: true });
     const labelPlay = this.add
-      .text(0, 0, "PLAY", { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "menu.play"), { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
 
     btnPlay.on("pointerdown", () => {
@@ -189,7 +250,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x57c27d, 0.9)
       .setInteractive({ useHandCursor: true });
     const labelPlayBoost = this.add
-      .text(0, 0, "PLAY + BOOST (Rewarded)", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "menu.playBoost"), { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
     btnPlayBoost.setVisible(boosterEnabled);
     labelPlayBoost.setVisible(boosterEnabled);
@@ -200,7 +261,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0xffd166, 0.78)
       .setInteractive({ useHandCursor: true });
     const labelTraining = this.add
-      .text(0, 0, "TRAINING", { fontSize: "18px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "menu.training"), { fontSize: "18px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
 
     btnTraining.on("pointerdown", () => {
@@ -215,7 +276,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true });
     const labelDaily = this.add
-      .text(0, 0, "DAILY", { fontSize: "22px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "menu.daily"), { fontSize: "18px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
 
     const btnDailyBoost = this.add
@@ -223,8 +284,8 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x57c27d, 0.75)
       .setInteractive({ useHandCursor: true });
     const labelDailyBoost = this.add
-      .text(0, 0, "DAILY + BOOST", {
-        fontSize: "14px",
+      .text(0, 0, t(this.locale, "menu.dailyBoost"), {
+        fontSize: "13px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -238,7 +299,7 @@ export class MenuScene extends Phaser.Scene {
       .setLineSpacing(4);
 
     const controlsText = this.add
-      .text(0, 0, "WASD/Arrows: move | Space: flip | Shift: dash", {
+      .text(0, 0, t(this.locale, "menu.controls"), {
         fontSize: "16px",
         color: "#98b7c7",
       })
@@ -261,7 +322,11 @@ export class MenuScene extends Phaser.Scene {
       const boostedPlan = planDailyStart(info, { boosted: true, boosterEnabled });
 
       labelDaily.setText(
-        regularPlan.canStart ? (regularPlan.kind === "free" ? "DAILY (Free)" : "DAILY (Rewarded)") : "DAILY (Locked)"
+        regularPlan.canStart
+          ? regularPlan.kind === "free"
+            ? t(this.locale, "menu.dailyFree")
+            : t(this.locale, "menu.dailyRewarded")
+          : t(this.locale, "menu.dailyLocked")
       );
       applyDailyButtonState(btnDaily, labelDaily, regularPlan.canStart, regularPlan.kind === "rewarded" ? 0x57c27d : 0x3aa4d4);
 
@@ -270,9 +335,9 @@ export class MenuScene extends Phaser.Scene {
       labelDailyBoost.setText(
         boostedPlan.canStart
           ? boostedPlan.kind === "boosted_rewarded"
-            ? "DAILY + BOOST (Extra Attempt)"
-            : "DAILY + BOOST"
-          : "DAILY + BOOST (Locked)"
+            ? t(this.locale, "menu.dailyBoostExtra")
+            : t(this.locale, "menu.dailyBoost")
+          : t(this.locale, "menu.dailyBoostLocked")
       );
       applyDailyButtonState(btnDailyBoost, labelDailyBoost, boostedPlan.canStart, 0x57c27d);
     };
@@ -294,6 +359,8 @@ export class MenuScene extends Phaser.Scene {
       labelSfx.setPosition(btnSfx.x - btnSfx.width / 2, btnSfx.y + btnSfx.height / 2);
       btnMusic.setPosition(s.width - 16, 96);
       labelMusic.setPosition(btnMusic.x - btnMusic.width / 2, btnMusic.y + btnMusic.height / 2);
+      btnLanguage.setPosition(s.width - 16, 136);
+      labelLanguage.setPosition(btnLanguage.x - btnLanguage.width / 2, btnLanguage.y + btnLanguage.height / 2);
 
       btnPlay.setPosition(s.width / 2, s.height * 0.47);
       labelPlay.setPosition(btnPlay.x, btnPlay.y);
@@ -335,13 +402,13 @@ export class MenuScene extends Phaser.Scene {
 
     const panel = this.add.rectangle(0, 0, 620, 760, 0x0f1720, 0.98).setStrokeStyle(2, 0x5cc8ff, 0.9);
     const title = this.add
-      .text(0, -338, "WORKSHOP", { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, -338, t(this.locale, "menu.workshop"), { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
     this.workshopWalletText = this.add
       .text(-270, -304, "", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700", wordWrap: { width: 540 } })
       .setOrigin(0, 0);
     this.workshopHintText = this.add
-      .text(-270, -270, "Permanent upgrades apply to all future runs.", {
+      .text(-270, -270, t(this.locale, "menu.workshopHint"), {
         fontSize: "13px",
         color: "#98b7c7",
         wordWrap: { width: 540 },
@@ -353,12 +420,12 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x3aa4d4, 0.75)
       .setInteractive({ useHandCursor: true });
     const labelClose = this.add
-      .text(260, -338, "CLOSE", { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .text(260, -338, t(this.locale, "menu.close"), { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
     btnClose.on("pointerdown", () => this.hideWorkshop());
 
     this.workshopFooterText = this.add
-      .text(-270, 332, "Buy upgrades with salvaged bolts and rare cores.", {
+      .text(-270, 332, t(this.locale, "menu.workshopFooter"), {
         fontSize: "12px",
         color: "#98b7c7",
         wordWrap: { width: 540 },
@@ -395,7 +462,12 @@ export class MenuScene extends Phaser.Scene {
     const save = this.saveManager.get();
     this.saveData = save;
     const wallet = save.meta.wallet;
-    this.walletText?.setText(`Wallet: ${formatCurrency(wallet.bolts ?? 0)} bolts | ${formatCurrency(wallet.cores ?? 0)} cores`);
+    this.walletText?.setText(
+      t(this.locale, "menu.wallet", {
+        bolts: formatResource(this.locale, "bolts", wallet.bolts ?? 0),
+        cores: formatResource(this.locale, "cores", wallet.cores ?? 0),
+      })
+    );
   }
 
   private refreshWorkshopSummary(): void {
@@ -404,9 +476,12 @@ export class MenuScene extends Phaser.Scene {
     this.refreshWalletSummary();
 
     this.workshopWalletText.setText(
-      `Stockpile: ${formatCurrency(getMetaWalletAmount(save, "bolts"))} bolts | ${formatCurrency(getMetaWalletAmount(save, "cores"))} cores`
+      t(this.locale, "menu.stockpile", {
+        bolts: formatResource(this.locale, "bolts", getMetaWalletAmount(save, "bolts")),
+        cores: formatResource(this.locale, "cores", getMetaWalletAmount(save, "cores")),
+      })
     );
-    this.workshopHintText.setText(buildInstalledMetaSummary(this.staticData.metaTree.nodes, save.meta.nodeLevels));
+    this.workshopHintText.setText(buildInstalledMetaSummary(this.locale, this.staticData.metaTree.nodes, save.meta.nodeLevels));
 
     for (const card of this.workshopCards) card.destroy();
     this.workshopCards = [];
@@ -422,24 +497,37 @@ export class MenuScene extends Phaser.Scene {
 
       const bg = this.add.rectangle(0, 0, 548, 86, 0x121a24, 0.96).setStrokeStyle(2, maxed ? 0x57c27d : 0x3aa4d4, 0.74);
       const title = this.add
-        .text(-256, -28, node.name, { fontSize: "17px", color: "#d9f2ff", fontStyle: "700", wordWrap: { width: 330 } })
+        .text(-256, -28, getMetaNodeName(this.locale, node.id, node.name), {
+          fontSize: "17px",
+          color: "#d9f2ff",
+          fontStyle: "700",
+          wordWrap: { width: 330 },
+        })
         .setOrigin(0, 0);
       const desc = this.add
-        .text(-256, -2, describeMetaNode(node.id), { fontSize: "13px", color: "#98b7c7", wordWrap: { width: 330 } })
+        .text(-256, -2, getMetaNodeDescription(this.locale, node.id), {
+          fontSize: "13px",
+          color: "#98b7c7",
+          wordWrap: { width: 330 },
+        })
         .setOrigin(0, 0);
       const levelText = this.add
-        .text(-256, 24, `Level ${level}/${node.maxLevel}`, { fontSize: "12px", color: maxed ? "#57c27d" : "#7fdfff", fontStyle: "700" })
+        .text(-256, 24, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
+          fontSize: "12px",
+          color: maxed ? "#57c27d" : "#7fdfff",
+          fontStyle: "700",
+        })
         .setOrigin(0, 0);
 
       const btn = this.add
         .rectangle(180, 0, 130, 42, affordable ? 0x1b2635 : 0x0d131b, 0.98)
         .setStrokeStyle(2, maxed ? 0x57c27d : affordable ? 0xffd166 : 0x5f6b76, 0.86);
-      const priceLabel = cost ? `${formatCurrency(cost.amount)} ${cost.currency.toUpperCase()}` : "MAXED";
+      const priceLabel = cost ? formatResource(this.locale, cost.currency, cost.amount) : t(this.locale, "menu.maxed");
       const btnLabel = this.add
         .text(
           180,
           -8,
-          maxed ? "INSTALLED" : affordable ? "BUY" : "LOCKED",
+          maxed ? t(this.locale, "menu.installedButton") : affordable ? t(this.locale, "menu.buy") : t(this.locale, "menu.locked"),
           { fontSize: "13px", color: "#d9f2ff", fontStyle: "700" }
         )
         .setOrigin(0.5);
@@ -465,7 +553,7 @@ export class MenuScene extends Phaser.Scene {
       const save = this.saveManager.get();
       const result = purchaseMetaNode(this.staticData.metaTree, save, nodeId);
       if (!result.ok) {
-        this.toast(result.reason === "insufficient_funds" ? "Not enough resources." : "Upgrade unavailable.");
+        this.toast(result.reason === "insufficient_funds" ? t(this.locale, "menu.notEnough") : t(this.locale, "menu.upgradeUnavailable"));
         return;
       }
 
@@ -473,7 +561,12 @@ export class MenuScene extends Phaser.Scene {
       this.registry.set("saveData", this.saveManager.get());
       this.saveData = this.saveManager.get();
       this.refreshWorkshopSummary();
-      this.toast(`Installed ${nodeId}: -${result.cost.amount} ${result.cost.currency}.`);
+      this.toast(
+        t(this.locale, "menu.installedToast", {
+          name: getMetaNodeName(this.locale, nodeId, nodeId),
+          cost: formatResource(this.locale, result.cost.currency, result.cost.amount),
+        })
+      );
     } finally {
       this.workshopBusy = false;
     }
@@ -491,26 +584,43 @@ export class MenuScene extends Phaser.Scene {
 
     const sel = pickDailyVariant(this.staticData.daily, dateUtc);
     const variant = this.staticData.daily.dailyVariants.find((v) => v.id === sel.variantId);
-    const title = variant?.ui?.title ?? sel.variantId;
-    const desc = variant?.ui?.desc ?? "";
+    const copy = getDailyVariantCopy(this.locale, sel.variantId, variant?.ui?.title ?? sel.variantId, variant?.ui?.desc ?? "");
 
     const info = getDailyAttemptsInfo(this.staticData.daily, this.saveData, dateUtc);
-    const best = this.saveData.daily.lastDateUtc === dateUtc ? `Best: W${this.saveData.daily.bestWave}, B${this.saveData.daily.bestBolts}` : "Best: -";
+    const best =
+      this.saveData.daily.lastDateUtc === dateUtc
+        ? t(this.locale, "menu.bestToday", {
+            wave: formatNumber(this.locale, this.saveData.daily.bestWave),
+            bolts: formatNumber(this.locale, this.saveData.daily.bestBolts),
+          })
+        : t(this.locale, "menu.bestNone");
     const nextStartLine =
       info.canStartFree
-        ? "Next daily: free start."
+        ? t(this.locale, "menu.nextDailyFree")
         : info.canStartRewarded
-          ? "Next daily: rewarded extra attempt."
-          : "Next daily: no starts left today.";
+          ? t(this.locale, "menu.nextDailyRewarded")
+          : t(this.locale, "menu.nextDailyUnavailable");
     const boostedLine = !this.staticData.balances.ads?.rewarded?.startBooster?.enabled
-      ? "Boosted daily: disabled."
+      ? t(this.locale, "menu.boostDailyDisabled")
       : info.canStartFree
-        ? "Boosted daily: one rewarded ad for the booster."
+        ? t(this.locale, "menu.boostDailyFree")
         : info.canStartRewarded
-          ? "Boosted daily: one rewarded ad grants the booster and uses the extra attempt."
-          : "Boosted daily: unavailable today.";
+          ? t(this.locale, "menu.boostDailyRewarded")
+          : t(this.locale, "menu.boostDailyUnavailable");
     dailyInfoText.setText(
-      `Seed: ${dateUtc} | ${title}\n${desc}\nAttempts: ${info.attemptsUsed}/${info.maxAttempts} | ${best}\n${nextStartLine}\n${boostedLine}`
+      [
+        `${t(this.locale, "menu.seedLine", { seed: dateUtc })} | ${copy.title}`,
+        copy.desc,
+        t(this.locale, "menu.attemptsLine", {
+          used: formatNumber(this.locale, info.attemptsUsed),
+          max: formatNumber(this.locale, info.maxAttempts),
+          best,
+        }),
+        nextStartLine,
+        boostedLine,
+      ]
+        .filter(Boolean)
+        .join("\n")
     );
     return info;
   }
@@ -527,7 +637,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.toast("Rewarded booster not granted.");
+    this.toast(t(this.locale, "menu.rewardedBoosterDenied"));
   }
 
   private async startDaily(boosted: boolean): Promise<void> {
@@ -555,7 +665,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     if (!plan.canStart) {
-      this.toast(plan.reason === "booster_disabled" ? "Boosters are disabled." : "No daily attempts left today.");
+      this.toast(plan.reason === "booster_disabled" ? t(this.locale, "menu.boosterDisabled") : t(this.locale, "menu.noDailyAttempts"));
       return;
     }
 
@@ -564,7 +674,7 @@ export class MenuScene extends Phaser.Scene {
     if (plan.needsBoosterRewarded) {
       const res = await this.ads.showRewarded(AD_PLACEMENTS.DAILY_START_BOOSTER);
       if (!(res.ok && res.rewarded)) {
-        this.toast("Rewarded booster not granted.");
+        this.toast(t(this.locale, "menu.rewardedBoosterDenied"));
         return;
       }
       boosterGranted = true;
@@ -573,7 +683,7 @@ export class MenuScene extends Phaser.Scene {
     if (plan.needsAttemptRewarded) {
       const res = await this.ads.showRewarded(AD_PLACEMENTS.DAILY_ATTEMPT);
       if (!(res.ok && res.rewarded)) {
-        this.toast("Rewarded attempt not granted.");
+        this.toast(t(this.locale, "menu.rewardedAttemptDenied"));
         return;
       }
     }
@@ -611,6 +721,14 @@ export class MenuScene extends Phaser.Scene {
     this.saveData = this.saveManager.get();
   }
 
+  private async setLanguage(language: LanguageSetting): Promise<void> {
+    const save = this.saveManager.get();
+    const next: SaveData = { ...save, settings: { ...save.settings, language } };
+    await this.saveManager.save(next);
+    this.registry.set("saveData", this.saveManager.get());
+    this.saveData = this.saveManager.get();
+  }
+
   private toast(msg: string): void {
     const { width, height } = this.scale;
     if (this.toastText) this.toastText.destroy();
@@ -640,47 +758,21 @@ function nextVolumeStep(current: number): number {
   return VOLUME_STEPS[(idx + 1) % VOLUME_STEPS.length]!;
 }
 
-function formatVolumeLabel(prefix: "SFX" | "MUSIC", value: number): string {
-  return `${prefix}: ${formatToastVolume(value)}`;
-}
-
-function formatToastVolume(value: number): string {
-  return value <= 0 ? "OFF" : `${Math.round(value * 100)}%`;
-}
-
-function formatCurrency(value: number): string {
-  return Math.max(0, Math.floor(value)).toLocaleString("en-US");
-}
-
-function describeMetaNode(nodeId: string): string {
-  switch (nodeId) {
-    case "meta_core_1":
-      return "Stronger magnet radius and pull. Great for smoother collection-heavy runs.";
-    case "meta_coil_1":
-      return "Shorter FLIP cooldown and stronger pulse. Improves control in high-pressure waves.";
-    case "meta_frame_1":
-      return "Permanent hull plating: more max HP and stronger heal when you bank at the recycler.";
-    case "meta_tail_1":
-      return "Longer caravan chain with a gentler speed penalty. Supports high-value hauling builds.";
-    case "meta_dash_unlock":
-      return "Unlocks Dash as a permanent default module for all future runs.";
-    case "meta_recycler_overdrive":
-      return "Faster banking, more heavy-scrap payout and stronger recycler healing for every run.";
-    default:
-      return "Permanent upgrade for future runs.";
-  }
+function formatVolumeLabel(locale: Locale, prefixKey: "settings.sfx" | "settings.music", value: number): string {
+  return `${t(locale, prefixKey)}: ${formatVolume(locale, value)}`;
 }
 
 function buildInstalledMetaSummary(
+  locale: Locale,
   nodes: Array<{ id: string; name: string }>,
   levels: Record<string, number>
 ): string {
   const active = nodes
     .map((node) => ({ node, level: Math.max(0, Math.floor(levels[node.id] ?? 0)) }))
     .filter((entry) => entry.level > 0)
-    .map((entry) => `${entry.node.name} Lv.${entry.level}`);
+    .map((entry) => `${getMetaNodeName(locale, entry.node.id, entry.node.name)} ${locale === "ru" ? "ур." : "Lv."}${entry.level}`);
 
   return active.length > 0
-    ? `Installed: ${active.join(" | ")}`
-    : "Installed: none yet. Buy permanent upgrades to shape future runs.";
+    ? t(locale, "menu.installedList", { items: active.join(" | ") })
+    : t(locale, "menu.installedNone");
 }

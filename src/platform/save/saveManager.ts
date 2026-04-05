@@ -1,6 +1,8 @@
 import type { PlatformAdapter } from "../platformAdapter";
 import { LOCAL_SAVE_BACKUP_KEY, LOCAL_SAVE_MIRROR_KEY } from "../storageKeys";
 import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "../utils/localStorage";
+import type { LanguageSetting } from "../../i18n/localization";
+import { normalizeLanguageSetting } from "../../i18n/localization";
 
 export const SAVE_VERSION = 1 as const;
 
@@ -10,6 +12,7 @@ export type SaveDataV1 = {
     sfxVolume: number;
     musicVolume: number;
     visualQuality: "auto" | "low" | "medium" | "high";
+    language: LanguageSetting;
   };
   tutorial: {
     completed: boolean;
@@ -45,6 +48,7 @@ export function makeDefaultSave(): SaveData {
       sfxVolume: 0.8,
       musicVolume: 0.6,
       visualQuality: "auto",
+      language: "auto",
     },
     tutorial: {
       completed: false,
@@ -111,6 +115,7 @@ function sanitize(raw: unknown): SaveData | null {
   const sfxVolume = clampNum((raw as any).settings?.sfxVolume, 0.8, 0, 1);
   const musicVolume = clampNum((raw as any).settings?.musicVolume, 0.6, 0, 1);
   const visualQuality = sanitizeVisualQuality((raw as any).settings?.visualQuality);
+  const language = normalizeLanguageSetting((raw as any).settings?.language);
 
   const bestWave = clampNum((raw as any).stats?.bestWave, 0, 0, 9999);
   const bestBolts = clampNum((raw as any).stats?.bestBolts, 0, 0, 1e9);
@@ -132,7 +137,7 @@ function sanitize(raw: unknown): SaveData | null {
 
   return {
     v: SAVE_VERSION,
-    settings: { sfxVolume, musicVolume, visualQuality },
+    settings: { sfxVolume, musicVolume, visualQuality, language },
     tutorial: { completed, skipped },
     meta: { nodeLevels, wallet },
     stats: { bestWave, bestBolts, runsCompleted },

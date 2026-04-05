@@ -5,6 +5,7 @@ import type { SaveData, SaveManager } from "../../platform/save/saveManager";
 import type { RunState } from "../run/runState";
 import { normalizeDailySave } from "../daily/dailyAttempts";
 import { grantMetaWallet } from "../meta/metaProgression";
+import { type Locale, formatNumber, resolveLocale, t } from "../../i18n/localization";
 
 export class ResultsScene extends Phaser.Scene {
   private ads!: AdsManager;
@@ -17,6 +18,7 @@ export class ResultsScene extends Phaser.Scene {
   private x2Label: Phaser.GameObjects.Text | null = null;
   private runRecorded = false;
   private grantedRewards = { bolts: 0, cores: 0 };
+  private locale: Locale = "en";
 
   constructor() {
     super("results");
@@ -26,6 +28,8 @@ export class ResultsScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.saveManager = this.registry.get("saveManager") as SaveManager;
     this.state = this.registry.get("runState") as RunState;
+    const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
+    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
     this.exitBusy = false;
     this.x2Used = false;
     this.runRecorded = false;
@@ -38,7 +42,7 @@ export class ResultsScene extends Phaser.Scene {
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.78).setDepth(2000);
 
     this.add
-      .text(width / 2, height * 0.22, "RUN OVER", { fontSize: "44px", color: "#d9f2ff", fontStyle: "700" })
+      .text(width / 2, height * 0.22, t(this.locale, "results.title"), { fontSize: "44px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(2001);
 
@@ -61,7 +65,7 @@ export class ResultsScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .setDepth(2001);
       const labelX2 = this.add
-        .text(btnX2.x, btnX2.y, `BOOST RESULTS x${formatMult(boostedMult)} (Rewarded)`, {
+        .text(btnX2.x, btnX2.y, t(this.locale, "results.boost", { mult: formatMult(boostedMult) }), {
           fontSize: "16px",
           color: "#d9f2ff",
           fontStyle: "700",
@@ -79,7 +83,7 @@ export class ResultsScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setDepth(2001);
     this.add
-      .text(btnRestart.x, btnRestart.y, "RESTART", { fontSize: "24px", color: "#d9f2ff", fontStyle: "700" })
+      .text(btnRestart.x, btnRestart.y, t(this.locale, "results.restart"), { fontSize: "24px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(2001);
 
@@ -89,7 +93,7 @@ export class ResultsScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setDepth(2001);
     this.add
-      .text(btnMenu.x, btnMenu.y, "MENU", { fontSize: "20px", color: "#d9f2ff", fontStyle: "700" })
+      .text(btnMenu.x, btnMenu.y, t(this.locale, "results.menu"), { fontSize: "20px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(2001);
 
@@ -101,9 +105,13 @@ export class ResultsScene extends Phaser.Scene {
 
   private refreshStatsText(): void {
     const rewardPreview = this.computeCurrentRunRewards(this.saveManager?.get?.() ?? null);
-    this.statsText.setText(
-      `Wave: ${this.state.waveIndex}\nBolts: ${this.state.bolts}\nCores: ${this.state.cores}\nWorkshop: +${rewardPreview.bolts} bolts | +${rewardPreview.cores} cores`
-    );
+    this.statsText.setText(t(this.locale, "results.stats", {
+      wave: formatNumber(this.locale, this.state.waveIndex),
+      bolts: formatNumber(this.locale, this.state.bolts),
+      cores: formatNumber(this.locale, this.state.cores),
+      rewardBolts: formatNumber(this.locale, rewardPreview.bolts),
+      rewardCores: formatNumber(this.locale, rewardPreview.cores),
+    }));
   }
 
   private async handleX2(): Promise<void> {

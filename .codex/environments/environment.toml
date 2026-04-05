@@ -10,5 +10,5 @@ name = "Запустить"
 icon = "run"
 command = '''
 npm run build
-npm run preview
+npx vite preview --port 4174
 '''

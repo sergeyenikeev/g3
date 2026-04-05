@@ -16,6 +16,8 @@ import { applyTrainingModeConfig, TRAINING_STARTING_SCRAP } from "../tutorial/tr
 import type { SaveData } from "../../platform/save/saveManager";
 import { VISUAL_PALETTE, createBgFarSilhouette, createBgTile256, createDecals, createVfxTextures } from "../../visual/TextureFactory";
 import { VfxManager, type VfxQuality } from "../../visual/VfxManager";
+import { type Locale, getEnemyLabel, getPatternTitle, resolveLocale, t } from "../../i18n/localization";
+import { createEntityTextures } from "../../visual/EntityTextureFactory";
 
 type EnemyEntity = {
   sprite: ArcadeImage;
@@ -80,6 +82,7 @@ export class GameScene extends Phaser.Scene {
   private visualQuality: VfxQuality = "medium";
   private visualQualityAuto = true;
   private fpsProbe = { t: 0, frames: 0, done: false };
+  private locale: Locale = "en";
 
   private readonly onVfxScrapCollected = (p: any) => this.vfx?.emit(GAME_EVENTS.SCRAP_COLLECTED, p);
   private readonly onVfxFlipUsed = (p: any) => this.vfx?.emit(GAME_EVENTS.FLIP_USED, p);
@@ -206,6 +209,7 @@ export class GameScene extends Phaser.Scene {
           ? `tutorial:${this.state.startedAtMs}`
           : `run:${this.state.startedAtMs}`;
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
+    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
     const pref = save?.settings?.visualQuality ?? "auto";
     if (pref === "low" || pref === "medium" || pref === "high") {
       this.visualQuality = pref;
@@ -527,7 +531,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private updateEnemyAI(_dt: number): void {
+  private updateEnemyAI(dt: number): void {
     const now = this.time.now / 1000;
     const cfg = this.state.config;
     const speedMult = clamp(
@@ -576,7 +580,8 @@ export class GameScene extends Phaser.Scene {
         spr.body.velocity.y = nny * cfg.enemies.cutter.speed * speedMult;
       }
 
-      spr.setRotation(Math.atan2(spr.body.velocity.y, spr.body.velocity.x));
+      if (e.type === "cutter") spr.rotation += dt * 8;
+      else spr.setRotation(Math.atan2(spr.body.velocity.y, spr.body.velocity.x));
     }
   }
 
@@ -686,13 +691,13 @@ export class GameScene extends Phaser.Scene {
       ctx,
       this.rng
     );
-    this.waveHudLabel = describeWavePlan(this.wavePlan);
+    this.waveHudLabel = describeWavePlan(this.wavePlan, this.locale);
     this.registry.set("uiStatusPrimary", this.waveHudLabel);
 
     this.game.events.emit(GAME_EVENTS.WAVE_START, { waveIndex });
 
     if (this.state.mode === "tutorial") {
-      this.waveHudLabel = "Training: learn the salvage loop";
+      this.waveHudLabel = t(this.locale, "wave.trainingLoop");
       this.registry.set("uiStatusPrimary", this.waveHudLabel);
       this.wavePlan.durationSec = 60 * 60;
       this.wavePlan.spawns.length = 0;
@@ -705,7 +710,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (import.meta.env.VITE_E2E === "1") {
-      this.waveHudLabel = "Quick test wave";
+      this.waveHudLabel = t(this.locale, "wave.quickTest");
       this.registry.set("uiStatusPrimary", this.waveHudLabel);
       this.wavePlan.durationSec = Math.min(this.wavePlan.durationSec, 6);
       this.wavePlan.spawns.length = 0;
@@ -769,7 +774,7 @@ export class GameScene extends Phaser.Scene {
     const tex = type === "shooter" ? "enemy_shooter" : type === "cutter" ? "enemy_cutter" : "enemy_chaser";
     const spr = this.enemyGroup.create(x, y, tex) as ArcadeImage;
     spr.setDepth(25);
-    spr.setCircle(this.state.config.tuning.enemyPhysics.radius);
+    spr.setCircle(this.state.config.tuning.enemyPhysics.radius, 4, 0);
     spr.body.setAllowGravity(false);
     spr.setCollideWorldBounds(true);
     spr.body.setBounce(this.state.config.tuning.enemyPhysics.bounce, this.state.config.tuning.enemyPhysics.bounce);
@@ -811,9 +816,10 @@ export class GameScene extends Phaser.Scene {
   ): void {
     const spr = this.projectileGroup.create(x, y, "projectile") as ArcadeImage;
     spr.setDepth(35);
-    spr.setCircle(4);
+    spr.setCircle(4, 3, 0);
     spr.body.setAllowGravity(false);
     spr.setVelocity(dirX * speed, dirY * speed);
+    spr.setRotation(Math.atan2(dirY, dirX));
     spr.setCollideWorldBounds(false);
     this.projectiles.push({ sprite: spr, owner, damage, bornAt: this.time.now / 1000, lifetimeSec });
   }
@@ -885,36 +891,7 @@ export class GameScene extends Phaser.Scene {
 
   private createTextures(): void {
     this.ensureVisualTextures();
-    if (this.textures.exists("player")) return;
-
-    const makeCircle = (
-      key: string,
-      radius: number,
-      fill: number,
-      stroke?: { color: number; width: number; alpha?: number }
-    ) => {
-      const g = this.add.graphics();
-      if (stroke) g.lineStyle(stroke.width, stroke.color, stroke.alpha ?? 1);
-      g.fillStyle(fill, 1);
-      g.fillCircle(radius, radius, radius);
-      if (stroke) g.strokeCircle(radius, radius, radius - stroke.width / 2);
-      g.generateTexture(key, radius * 2, radius * 2);
-      g.destroy();
-    };
-
-    makeCircle("player", 14, VISUAL_PALETTE.neonCyan, { color: VISUAL_PALETTE.metalLight, width: 3, alpha: 0.95 });
-    makeCircle("recycler", 60, VISUAL_PALETTE.bgMid, { color: VISUAL_PALETTE.neonBlue, width: 4, alpha: 0.9 });
-    makeCircle("scrap_common", 6, VISUAL_PALETTE.metalLight, { color: VISUAL_PALETTE.metalGray, width: 2, alpha: 0.95 });
-    makeCircle("scrap_heavy", 8, VISUAL_PALETTE.warningAmber, { color: VISUAL_PALETTE.rustDark, width: 2, alpha: 0.95 });
-    makeCircle("scrap_rare", 7, VISUAL_PALETTE.neonMagenta, { color: VISUAL_PALETTE.neonBlue, width: 2, alpha: 0.95 });
-    makeCircle("enemy_chaser", 12, VISUAL_PALETTE.hpRed, { color: VISUAL_PALETTE.rustDark, width: 2, alpha: 0.95 });
-    makeCircle("enemy_shooter", 11, VISUAL_PALETTE.neonBlue, { color: VISUAL_PALETTE.rustDark, width: 2, alpha: 0.95 });
-    makeCircle("enemy_cutter", 11, VISUAL_PALETTE.neonMagenta, { color: VISUAL_PALETTE.rustDark, width: 2, alpha: 0.95 });
-    makeCircle("projectile", 4, 0xffffff);
-    makeCircle("shrapnel", 3, VISUAL_PALETTE.neonCyan);
-    makeCircle("telegraph", 14, 0x000000, { color: VISUAL_PALETTE.neonCyan, width: 2, alpha: 0.8 });
-    makeCircle("drone_buddy", 7, VISUAL_PALETTE.neonBlue, { color: VISUAL_PALETTE.neonCyan, width: 2, alpha: 0.95 });
-    makeCircle("scrap_mine", 6, VISUAL_PALETTE.warningAmber, { color: VISUAL_PALETTE.neonMagenta, width: 2, alpha: 0.95 });
+    createEntityTextures(this);
   }
 
   private createWorld(): void {
@@ -949,7 +926,7 @@ export class GameScene extends Phaser.Scene {
       cfg.arena.recyclerPos.y + cfg.tuning.playerStart.offsetYFromRecycler,
       "player"
     ) as ArcadeImage;
-    this.player.setCircle(14);
+    this.player.setCircle(14, 6, 0);
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(30);
     this.player.body.setAllowGravity(false);
@@ -967,7 +944,7 @@ export class GameScene extends Phaser.Scene {
 
     this.recycler = this.physics.add.staticImage(cfg.arena.recyclerPos.x, cfg.arena.recyclerPos.y, "recycler") as ArcadeStaticImage;
     this.recycler.setDepth(5);
-    this.recycler.body.setCircle(cfg.recycler.radius);
+    this.recycler.body.setCircle(cfg.recycler.radius, 10, 10);
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
@@ -1124,7 +1101,7 @@ export class GameScene extends Phaser.Scene {
     this.projectiles = [];
     this.clearScrapMines();
 
-    this.registry.set("uiStatusPrimary", "Upgrade pick");
+    this.registry.set("uiStatusPrimary", t(this.locale, "wave.upgradePick"));
     this.registry.set("uiStatusSecondary", "");
     this.game.events.emit(GAME_EVENTS.WAVE_COMPLETE, { waveIndex: this.state.waveIndex });
     this.scene.launch("upgrade");
@@ -1577,20 +1554,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHudStatus(): void {
-    const waveStatus = this.awaitingUpgrade ? "Upgrade pick" : this.waveHudLabel;
+    const waveStatus = this.awaitingUpgrade ? t(this.locale, "wave.upgradePick") : this.waveHudLabel;
     const buffs: string[] = [];
 
-    if (this.shieldHp > 0) buffs.push(`Shield ${Math.ceil(this.shieldHp)}`);
-    if (this.clampCharges > 0) buffs.push(`Clamp x${this.clampCharges}`);
-    if (this.anchorTime > 0) buffs.push(`Anchor ${this.anchorTime.toFixed(1)}s`);
-    else if (this.state.perks.magnet_anchor) buffs.push(this.anchorCooldown > 0 ? `Anchor ${Math.ceil(this.anchorCooldown)}s` : "Anchor ready");
+    if (this.shieldHp > 0) buffs.push(t(this.locale, "status.shield", { value: Math.ceil(this.shieldHp) }));
+    if (this.clampCharges > 0) buffs.push(t(this.locale, "status.clamp", { value: this.clampCharges }));
+    if (this.anchorTime > 0) buffs.push(t(this.locale, "status.anchor", { value: this.anchorTime.toFixed(1) }));
+    else if (this.state.perks.magnet_anchor) {
+      buffs.push(this.anchorCooldown > 0 ? t(this.locale, "status.anchor", { value: Math.ceil(this.anchorCooldown) }) : t(this.locale, "status.anchorReady"));
+    }
 
-    if (this.vacuumBurstTime > 0) buffs.push(`Vacuum ${this.vacuumBurstTime.toFixed(1)}s`);
-    else if (this.state.perks.vacuum_burst) buffs.push(this.vacuumBurstCooldown > 0 ? `Vacuum ${Math.ceil(this.vacuumBurstCooldown)}s` : "Vacuum ready");
+    if (this.vacuumBurstTime > 0) buffs.push(t(this.locale, "status.vacuum", { value: this.vacuumBurstTime.toFixed(1) }));
+    else if (this.state.perks.vacuum_burst) {
+      buffs.push(this.vacuumBurstCooldown > 0 ? t(this.locale, "status.vacuum", { value: Math.ceil(this.vacuumBurstCooldown) }) : t(this.locale, "status.vacuumReady"));
+    }
 
-    if (this.drone) buffs.push("Drone online");
-    if (this.scrapMines.length > 0) buffs.push(`Mines ${this.scrapMines.length}`);
-    if (this.state.cores > 0) buffs.push(`Core pull x${this.getCorePullMult().toFixed(2)}`);
+    if (this.drone) buffs.push(t(this.locale, "status.drone"));
+    if (this.scrapMines.length > 0) buffs.push(t(this.locale, "status.mines", { value: this.scrapMines.length }));
+    if (this.state.cores > 0) buffs.push(t(this.locale, "status.corePull", { value: this.getCorePullMult().toFixed(2) }));
 
     this.registry.set("uiStatusPrimary", waveStatus);
     this.registry.set("uiStatusSecondary", buffs.join(" | "));
@@ -2073,22 +2054,18 @@ function numOrDefault(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
-function describeWavePlan(plan: WavePlan): string {
-  if (plan.special?.type === "breather") return "Breather wave: harvest and reset";
+function describeWavePlan(plan: WavePlan, locale: Locale): string {
+  if (plan.special?.type === "breather") return t(locale, "wave.breather");
 
   const counts: Record<EnemyType, number> = { chaser: 0, shooter: 0, cutter: 0 };
   for (const spawn of plan.spawns) counts[spawn.type] += spawn.count;
 
   const details = [
-    counts.chaser > 0 ? `${counts.chaser}x Chaser` : null,
-    counts.shooter > 0 ? `${counts.shooter}x Shooter` : null,
-    counts.cutter > 0 ? `${counts.cutter}x Cutter` : null,
+    counts.chaser > 0 ? `${counts.chaser}x ${getEnemyLabel(locale, "chaser")}` : null,
+    counts.shooter > 0 ? `${counts.shooter}x ${getEnemyLabel(locale, "shooter")}` : null,
+    counts.cutter > 0 ? `${counts.cutter}x ${getEnemyLabel(locale, "cutter")}` : null,
   ].filter(Boolean);
 
-  const title = plan.patternId ? titleCase(plan.patternId.replace(/_/g, " ")) : "Pressure wave";
+  const title = getPatternTitle(locale, plan.patternId ?? null);
   return details.length > 0 ? `${title} | ${details.join(", ")}` : title;
-}
-
-function titleCase(value: string): string {
-  return value.replace(/\b\w/g, (s) => s.toUpperCase());
 }

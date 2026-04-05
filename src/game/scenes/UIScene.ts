@@ -7,16 +7,20 @@ import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { SaveData, SaveManager } from "../../platform/save/saveManager";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
+import type { StaticGameData } from "../../data/staticGameData";
 import { VISUAL_PALETTE, createLightGradient, createVfxTextures, createVignette } from "../../visual/TextureFactory";
+import { type Locale, formatNumber, getDailyVariantCopy, resolveLocale, t } from "../../i18n/localization";
 
 type TutorialStep = 1 | 2 | 3;
 
 export class UIScene extends Phaser.Scene {
+  private staticData: StaticGameData | null = null;
   private runState: RunState | null = null;
   private saveManager: SaveManager | null = null;
   private saveData: SaveData | null = null;
   private ads: AdsManager | null = null;
   private analytics: AnalyticsAdapter | null = null;
+  private locale: Locale = "en";
 
   private overlayVignette!: Phaser.GameObjects.Image;
   private overlayLight!: Phaser.GameObjects.Image;
@@ -74,11 +78,13 @@ export class UIScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.staticData = (this.registry.get("staticGameData") as StaticGameData | undefined) ?? null;
     this.runState = (this.registry.get("runState") as RunState | undefined) ?? null;
     this.saveManager = (this.registry.get("saveManager") as SaveManager | undefined) ?? null;
     this.saveData = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.ads = (this.registry.get("adsManager") as AdsManager | undefined) ?? null;
     this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
+    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(this.saveData?.settings?.language ?? "auto"));
 
     this.sfxVolume = this.saveData?.settings?.sfxVolume ?? 0.8;
     this.musicVolume = this.saveData?.settings?.musicVolume ?? 0.6;
@@ -149,13 +155,13 @@ export class UIScene extends Phaser.Scene {
     const bolts = this.runState.bolts;
     const daily =
       this.runState.mode === "daily"
-        ? `| Daily: ${this.runState.daily?.variantId ?? "?"}`
+        ? `| ${t(this.locale, "hud.daily")}: ${this.getDailyLabel()}`
         : this.runState.mode === "tutorial"
-          ? "| Training"
+          ? `| ${t(this.locale, "hud.training")}`
           : "";
 
-    this.hudText.setText(`HP ${Math.ceil(hp)}/${Math.ceil(hpMax)} | Wave ${wave} |`);
-    this.boltsText.setText(`Bolts ${bolts}`);
+    this.hudText.setText(`${t(this.locale, "hud.hp")} ${formatNumber(this.locale, hp)}/${formatNumber(this.locale, hpMax)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, wave)}`);
+    this.boltsText.setText(`${t(this.locale, "hud.bolts")} ${formatNumber(this.locale, bolts)}`);
     this.dailyText.setText(daily);
     this.dailyText.setVisible(Boolean(daily));
     const waveLabel = ((this.registry.get("uiStatusPrimary") as string | undefined) ?? "").trim();
@@ -184,19 +190,19 @@ export class UIScene extends Phaser.Scene {
       this.btnFlip.setScale(pulse);
       this.flipGlow.setAlpha(0.22 + Math.sin(this.flipPulseT * Math.PI * 2 * 1.25) * 0.06);
       this.btnFlip.setStrokeStyle(2, VISUAL_PALETTE.neonCyan, 0.95);
-      this.flipLabel.setText("FLIP");
+      this.flipLabel.setText(t(this.locale, "hud.flip"));
     } else {
       this.btnFlip.setScale(1);
       this.flipGlow.setAlpha(0.08);
       this.btnFlip.setStrokeStyle(2, VISUAL_PALETTE.metalGray, 0.75);
-      this.flipLabel.setText(`FLIP ${Math.ceil(flipCd)}s`);
+      this.flipLabel.setText(`${t(this.locale, "hud.flip")} ${formatCooldown(this.locale, flipCd)}`);
     }
 
     if (dashEnabled) {
       const dashReady = dashCd <= 0.001;
       this.btnDash.setStrokeStyle(2, dashReady ? VISUAL_PALETTE.successGreen : VISUAL_PALETTE.metalGray, dashReady ? 0.95 : 0.7);
       this.dashGlow.setAlpha(dashReady ? 0.16 : 0.06);
-      this.dashLabel.setText(dashReady ? "DASH" : `DASH ${Math.ceil(dashCd)}s`);
+      this.dashLabel.setText(dashReady ? t(this.locale, "hud.dash") : `${t(this.locale, "hud.dash")} ${formatCooldown(this.locale, dashCd)}`);
     }
   }
 
@@ -241,7 +247,7 @@ export class UIScene extends Phaser.Scene {
       inputState.flipPressed = true;
     });
     this.flipLabel = this.add
-      .text(0, 0, "FLIP", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "hud.flip"), { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(1001)
       .setScrollFactor(0);
@@ -267,7 +273,7 @@ export class UIScene extends Phaser.Scene {
       inputState.dashPressed = true;
     });
     this.dashLabel = this.add
-      .text(0, 0, "DASH", { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "hud.dash"), { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(1001)
       .setScrollFactor(0);
@@ -380,7 +386,11 @@ export class UIScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x5cc8ff, 0.8)
       .setInteractive({ useHandCursor: true });
     const btnTxt = this.add
-      .text(220, 0, tutorialMode ? "EXIT" : "SKIP", { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .text(220, 0, tutorialMode ? t(this.locale, "tutorial.exit") : t(this.locale, "tutorial.skip"), {
+        fontSize: "12px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
       .setOrigin(0.5);
 
     btn.on("pointerdown", () => void (tutorialMode ? this.exitTrainingMode() : this.skipTutorial()));
@@ -397,10 +407,12 @@ export class UIScene extends Phaser.Scene {
 
   private refreshTutorialText(): void {
     if (!this.tutorialActive) return;
-    const label = this.isTrainingMode() ? "Training" : "Step";
-    if (this.tutorialStep === 1) this.tutorialText.setText(`${label} 1/3: Move and collect 3 scrap (${this.tutorialScrap}/3).`);
-    if (this.tutorialStep === 2) this.tutorialText.setText(`${label} 2/3: Use FLIP to repel enemies / deflect shots.`);
-    if (this.tutorialStep === 3) this.tutorialText.setText(`${label} 3/3: Bank your tail in the Recycler Zone.`);
+    const label = this.isTrainingMode() ? t(this.locale, "tutorial.trainingLabel") : t(this.locale, "tutorial.stepLabel");
+    if (this.tutorialStep === 1) {
+      this.tutorialText.setText(`${label} 1/3: ${t(this.locale, "tutorial.step1", { count: this.tutorialScrap })}`);
+    }
+    if (this.tutorialStep === 2) this.tutorialText.setText(`${label} 2/3: ${t(this.locale, "tutorial.step2")}`);
+    if (this.tutorialStep === 3) this.tutorialText.setText(`${label} 3/3: ${t(this.locale, "tutorial.step3")}`);
   }
 
   private bindTutorialEvents(): void {
@@ -439,23 +451,27 @@ export class UIScene extends Phaser.Scene {
     this.reviveDim = this.add.rectangle(0, 0, 10, 10, 0x000000, 0.72).setDepth(1400).setScrollFactor(0);
     this.revivePanel = this.add.rectangle(0, 0, 420, 190, 0x0f1720, 0.96).setStrokeStyle(2, 0x5cc8ff, 0.9);
     this.reviveTitle = this.add
-      .text(0, -70, "REVIVE?", { fontSize: "26px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, -70, t(this.locale, "revive.title"), { fontSize: "26px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
     this.reviveHint = this.add
-      .text(0, -32, "Watch a rewarded ad to continue this run.", { fontSize: "14px", color: "#98b7c7", align: "center" })
+      .text(0, -32, t(this.locale, "revive.hint"), { fontSize: "14px", color: "#98b7c7", align: "center" })
       .setOrigin(0.5);
 
     const btnYes = this.add
       .rectangle(0, 42, 260, 54, 0x1b2635, 0.95)
       .setStrokeStyle(2, 0x57c27d, 0.9)
       .setInteractive({ useHandCursor: true });
-    const txtYes = this.add.text(0, 42, "REVIVE (Rewarded)", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" }).setOrigin(0.5);
+    const txtYes = this.add
+      .text(0, 42, t(this.locale, "revive.accept"), { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
 
     const btnNo = this.add
       .rectangle(0, 104, 260, 46, 0x121a24, 0.95)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true });
-    const txtNo = this.add.text(0, 104, "NO THANKS", { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" }).setOrigin(0.5);
+    const txtNo = this.add
+      .text(0, 104, t(this.locale, "revive.decline"), { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
 
     btnYes.on("pointerdown", () => void this.handleRevive(true));
     btnNo.on("pointerdown", () => this.handleRevive(false));
@@ -597,8 +613,18 @@ export class UIScene extends Phaser.Scene {
       // ignore
     }
   }
+
+  private getDailyLabel(): string {
+    if (!this.runState?.daily?.variantId) return "?";
+    const variant = this.staticData?.daily.dailyVariants.find((entry) => entry.id === this.runState?.daily?.variantId);
+    return getDailyVariantCopy(this.locale, this.runState.daily.variantId, variant?.ui?.title ?? this.runState.daily.variantId).title;
+  }
 }
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
+}
+
+function formatCooldown(locale: Locale, seconds: number): string {
+  return `${Math.ceil(Math.max(0, seconds))}${locale === "ru" ? "с" : "s"}`;
 }

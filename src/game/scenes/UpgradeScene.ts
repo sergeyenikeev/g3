@@ -9,6 +9,8 @@ import { GAME_EVENTS } from "../events";
 import { makeUpgradeOffer } from "../upgrades/upgradeSelection";
 import { updatePityAfterPick } from "../upgrades/rarity";
 import { createRarityFrames, createVfxTextures } from "../../visual/TextureFactory";
+import type { SaveData } from "../../platform/save/saveManager";
+import { type Locale, getRarityLabel, getUpgradeCopy, resolveLocale, t } from "../../i18n/localization";
 
 const RARITY_COLORS: Record<string, number> = {
   common: 0x6e7a86,
@@ -22,6 +24,7 @@ export class UpgradeScene extends Phaser.Scene {
   private analytics: AnalyticsAdapter | null = null;
   private state!: RunState;
   private cards: Phaser.GameObjects.Container[] = [];
+  private locale: Locale = "en";
 
   constructor() {
     super("upgrade");
@@ -31,6 +34,8 @@ export class UpgradeScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
     this.state = this.registry.get("runState") as RunState;
+    const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
+    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
     createVfxTextures(this);
     createRarityFrames(this);
 
@@ -38,7 +43,7 @@ export class UpgradeScene extends Phaser.Scene {
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.72).setScrollFactor(0).setDepth(1000);
 
     this.add
-      .text(width / 2, height * 0.16, `UPGRADE PICK - WAVE ${this.state.waveIndex}`, {
+      .text(width / 2, height * 0.16, t(this.locale, "upgrade.title", { wave: this.state.waveIndex }), {
         fontSize: "24px",
         color: "#d9f2ff",
         fontStyle: "700",
@@ -52,7 +57,7 @@ export class UpgradeScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setDepth(1001);
     const rerollLabel = this.add
-      .text(reroll.x, reroll.y, "REROLL (Rewarded)", {
+      .text(reroll.x, reroll.y, t(this.locale, "upgrade.reroll"), {
         fontSize: "16px",
         color: "#d9f2ff",
         fontStyle: "700",
@@ -137,9 +142,10 @@ export class UpgradeScene extends Phaser.Scene {
         .setDisplaySize(w, h)
         .setAlpha(isNeon ? 0.98 : 0.9);
       if (isNeon) frame.setBlendMode(Phaser.BlendModes.ADD);
+      const copy = getUpgradeCopy(this.locale, o.upgrade);
 
       const title = this.add
-        .text(-w / 2 + 18, -h / 2 + 14, o.upgrade.ui?.title ?? o.upgrade.name, {
+        .text(-w / 2 + 18, -h / 2 + 14, copy.title, {
           fontSize: "18px",
           color: "#d9f2ff",
           fontStyle: "700",
@@ -148,7 +154,7 @@ export class UpgradeScene extends Phaser.Scene {
         .setOrigin(0, 0);
 
       const desc = this.add
-        .text(-w / 2 + 18, -h / 2 + 44, o.upgrade.ui?.desc ?? "", {
+        .text(-w / 2 + 18, -h / 2 + 44, copy.desc, {
           fontSize: "14px",
           color: "#98b7c7",
           wordWrap: { width: w - 36 },
@@ -156,7 +162,7 @@ export class UpgradeScene extends Phaser.Scene {
         .setOrigin(0, 0);
 
       const chip = this.add
-        .text(w / 2 - 18, -h / 2 + 14, o.upgrade.rarity.toUpperCase(), {
+        .text(w / 2 - 18, -h / 2 + 14, getRarityLabel(this.locale, o.upgrade.rarity), {
           fontSize: "12px",
           color: "#0b0f14",
           backgroundColor: `#${rarityColor.toString(16).padStart(6, "0")}`,

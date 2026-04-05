@@ -6,6 +6,7 @@ import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
 import { AdsManager } from "../../platform/ads/adsManager";
 import { createPlatformAdapter } from "../../platform/platformFactory";
 import { SaveManager } from "../../platform/save/saveManager";
+import { resolveLocale } from "../../i18n/localization";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -94,6 +95,8 @@ export class BootScene extends Phaser.Scene {
     this.registry.set("platformAdapter", adapter);
     this.registry.set("saveManager", saveManager);
     this.registry.set("saveData", save);
+    this.registry.set("languageSetting", save.settings.language);
+    this.registry.set("locale", resolveLocale(save.settings.language));
     this.registry.set("analytics", analytics);
     this.registry.set("adsManager", adsManager);
 

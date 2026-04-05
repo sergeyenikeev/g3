@@ -31,6 +31,7 @@ describe("SaveManager (integration)", () => {
     const s = await sm.load();
 
     expect(s.v).toBe(1);
+    expect(s.settings.language).toBe("auto");
     expect(s.meta.wallet.bolts).toBe(0);
     expect(s.meta.wallet.cores).toBe(0);
   });
@@ -39,11 +40,13 @@ describe("SaveManager (integration)", () => {
     const sm = new SaveManager(new MemoryAdapter());
     const s = await sm.load();
     s.stats.bestWave = 10;
+    s.settings.language = "ru";
     s.meta.wallet.bolts = 250;
     await sm.save(s);
 
     const s2 = await sm.load();
     expect(s2.stats.bestWave).toBe(10);
+    expect(s2.settings.language).toBe("ru");
     expect(s2.meta.wallet.bolts).toBe(250);
   });
 

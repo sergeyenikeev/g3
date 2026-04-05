@@ -77,23 +77,22 @@ await writeToneMp3(join(OUT_DIR, "upgrade_select.mp3"), {
   env: { attackSec: 0.003, decaySec: 0.03, sustain: 0.25, releaseSec: 0.08 },
 });
 
-await writeToneMp3(join(OUT_DIR, "music_loop.mp3"), {
-  durationSec: 12.0,
-  ffmpegQ: 4,
-  osc: [
-    { type: "sine", freqHz: 220, gain: 0.12 },
-    { type: "sine", freqHz: 277.18, gain: 0.09 },
-    { type: "sine", freqHz: 329.63, gain: 0.08 },
-  ],
-  env: { attackSec: 0.03, decaySec: 0.2, sustain: 0.85, releaseSec: 0.25 },
-  lfo: { freqHz: 0.25, depth: 0.35 },
-});
+await writeMusicLoopMp3(join(OUT_DIR, "music_loop.mp3"));
 
 console.log(`Audio MP3 generated in ${OUT_DIR}`);
 
 async function writeToneMp3(filePath, spec) {
-  const wavPath = join(TMP_DIR, `${safeName(filePath)}.wav`);
   const samples = synth(spec);
+  await writeSamplesMp3(filePath, samples, spec.ffmpegQ ?? 6);
+}
+
+async function writeMusicLoopMp3(filePath) {
+  const samples = composeMusicLoop();
+  await writeSamplesMp3(filePath, samples, 4);
+}
+
+async function writeSamplesMp3(filePath, samples, ffmpegQ) {
+  const wavPath = join(TMP_DIR, `${safeName(filePath)}.wav`);
   const wav = encodeWavMono16(samples, SAMPLE_RATE);
   await writeFile(wavPath, wav);
   await runFfmpeg([
@@ -106,7 +105,7 @@ async function writeToneMp3(filePath, spec) {
     "-codec:a",
     "libmp3lame",
     "-q:a",
-    String(spec.ffmpegQ ?? 6),
+    String(ffmpegQ),
     filePath,
   ]);
   await rm(wavPath, { force: true });
@@ -175,6 +174,237 @@ function synth(spec) {
   return out;
 }
 
+function composeMusicLoop() {
+  const bpm = 118;
+  const beatSec = 60 / bpm;
+  const bars = 4;
+  const beatsPerBar = 4;
+  const durationSec = beatSec * beatsPerBar * bars;
+  const frames = Math.max(1, Math.floor(durationSec * SAMPLE_RATE));
+  const out = new Float32Array(frames);
+
+  const chords = [
+    [220.0, 261.63, 329.63],
+    [174.61, 220.0, 261.63],
+    [130.81, 164.81, 196.0],
+    [196.0, 246.94, 293.66],
+  ];
+
+  const bassPattern = [0, 1.5, 2.0, 3.25];
+  const melodyBars = [
+    [
+      { beat: 0.5, note: 440.0, length: 0.5 },
+      { beat: 1.25, note: 523.25, length: 0.5 },
+      { beat: 2.0, note: 659.25, length: 0.5 },
+      { beat: 2.75, note: 783.99, length: 0.5 },
+      { beat: 3.5, note: 659.25, length: 0.75 },
+    ],
+    [
+      { beat: 0.25, note: 440.0, length: 0.5 },
+      { beat: 1.0, note: 523.25, length: 0.5 },
+      { beat: 1.75, note: 698.46, length: 0.75 },
+      { beat: 3.0, note: 659.25, length: 0.75 },
+    ],
+    [
+      { beat: 0.5, note: 392.0, length: 0.5 },
+      { beat: 1.25, note: 523.25, length: 0.5 },
+      { beat: 2.0, note: 659.25, length: 0.5 },
+      { beat: 2.75, note: 587.33, length: 0.75 },
+    ],
+    [
+      { beat: 0.25, note: 392.0, length: 0.5 },
+      { beat: 1.0, note: 493.88, length: 0.5 },
+      { beat: 1.75, note: 587.33, length: 0.5 },
+      { beat: 2.5, note: 659.25, length: 0.5 },
+      { beat: 3.25, note: 587.33, length: 0.75 },
+    ],
+  ];
+
+  for (let bar = 0; bar < bars; bar++) {
+    const barStart = bar * beatsPerBar * beatSec;
+    const chord = chords[bar] ?? chords[0];
+    if (!chord) continue;
+
+    for (const note of chord) {
+      mixNote(out, {
+        startSec: barStart,
+        durationSec: beatsPerBar * beatSec + 0.06,
+        freqHz: note,
+        gain: 0.055,
+        wave: "triangle",
+        env: { attackSec: 0.04, decaySec: 0.16, sustain: 0.82, releaseSec: 0.12 },
+        vibratoHz: 4.3,
+        vibratoDepth: 0.0025,
+      });
+      mixNote(out, {
+        startSec: barStart,
+        durationSec: beatsPerBar * beatSec + 0.04,
+        freqHz: note * 2,
+        gain: 0.012,
+        wave: "sine",
+        env: { attackSec: 0.02, decaySec: 0.18, sustain: 0.74, releaseSec: 0.08 },
+      });
+    }
+
+    for (const beat of bassPattern) {
+      mixNote(out, {
+        startSec: barStart + beat * beatSec,
+        durationSec: beatSec * 0.42,
+        freqHz: chord[0] / 2,
+        gain: 0.13,
+        wave: "square",
+        env: { attackSec: 0.004, decaySec: 0.08, sustain: 0.52, releaseSec: 0.09 },
+      });
+      mixNote(out, {
+        startSec: barStart + beat * beatSec,
+        durationSec: beatSec * 0.42,
+        freqHz: chord[0] / 2,
+        gain: 0.05,
+        wave: "triangle",
+        env: { attackSec: 0.004, decaySec: 0.06, sustain: 0.45, releaseSec: 0.08 },
+      });
+    }
+
+    for (const phrase of melodyBars[bar] ?? []) {
+      mixNote(out, {
+        startSec: barStart + phrase.beat * beatSec,
+        durationSec: phrase.length * beatSec,
+        freqHz: phrase.note,
+        gain: 0.095,
+        wave: "square",
+        env: { attackSec: 0.01, decaySec: 0.05, sustain: 0.38, releaseSec: 0.08 },
+        vibratoHz: 5.2,
+        vibratoDepth: 0.003,
+      });
+      mixNote(out, {
+        startSec: barStart + phrase.beat * beatSec,
+        durationSec: phrase.length * beatSec,
+        freqHz: phrase.note * 2,
+        gain: 0.018,
+        wave: "triangle",
+        env: { attackSec: 0.008, decaySec: 0.04, sustain: 0.32, releaseSec: 0.06 },
+      });
+    }
+
+    for (let beat = 0; beat < beatsPerBar; beat++) {
+      const start = barStart + beat * beatSec;
+      if (beat === 0 || beat === 2) mixKick(out, start, 0.9);
+      if (beat === 3) mixKick(out, start + beatSec * 0.5, 0.52);
+      if (beat === 1 || beat === 3) mixSnare(out, start, 0.5);
+      mixHat(out, start + beatSec * 0.5, 0.18);
+      mixHat(out, start + beatSec * 0.75, 0.09);
+    }
+  }
+
+  applyDelay(out, Math.floor(beatSec * SAMPLE_RATE * 0.75), 0.2);
+  applyShortCrossfade(out, Math.floor(SAMPLE_RATE * 0.02));
+
+  const rendered = new Int16Array(out.length);
+  for (let i = 0; i < out.length; i++) rendered[i] = floatToInt16(softClip(out[i] * 0.82));
+  return rendered;
+}
+
+function mixNote(out, spec) {
+  const startFrame = Math.max(0, Math.floor(spec.startSec * SAMPLE_RATE));
+  const frames = Math.max(1, Math.floor(spec.durationSec * SAMPLE_RATE));
+  let phase = 0;
+  const freqBase = spec.freqHz;
+  const env = spec.env ?? { attackSec: 0.005, decaySec: 0.04, sustain: 0.5, releaseSec: 0.06 };
+
+  for (let i = 0; i < frames; i++) {
+    const frame = startFrame + i;
+    if (frame >= out.length) break;
+
+    const t = i / SAMPLE_RATE;
+    const amp = envelope(t, spec.durationSec, env);
+    const vib =
+      spec.vibratoHz && spec.vibratoDepth
+        ? 1 + Math.sin(t * Math.PI * 2 * spec.vibratoHz) * spec.vibratoDepth
+        : 1;
+    const freq = freqBase * vib;
+    phase += freq / SAMPLE_RATE;
+    out[frame] += waveSample(spec.wave ?? "sine", phase) * spec.gain * amp;
+  }
+}
+
+function mixKick(out, startSec, gain) {
+  const startFrame = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
+  const frames = Math.max(1, Math.floor(0.2 * SAMPLE_RATE));
+  let phase = 0;
+
+  for (let i = 0; i < frames; i++) {
+    const frame = startFrame + i;
+    if (frame >= out.length) break;
+
+    const t = i / SAMPLE_RATE;
+    const k = i / Math.max(1, frames - 1);
+    const freq = 126 - 82 * Math.pow(k, 0.58);
+    phase += freq / SAMPLE_RATE;
+    const body = Math.sin(phase * Math.PI * 2);
+    const snap = Math.sin(phase * Math.PI * 4) * Math.exp(-t * 28) * 0.24;
+    const amp = Math.exp(-t * 13);
+    out[frame] += (body + snap) * gain * amp * 0.52;
+  }
+}
+
+function mixSnare(out, startSec, gain) {
+  const startFrame = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
+  const frames = Math.max(1, Math.floor(0.16 * SAMPLE_RATE));
+  let phase = 0;
+
+  for (let i = 0; i < frames; i++) {
+    const frame = startFrame + i;
+    if (frame >= out.length) break;
+
+    const t = i / SAMPLE_RATE;
+    phase += 180 / SAMPLE_RATE;
+    const tone = waveSample("triangle", phase) * Math.exp(-t * 18) * 0.18;
+    const noise = (hashNoise(frame * 0.00023) * 2 - 1) * Math.exp(-t * 24);
+    out[frame] += (noise * 0.32 + tone) * gain;
+  }
+}
+
+function mixHat(out, startSec, gain) {
+  const startFrame = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
+  const frames = Math.max(1, Math.floor(0.05 * SAMPLE_RATE));
+
+  for (let i = 0; i < frames; i++) {
+    const frame = startFrame + i;
+    if (frame >= out.length) break;
+
+    const t = i / SAMPLE_RATE;
+    const noise = hashNoise(frame * 0.00071) * 2 - 1;
+    out[frame] += noise * Math.exp(-t * 68) * gain * 0.22;
+  }
+}
+
+function applyDelay(out, delayFrames, feedback) {
+  if (delayFrames <= 0) return;
+  for (let i = delayFrames; i < out.length; i++) {
+    out[i] += out[i - delayFrames] * feedback;
+  }
+}
+
+function applyShortCrossfade(out, fadeFrames) {
+  const frames = Math.max(1, Math.min(fadeFrames, Math.floor(out.length / 4)));
+  for (let i = 0; i < frames; i++) {
+    const k = i / frames;
+    const head = out[i];
+    const tailIndex = out.length - frames + i;
+    const tail = out[tailIndex];
+    out[i] = head * (1 - k) + tail * k;
+    out[tailIndex] = tail * (1 - k) + head * k;
+  }
+}
+
+function waveSample(type, phase) {
+  const p = phase - Math.floor(phase);
+  if (type === "triangle") return 1 - 4 * Math.abs(p - 0.5);
+  if (type === "square") return p < 0.5 ? 1 : -1;
+  if (type === "saw") return p * 2 - 1;
+  return Math.sin(p * Math.PI * 2);
+}
+
 function oscillator(o, t) {
   const type = o.type ?? "sine";
   if (type === "noise") return (hashNoise(t) * 2 - 1) * 0.9;
@@ -235,4 +465,3 @@ function hashNoise(t) {
 function safeName(filePath) {
   return filePath.replaceAll(/[^\w.-]+/g, "_");
 }
-
