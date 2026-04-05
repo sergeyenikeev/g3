@@ -8,7 +8,7 @@
     "invulnOnHitSec": 0.55
   },
   "dash": {
-    "enabledByDefault": false,
+    "enabledByDefault": true,
     "speedMult": 1.85,
     "durationSec": 0.25,
     "cooldownSec": 4.5,

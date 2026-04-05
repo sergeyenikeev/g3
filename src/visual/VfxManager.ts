@@ -115,6 +115,9 @@ export class VfxManager {
       case "flip_used":
         this.onFlipUsed(params);
         return;
+      case "dash_used":
+        this.onDashUsed(params);
+        return;
       case "projectile_deflected":
         this.onProjectileDeflected(params);
         return;
@@ -316,6 +319,55 @@ export class VfxManager {
     }
 
     this.spawnSparkBurst(x, y, 5, { tintA: VISUAL_PALETTE.metalLight, tintB: VISUAL_PALETTE.neonCyan, speed: 190, life: 0.18, spread: 1 });
+  }
+
+  private onDashUsed(p: any): void {
+    const x = num(p?.x);
+    const y = num(p?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    const dirX = Number.isFinite(num(p?.dirX)) ? num(p?.dirX) : 1;
+    const dirY = Number.isFinite(num(p?.dirY)) ? num(p?.dirY) : 0;
+    const rot = Math.atan2(dirY, dirX);
+
+    this.cameraShake(75, 0.0022);
+    this.spawnGlow(x, y, VISUAL_PALETTE.successGreen, 0.24, 0.86, 0.16);
+    this.spawnSparkBurst(x, y, this.quality === "low" ? 5 : 8, {
+      tintA: VISUAL_PALETTE.successGreen,
+      tintB: VISUAL_PALETTE.neonCyan,
+      speed: 190,
+      life: 0.2,
+      spread: 1,
+    });
+
+    for (let i = 0; i < (this.quality === "low" ? 2 : 4); i++) {
+      const offset = 16 + i * 10;
+      const px = x - dirX * offset;
+      const py = y - dirY * offset;
+      const obj = this.world?.add?.image?.(px, py, "vfx_trail");
+      if (!obj) continue;
+      safeSet(obj, "setDepth", 68);
+      safeSet(obj, "setBlendMode", "ADD");
+      safeSet(obj, "setTint", VISUAL_PALETTE.successGreen);
+      safeSet(obj, "setAlpha", 0.72 - i * 0.12);
+      safeSet(obj, "setScale", 0.9 - i * 0.08);
+      safeSet(obj, "setRotation", rot + Math.PI / 2);
+      this.fx.push({
+        kind: "tween",
+        obj,
+        age: 0,
+        life: 0.14 + i * 0.03,
+        x0: px,
+        y0: py,
+        x1: px - dirX * 22,
+        y1: py - dirY * 22,
+        s0: 0.95 - i * 0.08,
+        s1: 0.18,
+        a0: 0.72 - i * 0.12,
+        a1: 0,
+        ease: "out",
+      });
+    }
   }
 
   private onPlayerHit(p: any): void {

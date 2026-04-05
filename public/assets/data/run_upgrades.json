@@ -330,8 +330,9 @@
       "desc": "Открывает Dash в ранe и −15% кд Dash."
     },
     "effects": [
-      { "op": "set", "path": "dash.enabledByDefault", "value": true },
-      { "op": "mul", "path": "dash.cooldownSec", "value": 0.85 }
+      { "op": "mul", "path": "dash.cooldownSec", "value": 0.85 },
+      { "op": "mul", "path": "dash.durationSec", "value": 1.15 },
+      { "op": "add", "path": "dash.iframesSec", "value": 0.05 }
     ],
     "synergy": { "worksWith": ["emergency_patch", "overclock"] }
   },

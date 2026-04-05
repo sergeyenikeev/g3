@@ -28,7 +28,7 @@ describe("localization", () => {
   it("formats localized copy for gameplay and meta data", () => {
     expect(t("ru", "menu.play")).toBe("ИГРАТЬ");
     expect(getDailyVariantCopy("ru", "daily_fast_flip").title).toBe("Быстрый флип");
-    expect(getMetaNodeName("ru", "meta_dash_unlock", "Dash")).toBe("Модуль рывка");
+    expect(getMetaNodeName("ru", "meta_dash_unlock", "Dash")).toBe("Тюнинг рывка");
     expect(getRarityLabel("en", "epic")).toBe("EPIC");
     expect(formatResource("ru", "cores", 3)).toBe("3 ядра");
   });

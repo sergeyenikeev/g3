@@ -48,11 +48,12 @@
     },
     {
       "id": "meta_dash_unlock",
-      "name": "Dash Module (Unlock)",
+      "name": "Dash Tuning",
       "maxLevel": 1,
       "cost": { "currency": "cores", "amount": 2 },
       "effects": [
-        { "op": "set", "path": "dash.enabledByDefault", "value": true }
+        { "op": "mul", "path": "dash.cooldownSec", "value": 0.9 },
+        { "op": "add", "path": "dash.iframesSec", "value": 0.05 }
       ]
     },
     {

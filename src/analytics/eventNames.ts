@@ -11,6 +11,7 @@ export const ANALYTICS_EVENTS = {
   RUN_END: "run_end",
 
   FLIP_USED: "flip_used",
+  DASH_USED: "dash_used",
   RECYCLER_BANK_COMPLETE: "recycler_bank_complete",
 
   UPGRADE_OFFER: "upgrade_offer",
@@ -29,4 +30,3 @@ export const ANALYTICS_EVENTS = {
   DAILY_ENTER: "daily_enter",
   DAILY_ATTEMPT_USED: "daily_attempt_used",
 } as const;
-

@@ -139,6 +139,7 @@ export class GameScene extends Phaser.Scene {
   private flipCount = 0;
   private dashCooldown = 0;
   private dashTime = 0;
+  private dashWakeTime = 0;
   private shieldHp = 0;
   private shieldTime = 0;
   private clampCharges = 0;
@@ -1130,9 +1131,94 @@ export class GameScene extends Phaser.Scene {
   }
 
   private doDash(): void {
-    this.dashCooldown = this.state.config.dash.cooldownSec;
-    this.dashTime = this.state.config.dash.durationSec;
-    this.playerInvuln = Math.max(this.playerInvuln, this.state.config.dash.iframesSec);
+    const cfg = this.state.config.dash;
+    this.dashCooldown = cfg.cooldownSec;
+    this.dashTime = cfg.durationSec;
+    this.playerInvuln = Math.max(this.playerInvuln, cfg.iframesSec);
+
+    let dirX = inputState.moveX;
+    let dirY = inputState.moveY;
+    const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
+    if (dirLen > 0.001) {
+      dirX /= dirLen;
+      dirY /= dirLen;
+    } else {
+      const vel = this.player.body.velocity;
+      const velLen = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
+      if (velLen > 0.001) {
+        dirX = vel.x / velLen;
+        dirY = vel.y / velLen;
+      } else {
+        dirX = Math.cos(this.player.rotation);
+        dirY = Math.sin(this.player.rotation);
+      }
+    }
+
+    const burstSpeed = Math.max(this.state.config.player.speedBase * (cfg.speedMult + 0.45), 520);
+    this.player.setVelocity(dirX * burstSpeed, dirY * burstSpeed);
+    this.applyDashBurst(dirX, dirY);
+    this.vfx?.emit("dash_used", { x: this.player.x, y: this.player.y, dirX, dirY });
+    this.track(ANALYTICS_EVENTS.DASH_USED, {});
+  }
+
+  private applyDashBurst(dirX: number, dirY: number): void {
+    const enemyRadius = 108;
+    const enemyRadiusSq = enemyRadius * enemyRadius;
+    const projectileRadius = 118;
+    const projectileRadiusSq = projectileRadius * projectileRadius;
+    const coneDot = -0.2;
+    const enemyDamage = 7;
+    const enemyPush = 540;
+    const forwardPush = 220;
+    let enemyHits = 0;
+    let projectileHits = 0;
+
+    for (const enemy of this.enemies) {
+      const spr = enemy.sprite;
+      if (!spr.active) continue;
+      const dx = spr.x - this.player.x;
+      const dy = spr.y - this.player.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > enemyRadiusSq || d2 < 0.001) continue;
+
+      const dist = Math.sqrt(d2);
+      const nx = dx / dist;
+      const ny = dy / dist;
+      if (nx * dirX + ny * dirY < coneDot) continue;
+
+      enemy.disruption = addEnemyDisruption(enemy.disruption, nx * enemyPush + dirX * forwardPush, ny * enemyPush + dirY * forwardPush, 0.18);
+      this.applyEnemyShock(enemy, 0.14, VISUAL_PALETTE.successGreen);
+      enemy.hp -= enemyDamage;
+      if (enemy.hp <= 0) this.killEnemy(enemy);
+      else this.vfx?.emit("enemy_hit", { x: spr.x, y: spr.y, enemyType: enemy.type, damage: enemyDamage, source: "dash" });
+      enemyHits += 1;
+    }
+
+    for (const projectile of this.projectiles) {
+      const spr = projectile.sprite;
+      if (!spr.active || projectile.owner !== "enemy") continue;
+      const dx = spr.x - this.player.x;
+      const dy = spr.y - this.player.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > projectileRadiusSq || d2 < 0.001) continue;
+
+      const dist = Math.sqrt(d2);
+      const nx = dx / dist;
+      const ny = dy / dist;
+      if (nx * dirX + ny * dirY < coneDot) continue;
+
+      const speed = Math.max(this.state.config.tuning.projectile.deflectMinSpeed * 2.4, spr.body.velocity.length() * 1.15, 280);
+      spr.body.velocity.x = dirX * speed + nx * 60;
+      spr.body.velocity.y = dirY * speed + ny * 60;
+      spr.setRotation(Math.atan2(spr.body.velocity.y, spr.body.velocity.x));
+      projectile.owner = "player";
+      this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: spr.x, y: spr.y });
+      projectileHits += 1;
+    }
+
+    if (enemyHits > 0 || projectileHits > 0) {
+      this.triggerHitStop(Math.min(34, 10 + enemyHits * 4 + projectileHits * 3));
+    }
   }
 
   private isDashEnabled(): boolean {

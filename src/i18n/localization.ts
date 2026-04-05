@@ -265,7 +265,7 @@ const UPGRADE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     emergency_patch: { title: "Emergency Patch", desc: "+20 max HP and heal 20 immediately." },
     recycler_bonus: { title: "Recycler Bonus", desc: "Banking heals more and grants +10% bolts." },
     overclock: { title: "Overclock", desc: "+12% speed, but incoming damage is +10%." },
-    dash_module: { title: "Dash Module", desc: "Unlock Dash for this run and reduce its cooldown by 15%." },
+    dash_module: { title: "Dash Module", desc: "Boost Dash for this run: -15% cooldown, longer burst, and more i-frames." },
     drone_buddy: { title: "Drone Buddy", desc: "A support drone fires every 1.4s for 6 damage." },
     scrap_mine: { title: "Scrap Mine", desc: "Lost tail segments become mines for 3s." },
     x2_results_hook: { title: "Double Results Hook", desc: "Improves the value of the rewarded results screen." },
@@ -288,7 +288,7 @@ const UPGRADE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     emergency_patch: { title: "Экстренный ремонт", desc: "+20 к макс. HP и мгновенное лечение на 20." },
     recycler_bonus: { title: "Бонус переработчика", desc: "Сдача сильнее лечит и даёт +10% болтов." },
     overclock: { title: "Разгон", desc: "+12% скорости, но входящий урон +10%." },
-    dash_module: { title: "Модуль рывка", desc: "Открывает рывок в этом заезде и снижает его кд на 15%." },
+    dash_module: { title: "Модуль рывка", desc: "Усиливает рывок в этом заезде: -15% кд, длиннее окно рывка и больше i-frame." },
     drone_buddy: { title: "Дрон-напарник", desc: "Дрон стреляет раз в 1.4с и наносит 6 урона." },
     scrap_mine: { title: "Мины из лома", desc: "Потерянные сегменты хвоста превращаются в мины на 3с." },
     x2_results_hook: { title: "Крюк двойной выгоды", desc: "Усиливает ценность рекламного экрана наград." },
@@ -314,8 +314,8 @@ const META_NODE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
       desc: "Permanent tail length and gentler speed penalties for hauling builds.",
     },
     meta_dash_unlock: {
-      title: "Dash Module",
-      desc: "Unlock Dash as a default tool for every future run.",
+      title: "Dash Tuning",
+      desc: "Sharpen every future dash with lower cooldown and a safer burst window.",
     },
     meta_recycler_overdrive: {
       title: "Recycler Overdrive",
@@ -340,8 +340,8 @@ const META_NODE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
       desc: "Постоянно удлиняет караван и смягчает штраф скорости за хвост.",
     },
     meta_dash_unlock: {
-      title: "Модуль рывка",
-      desc: "Открывает рывок как постоянный инструмент во всех будущих заездах.",
+      title: "Тюнинг рывка",
+      desc: "Улучшает все будущие рывки: ниже кд и безопаснее окно прорыва.",
     },
     meta_recycler_overdrive: {
       title: "Форсаж переработчика",

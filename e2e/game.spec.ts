@@ -59,6 +59,19 @@ test("smoke: training, daily, tutorial, upgrade, results", async ({ page }) => {
 
   // Flip
   await page.keyboard.press("Space");
+  await page.waitForFunction(() => {
+    const g = (window as any).__MC_GAME__;
+    const cd = g?.registry?.get("flipCooldown");
+    return typeof cd === "number" && cd > 0;
+  });
+
+  // Dash
+  await page.keyboard.press("Shift");
+  await page.waitForFunction(() => {
+    const g = (window as any).__MC_GAME__;
+    const cd = g?.registry?.get("dashCooldown");
+    return typeof cd === "number" && cd > 0;
+  });
 
   // Move to recycler
   await page.keyboard.down("ArrowUp");
