@@ -7,6 +7,9 @@ import { consumeDailyAttempt, getDailyAttemptsInfo, normalizeDailySave, planDail
 import { getMetaNodeCost, getMetaNodeLevel, getMetaWalletAmount, purchaseMetaNode } from "../meta/metaProgression";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
+import { bindPageLifecycle } from "../../platform/pageLifecycle";
+import type { PlatformAdapter } from "../../platform/platformAdapter";
+import { getPlatformNowMs, signalPlatformGameReady, addPlatformLifecycleListener } from "../../platform/platformRuntime";
 import type { SaveData } from "../../platform/save/saveManager";
 import type { SaveManager } from "../../platform/save/saveManager";
 import { createEntityTextures } from "../../visual/EntityTextureFactory";
@@ -33,6 +36,7 @@ export class MenuScene extends Phaser.Scene {
   private ads!: AdsManager;
   private analytics!: AnalyticsAdapter;
   private saveManager!: SaveManager;
+  private platformAdapter: PlatformAdapter | null = null;
   private saveData: SaveData | null = null;
   private toastText: Phaser.GameObjects.Text | null = null;
   private walletText: Phaser.GameObjects.Text | null = null;
@@ -65,6 +69,7 @@ export class MenuScene extends Phaser.Scene {
   private heroHintText!: Phaser.GameObjects.Text;
   private heroBaseX = 0;
   private heroBaseY = 0;
+  private suspendReasons = new Set<string>();
 
   constructor() {
     super("menu");
@@ -75,10 +80,11 @@ export class MenuScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.analytics = this.registry.get("analytics") as AnalyticsAdapter;
     this.saveManager = this.registry.get("saveManager") as SaveManager;
+    this.platformAdapter = (this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null;
     this.saveData = (this.registry.get("saveData") as SaveData | undefined) ?? this.saveManager.get();
     const save = this.saveData;
     this.languageSetting = normalizeLanguageSetting(save?.settings?.language);
-    this.locale = resolveLocale(this.languageSetting);
+    this.locale = this.resolveLocaleSetting(this.languageSetting);
     this.registry.set("languageSetting", this.languageSetting);
     this.registry.set("locale", this.locale);
     createEntityTextures(this);
@@ -87,6 +93,14 @@ export class MenuScene extends Phaser.Scene {
     this.input.once("pointerdown", () => this.enableAudio());
     this.input.keyboard?.once("keydown", () => this.enableAudio());
     if (!(this.sound as any)?.locked) this.enableAudio();
+    const releasePageLifecycle = bindPageLifecycle({
+      hide: () => this.setExternalPause("page", true),
+      show: () => this.setExternalPause("page", false),
+    });
+    const releasePlatformLifecycle = addPlatformLifecycleListener(this.platformAdapter, {
+      pause: () => this.setExternalPause("platform", true),
+      resume: () => this.setExternalPause("platform", false),
+    });
     const stats = save?.stats ?? { bestWave: 0, bestBolts: 0 };
     const boosterCfg = this.staticData.balances.ads?.rewarded?.startBooster;
     const boosterEnabled = Boolean(boosterCfg?.enabled);
@@ -265,7 +279,7 @@ export class MenuScene extends Phaser.Scene {
       const next = languageOrder[(idx + 1) % languageOrder.length]!;
       void this.setLanguage(next).then(() => {
         this.languageSetting = next;
-        this.locale = resolveLocale(next);
+        this.locale = this.resolveLocaleSetting(next);
         this.registry.set("languageSetting", next);
         this.registry.set("locale", this.locale);
         this.scene.restart();
@@ -434,10 +448,16 @@ export class MenuScene extends Phaser.Scene {
     this.scale.on("resize", onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off("resize", onResize);
+      releasePageLifecycle();
+      releasePlatformLifecycle();
+      this.suspendReasons.clear();
     });
 
     layoutMenu(this.scale);
     this.refreshWalletSummary();
+    this.time.delayedCall(0, () => {
+      void signalPlatformGameReady(this.platformAdapter, this.registry);
+    });
     void this.ensureDailyNormalizedAndRefresh(dailyInfo).then((info) => refreshDailyButtons(info));
   }
 
@@ -771,7 +791,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private async ensureDailyNormalizedAndRefresh(dailyInfoText: Phaser.GameObjects.Text): Promise<DailyAttemptsInfo> {
-    const dateUtc = getUtcYyyymmdd();
+    const dateUtc = this.getCurrentDateUtc();
     const save = this.saveManager.get();
     const normalized = normalizeDailySave(save, dateUtc);
     if (normalized !== save) {
@@ -840,7 +860,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private async startDaily(boosted: boolean): Promise<void> {
-    const dateUtc = getUtcYyyymmdd();
+    const dateUtc = this.getCurrentDateUtc();
     const save0 = this.saveManager.get();
     const normalized = normalizeDailySave(save0, dateUtc);
     if (normalized !== save0) {
@@ -954,24 +974,64 @@ export class MenuScene extends Phaser.Scene {
       // ignore
     }
 
-    try {
-      const battleMusic = (this.sound as any).get?.("music_main") as Phaser.Sound.BaseSound | undefined;
-      if (battleMusic?.isPlaying) battleMusic.stop();
-      const volume = this.saveData?.settings?.musicVolume ?? 0.6;
-      const existing = (this.sound as any).get?.("music_menu") as Phaser.Sound.BaseSound | undefined;
-      this.menuMusic = existing ?? this.sound.add("music_menu", { loop: true, volume });
-      (this.menuMusic as any)?.setVolume?.(volume);
-      if (this.menuMusic && typeof (this.menuMusic as any).volume === "number") (this.menuMusic as any).volume = volume;
-      if (!this.menuMusic?.isPlaying) this.menuMusic?.play();
-    } catch {
-      // ignore
-    }
+    this.resumeMenuMusicIfAllowed();
   }
 
   private stopMenuMusic(): void {
     try {
       const track = (this.sound as any).get?.("music_menu") as Phaser.Sound.BaseSound | undefined;
-      if (track?.isPlaying) track.stop();
+      if (!track) return;
+      if (typeof (track as any).pause === "function" && ((track as any).isPlaying || (track as any).isPaused === false)) {
+        (track as any).pause();
+        return;
+      }
+      if (track.isPlaying) track.stop();
+    } catch {
+      // ignore
+    }
+  }
+
+  private getCurrentDateUtc(): string {
+    return getUtcYyyymmdd(new Date(getPlatformNowMs(this.registry)));
+  }
+
+  private resolveLocaleSetting(setting: LanguageSetting): Locale {
+    const platformLanguageHint = (this.registry.get("platformLanguageHint") as string | undefined) ?? null;
+    return resolveLocale(setting, platformLanguageHint ? [platformLanguageHint] : null);
+  }
+
+  private setExternalPause(reason: string, paused: boolean): void {
+    if (paused) this.suspendReasons.add(reason);
+    else this.suspendReasons.delete(reason);
+
+    if (this.suspendReasons.size > 0) {
+      this.stopMenuMusic();
+      return;
+    }
+
+    this.resumeMenuMusicIfAllowed();
+  }
+
+  private resumeMenuMusicIfAllowed(): void {
+    if (!this.audioEnabled) return;
+    if (this.suspendReasons.size > 0) return;
+
+    try {
+      const battleMusic = (this.sound as any).get?.("music_main") as Phaser.Sound.BaseSound | undefined;
+      if (battleMusic?.isPlaying) battleMusic.stop();
+
+      const volume = this.saveData?.settings?.musicVolume ?? 0.6;
+      const existing = (this.sound as any).get?.("music_menu") as Phaser.Sound.BaseSound | undefined;
+      this.menuMusic = existing ?? this.sound.add("music_menu", { loop: true, volume });
+      (this.menuMusic as any)?.setVolume?.(volume);
+      if (this.menuMusic && typeof (this.menuMusic as any).volume === "number") (this.menuMusic as any).volume = volume;
+
+      if (typeof (this.menuMusic as any)?.resume === "function" && (this.menuMusic as any).isPaused) {
+        (this.menuMusic as any).resume();
+        return;
+      }
+
+      if (!this.menuMusic?.isPlaying) this.menuMusic?.play();
     } catch {
       // ignore
     }

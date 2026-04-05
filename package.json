@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:web": "node scripts/build_platform_release.mjs web",
+    "build:generic": "node scripts/build_platform_release.mjs generic",
+    "build:yandex": "node scripts/build_platform_release.mjs yandex",
+    "build:vk": "node scripts/build_platform_release.mjs vk",
     "preview": "vite preview --strictPort --port 4173",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
@@ -17,6 +21,8 @@
     "test:e2e": "node scripts/run_playwright_e2e.mjs",
     "audio:generate": "node scripts/generate_audio_assets.mjs",
     "visual:generate": "node scripts/generate_visual_assets.mjs",
+    "media:yandex": "node scripts/capture_yandex_media.mjs",
+    "package:yandex": "node scripts/assemble_yandex_upload.mjs",
     "build:test-mock": "node scripts/build_test_mock.mjs",
     "build:release": "node scripts/build_release.mjs"
   },

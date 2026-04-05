@@ -47,10 +47,21 @@
 - `showInterstitial()`
 - `showRewarded(placement)`
 - `save()/load()`
+- `getPreferredLanguage()`
+- `getServerTimeMs()`
+- `signalGameReady()`
+- `signalGameplayStart()/signalGameplayStop()`
+- `addLifecycleListener()`
 
 Для разработки/тестов используется mock-адаптер.
-Активно поддерживаемые release-цели: `web`, `yandex`, `vk`.
+Активно поддерживаемые release-цели: `web`, `generic`, `yandex`, `vk`.
 `scripts/build_release.mjs` собирает отдельные ZIP только для этих целей, а `src/platform/sdk/loadPlatformSdk.ts` подгружает SDK только там, где они ещё используются.
+
+Такой контракт нужен не только для текущего релиза в Яндекс Игры, но и для дальнейшего поэтапного переноса на другие площадки:
+- язык и серверное время не зависят от `navigator` и локальных часов браузера;
+- loading/gameplay hooks не вшиваются в сцены напрямую;
+- pause/resume события платформы обрабатываются единообразно;
+- платформенный код не проникает в core gameplay.
 
 ### Сохранения
 

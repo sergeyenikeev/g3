@@ -11,6 +11,8 @@ import { updatePityAfterPick } from "../upgrades/rarity";
 import { createRarityFrames, createVfxTextures } from "../../visual/TextureFactory";
 import type { SaveData } from "../../platform/save/saveManager";
 import { type Locale, getRarityLabel, getUpgradeCopy, resolveLocale, t } from "../../i18n/localization";
+import type { PlatformAdapter } from "../../platform/platformAdapter";
+import { signalPlatformGameplayStop } from "../../platform/platformRuntime";
 
 const RARITY_COLORS: Record<string, number> = {
   common: 0x6e7a86,
@@ -34,6 +36,7 @@ export class UpgradeScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
     this.state = this.registry.get("runState") as RunState;
+    void signalPlatformGameplayStop((this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null);
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
     createVfxTextures(this);

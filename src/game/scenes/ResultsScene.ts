@@ -6,6 +6,8 @@ import type { RunState } from "../run/runState";
 import { normalizeDailySave } from "../daily/dailyAttempts";
 import { grantMetaWallet } from "../meta/metaProgression";
 import { type Locale, formatNumber, resolveLocale, t } from "../../i18n/localization";
+import type { PlatformAdapter } from "../../platform/platformAdapter";
+import { signalPlatformGameplayStop } from "../../platform/platformRuntime";
 
 export class ResultsScene extends Phaser.Scene {
   private ads!: AdsManager;
@@ -28,6 +30,7 @@ export class ResultsScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.saveManager = this.registry.get("saveManager") as SaveManager;
     this.state = this.registry.get("runState") as RunState;
+    void signalPlatformGameplayStop((this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null);
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
     this.exitBusy = false;

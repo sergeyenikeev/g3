@@ -19,6 +19,8 @@ import { VISUAL_PALETTE, createBgFarSilhouette, createBgTile256, createDecals, c
 import { VfxManager, type VfxQuality } from "../../visual/VfxManager";
 import { type Locale, getEnemyLabel, getPatternTitle, resolveLocale, t } from "../../i18n/localization";
 import { createEntityTextures } from "../../visual/EntityTextureFactory";
+import type { PlatformAdapter } from "../../platform/platformAdapter";
+import { getPlatformNowMs, signalPlatformGameplayStart, signalPlatformGameplayStop } from "../../platform/platformRuntime";
 
 type EnemyEntity = {
   sprite: ArcadeImage;
@@ -73,6 +75,7 @@ export class GameScene extends Phaser.Scene {
   private staticData!: StaticGameData;
   private state!: RunState;
   private analytics: AnalyticsAdapter | null = null;
+  private platformAdapter: PlatformAdapter | null = null;
   private e2eKillKey: Phaser.Input.Keyboard.Key | null = null;
   private e2eWindowBound = false;
 
@@ -171,6 +174,8 @@ export class GameScene extends Phaser.Scene {
     this.staticData = this.registry.get("staticGameData") as StaticGameData;
     const mode = (this.registry.get("runMode") as RunMode | undefined) ?? "run";
     this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
+    this.platformAdapter = (this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null;
+    const currentDateUtc = getUtcYyyymmdd(new Date(getPlatformNowMs(this.registry)));
 
     const built = buildRuntimeConfig(this.staticData, {
       presetId: "normal",
@@ -182,7 +187,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set("pendingStartBooster", false);
 
     this.rng = createRng(
-      mode === "daily" ? `daily-run:${getUtcYyyymmdd()}` : mode === "tutorial" ? `tutorial:${Date.now()}` : `run:${Date.now()}`
+      mode === "daily" ? `daily-run:${currentDateUtc}` : mode === "tutorial" ? `tutorial:${Date.now()}` : `run:${Date.now()}`
     );
 
     this.state = {
@@ -202,8 +207,7 @@ export class GameScene extends Phaser.Scene {
     };
 
     if (mode === "daily") {
-      const dateUtc = getUtcYyyymmdd();
-      const sel = pickDailyVariant(this.state.config.daily, dateUtc);
+      const sel = pickDailyVariant(this.state.config.daily, currentDateUtc);
       applyDailyToConfig(this.state.config, this.state.perks, this.state.config.daily, sel);
       this.state.daily = { dateUtc: sel.dateUtc, variantId: sel.variantId, specialRule: sel.specialRule };
     }
@@ -215,12 +219,15 @@ export class GameScene extends Phaser.Scene {
     this.registry.set("runState", this.state);
     this.visualSeed =
       mode === "daily"
-        ? `daily:${this.state.daily?.dateUtc ?? getUtcYyyymmdd()}`
+        ? `daily:${this.state.daily?.dateUtc ?? currentDateUtc}`
         : mode === "tutorial"
           ? `tutorial:${this.state.startedAtMs}`
           : `run:${this.state.startedAtMs}`;
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
-    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
+    const platformLanguageHint = (this.registry.get("platformLanguageHint") as string | undefined) ?? null;
+    this.locale =
+      ((this.registry.get("locale") as Locale | undefined) ??
+        resolveLocale(save?.settings?.language ?? "auto", platformLanguageHint ? [platformLanguageHint] : null));
     const pref = save?.settings?.visualQuality ?? "auto";
     this.applyVisualQualityPreference(pref);
     this.registry.set("visualQuality", this.visualQuality);
@@ -259,6 +266,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(GAME_EVENTS.TUTORIAL_STEP_CHANGED, this.onTutorialStepChanged, this);
     this.game.events.on(GAME_EVENTS.TUTORIAL_FINISHED, this.onTutorialFinished, this);
     this.game.events.on(GAME_EVENTS.TUTORIAL_EXITED, this.onTutorialExited, this);
+    void signalPlatformGameplayStart(this.platformAdapter);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.REVIVE_ACCEPTED, this.onReviveAccepted, this);
       this.game.events.off(GAME_EVENTS.REVIVE_DECLINED, this.onReviveDeclined, this);
@@ -272,9 +280,11 @@ export class GameScene extends Phaser.Scene {
       } catch {
         // ignore
       }
+      void signalPlatformGameplayStop(this.platformAdapter);
     });
 
     this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      void signalPlatformGameplayStart(this.platformAdapter);
       if (this.awaitingUpgrade) {
         this.awaitingUpgrade = false;
         this.state.waveIndex += 1;
@@ -1279,11 +1289,12 @@ export class GameScene extends Phaser.Scene {
     this.projectiles = [];
     this.clearScrapMines();
 
-    this.registry.set("uiStatusPrimary", t(this.locale, "wave.upgradePick"));
-    this.registry.set("uiStatusSecondary", "");
-    this.game.events.emit(GAME_EVENTS.WAVE_COMPLETE, { waveIndex: this.state.waveIndex });
-    this.scene.launch("upgrade");
-    this.scene.pause();
+      this.registry.set("uiStatusPrimary", t(this.locale, "wave.upgradePick"));
+      this.registry.set("uiStatusSecondary", "");
+      this.game.events.emit(GAME_EVENTS.WAVE_COMPLETE, { waveIndex: this.state.waveIndex });
+      void signalPlatformGameplayStop(this.platformAdapter);
+      this.scene.launch("upgrade");
+      this.scene.pause();
   }
 
   private spawnScrapAt(x: number, y: number, forcedType?: ScrapType): void {
@@ -1592,6 +1603,7 @@ export class GameScene extends Phaser.Scene {
   private endRun(reason: string): void {
     if (this.state.deathReason) return;
     this.state.deathReason = reason;
+    void signalPlatformGameplayStop(this.platformAdapter);
     this.game.events.emit(GAME_EVENTS.RUN_END, { waveIndex: this.state.waveIndex, bolts: this.state.bolts });
     const durationMs = Math.max(0, Date.now() - this.state.startedAtMs);
     this.track(ANALYTICS_EVENTS.RUN_END, {
@@ -1625,6 +1637,7 @@ export class GameScene extends Phaser.Scene {
   private offerRevive(): void {
     this.revivePending = true;
     this.reviveOffered = true;
+    void signalPlatformGameplayStop(this.platformAdapter);
     this.physics.world.pause();
     try {
       (this.time as any).paused = true;
@@ -1645,6 +1658,7 @@ export class GameScene extends Phaser.Scene {
   private onReviveAccepted(): void {
     if (!this.revivePending) return;
     this.revivePending = false;
+    void signalPlatformGameplayStart(this.platformAdapter);
     this.physics.world.resume();
     try {
       (this.time as any).paused = false;
@@ -1806,6 +1820,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private finishTutorialMode(_reason: string): void {
+    void signalPlatformGameplayStop(this.platformAdapter);
     this.scene.stop("upgrade");
     this.scene.stop("ui");
     this.scene.start("menu");

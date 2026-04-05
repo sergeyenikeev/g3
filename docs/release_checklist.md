@@ -74,10 +74,20 @@
 - [x] PlatformAdapter слой (mock/local + Yandex/VK) с безопасной деградацией
 - [x] `scripts/build_test_mock.mjs` (моки + проверки + тесты + dist-mock)
 - [x] `scripts/build_release.mjs` (unit+integration + prod build + zip релизы)
-- [x] ZIP: `dist/releases/magnet-caravan_{web,yandex,vk}.zip`
+- [x] ZIP: `dist/releases/magnet-caravan_{web,generic,yandex,vk}.zip`
 - [x] SDK loader + platform builds: `src/platform/sdk/loadPlatformSdk.ts` + release-сборка по активным целям
 
 ## 11) Аудио
 - [x] Реальные `.mp3` в `public/assets/audio/`
 - [x] Генератор `npm run audio:generate` (без лицензированных ассетов)
 - [x] Музыка стартует только после user interaction (autoplay policy)
+
+## 12) Яндекс Игры
+- [x] Yandex build использует `/sdk.js` для архивной публикации
+- [x] `LoadingAPI.ready()` отправляется после загрузки и выхода в меню
+- [x] `GameplayAPI.start/stop()` подключены к run lifecycle
+- [x] Auto language использует `environment.i18n.lang`
+- [x] Daily UTC seed использует `serverTime()`
+- [x] Yandex save/load идёт через `player.getData()` / `player.setData()` с fallback в localStorage
+- [x] Для публикации готовы `docs/platform_texts/yandex_ru.md` и `docs/platform_texts/yandex_en.md`
+- [ ] Проверить карточку в консоли: landscape, desktop+mobile, cloud save, platform SDK monetization

@@ -5,6 +5,7 @@ import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
 import { AdsManager } from "../../platform/ads/adsManager";
 import { createPlatformAdapter } from "../../platform/platformFactory";
+import { getPlatformLanguageHint, resolvePlatformTimeOffsetMs } from "../../platform/platformRuntime";
 import { SaveManager } from "../../platform/save/saveManager";
 import { resolveLocale } from "../../i18n/localization";
 
@@ -86,18 +87,23 @@ export class BootScene extends Phaser.Scene {
   private async bootstrap(): Promise<void> {
     const adapter = createPlatformAdapter();
     await adapter.init();
+    const platformLanguageHint = getPlatformLanguageHint(adapter);
+    const platformTimeOffsetMs = await resolvePlatformTimeOffsetMs(adapter);
     const saveManager = new SaveManager(adapter);
     const save = await saveManager.load();
 
     const analytics = createAnalyticsAdapter();
     await analytics.init();
     const adsManager = new AdsManager(adapter, analytics, saveManager);
+    const locale = resolveLocale(save.settings.language, platformLanguageHint ? [platformLanguageHint] : null);
 
     this.registry.set("platformAdapter", adapter);
+    this.registry.set("platformLanguageHint", platformLanguageHint);
+    this.registry.set("platformTimeOffsetMs", platformTimeOffsetMs);
     this.registry.set("saveManager", saveManager);
     this.registry.set("saveData", save);
     this.registry.set("languageSetting", save.settings.language);
-    this.registry.set("locale", resolveLocale(save.settings.language));
+    this.registry.set("locale", locale);
     this.registry.set("analytics", analytics);
     this.registry.set("adsManager", adsManager);
 

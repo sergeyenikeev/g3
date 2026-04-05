@@ -1,17 +1,21 @@
 type PlatformMode = "auto" | "mock" | "local" | "web" | "generic" | "yandex" | "vk";
 
 type SdkScript = {
-  url: string;
+  getUrl: () => string;
   isPresent: () => boolean;
 };
 
 const SCRIPTS: Record<Exclude<PlatformMode, "auto" | "mock" | "local" | "web" | "generic">, SdkScript> = {
   yandex: {
-    url: "https://yandex.ru/games/sdk/v2",
+    getUrl: () => {
+      const envUrl = (import.meta as any).env?.VITE_YANDEX_SDK_URL;
+      if (typeof envUrl === "string" && envUrl.trim().length > 0) return envUrl.trim();
+      return "/sdk.js";
+    },
     isPresent: () => Boolean((window as any)?.YaGames?.init),
   },
   vk: {
-    url: "https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js",
+    getUrl: () => "https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js",
     isPresent: () => Boolean((window as any)?.vkBridge?.send),
   },
 };
@@ -26,7 +30,7 @@ export async function ensurePlatformSdkLoaded(): Promise<void> {
   if (script.isPresent()) return;
 
   try {
-    await withTimeout(loadScriptOnce(script.url), 7000);
+    await withTimeout(loadScriptOnce(script.getUrl()), 7000);
   } catch {
     // ignore: safe degradation if SDK isn't reachable
   }

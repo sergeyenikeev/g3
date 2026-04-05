@@ -7,6 +7,9 @@ import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { SaveData, SaveManager } from "../../platform/save/saveManager";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
+import { bindPageLifecycle } from "../../platform/pageLifecycle";
+import type { PlatformAdapter } from "../../platform/platformAdapter";
+import { addPlatformLifecycleListener, signalPlatformGameplayStop } from "../../platform/platformRuntime";
 import type { StaticGameData } from "../../data/staticGameData";
 import { VISUAL_PALETTE, createLightGradient, createVfxTextures, createVignette } from "../../visual/TextureFactory";
 import { languageStroke, nextVolumeStep, qualityStroke, snapVolumeStep } from "./uiSettingsHelpers";
@@ -32,6 +35,7 @@ export class UIScene extends Phaser.Scene {
   private saveData: SaveData | null = null;
   private ads: AdsManager | null = null;
   private analytics: AnalyticsAdapter | null = null;
+  private platformAdapter: PlatformAdapter | null = null;
   private locale: Locale = "en";
   private languageSetting: LanguageSetting = "auto";
   private qualityPref: SaveData["settings"]["visualQuality"] = "auto";
@@ -98,6 +102,8 @@ export class UIScene extends Phaser.Scene {
   private music: Phaser.Sound.BaseSound | null = null;
   private sfxVolume = 0.8;
   private musicVolume = 0.6;
+  private suspendReasons = new Set<string>();
+  private externalPauseOwnsGamePause = false;
 
   private readonly onSfxPickup = () => this.playSfx("sfx_pickup");
   private readonly onSfxFlip = () => this.playSfx("sfx_flip");
@@ -120,8 +126,9 @@ export class UIScene extends Phaser.Scene {
     this.saveData = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.ads = (this.registry.get("adsManager") as AdsManager | undefined) ?? null;
     this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
+    this.platformAdapter = (this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null;
     this.languageSetting = normalizeLanguageSetting(this.saveData?.settings?.language ?? "auto");
-    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(this.languageSetting));
+    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? this.resolveLocaleSetting(this.languageSetting));
     this.qualityPref = this.saveData?.settings?.visualQuality ?? "auto";
 
     this.sfxVolume = snapVolumeStep(this.saveData?.settings?.sfxVolume ?? 0.8);
@@ -164,6 +171,14 @@ export class UIScene extends Phaser.Scene {
     this.bindAnalyticsEvents();
     this.input.keyboard?.on("keydown-ESC", this.onEscapePressed, this);
     if (!(this.sound as any)?.locked) this.enableAudio();
+    const releasePageLifecycle = bindPageLifecycle({
+      hide: () => this.setExternalPause("page", true),
+      show: () => this.setExternalPause("page", false),
+    });
+    const releasePlatformLifecycle = addPlatformLifecycleListener(this.platformAdapter, {
+      pause: () => this.setExternalPause("platform", true),
+      resume: () => this.setExternalPause("platform", false),
+    });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.SCRAP_COLLECTED, this.onTutorialScrap, this);
@@ -182,6 +197,9 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.BANK_COMPLETE, this.onAnalyticsBank, this);
       this.game.events.off(GAME_EVENTS.UPGRADE_PICKED, this.onAnalyticsUpgradePick, this);
       this.input.keyboard?.off("keydown-ESC", this.onEscapePressed, this);
+      releasePageLifecycle();
+      releasePlatformLifecycle();
+      this.suspendReasons.clear();
     });
 
     this.scale.on("resize", () => this.layout());
@@ -655,6 +673,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private onReviveOffer(): void {
+    void signalPlatformGameplayStop(this.platformAdapter);
     this.modalActive = true;
     this.reviveBusy = false;
     this.reviveBox.setVisible(true);
@@ -762,17 +781,7 @@ export class UIScene extends Phaser.Scene {
       // ignore
     }
 
-    try {
-      const menuMusic = (this.sound as any).get?.("music_menu") as Phaser.Sound.BaseSound | undefined;
-      if (menuMusic?.isPlaying) menuMusic.stop();
-      const existing = (this.sound as any).get?.("music_main") as Phaser.Sound.BaseSound | undefined;
-      this.music = existing ?? this.sound.add("music_main", { loop: true, volume: this.musicVolume });
-      (this.music as any).setVolume?.(this.musicVolume);
-      if (typeof (this.music as any).volume === "number") (this.music as any).volume = this.musicVolume;
-      if (!this.music.isPlaying) this.music.play();
-    } catch {
-      // ignore
-    }
+    this.resumeMusicIfAllowed();
   }
 
   private playSfx(key: string): void {
@@ -805,6 +814,7 @@ export class UIScene extends Phaser.Scene {
     this.settingsVisible = true;
     this.modalActive = true;
     this.releaseControls();
+    void signalPlatformGameplayStop(this.platformAdapter);
     this.scene.pause("game");
     this.pauseButton.setVisible(false);
     this.pauseLabel.setVisible(false);
@@ -820,13 +830,14 @@ export class UIScene extends Phaser.Scene {
     this.settingsBox.setVisible(false);
     this.pauseButton.setVisible(true);
     this.pauseLabel.setVisible(true);
-    this.scene.resume("game");
+    if (this.suspendReasons.size === 0) this.scene.resume("game");
   }
 
   private returnToMenu(): void {
     this.settingsVisible = false;
     this.modalActive = false;
     this.settingsBox.setVisible(false);
+    void signalPlatformGameplayStop(this.platformAdapter);
     this.scene.stop("upgrade");
     this.scene.stop("game");
     this.scene.start("menu");
@@ -859,7 +870,7 @@ export class UIScene extends Phaser.Scene {
     const order: LanguageSetting[] = ["auto", "ru", "en"];
     const idx = order.indexOf(this.languageSetting);
     this.languageSetting = order[(idx + 1) % order.length] ?? "auto";
-    this.locale = resolveLocale(this.languageSetting);
+    this.locale = this.resolveLocaleSetting(this.languageSetting);
     this.registry.set("languageSetting", this.languageSetting);
     this.registry.set("locale", this.locale);
     await this.saveSettings({ language: this.languageSetting });
@@ -901,6 +912,98 @@ export class UIScene extends Phaser.Scene {
     this.reviveAcceptLabel.setText(t(this.locale, "revive.accept"));
     this.reviveDeclineLabel.setText(t(this.locale, "revive.decline"));
     this.refreshTutorialText();
+  }
+
+  private setExternalPause(reason: string, paused: boolean): void {
+    if (paused) this.suspendReasons.add(reason);
+    else this.suspendReasons.delete(reason);
+
+    if (this.suspendReasons.size > 0) {
+      this.pauseForExternalSuspend();
+      this.pauseMusic();
+      return;
+    }
+
+    if (
+      this.externalPauseOwnsGamePause &&
+      !this.settingsVisible &&
+      !this.reviveBox.visible &&
+      !this.scene.isActive("upgrade")
+    ) {
+      this.externalPauseOwnsGamePause = false;
+      this.scene.resume("game");
+    }
+
+    this.resumeMusicIfAllowed();
+  }
+
+  private pauseForExternalSuspend(): void {
+    if (this.externalPauseOwnsGamePause) return;
+    if (this.settingsVisible || this.reviveBox.visible || this.scene.isActive("upgrade")) return;
+    if (!this.scene.isActive("game") || this.scene.isPaused("game")) return;
+
+    this.externalPauseOwnsGamePause = true;
+    void signalPlatformGameplayStop(this.platformAdapter);
+    this.scene.pause("game");
+  }
+
+  private pauseMusic(): void {
+    try {
+      const track = this.getMainMusicTrack(false);
+      if (!track) return;
+
+      if (typeof (track as any).pause === "function" && track.isPlaying) {
+        (track as any).pause();
+        return;
+      }
+
+      if (track.isPlaying) track.stop();
+    } catch {
+      // ignore
+    }
+  }
+
+  private resumeMusicIfAllowed(): void {
+    if (!this.audioEnabled) return;
+    if (this.suspendReasons.size > 0) return;
+
+    try {
+      const menuMusic = (this.sound as any).get?.("music_menu") as Phaser.Sound.BaseSound | undefined;
+      if (menuMusic?.isPlaying) menuMusic.stop();
+
+      const track = this.getMainMusicTrack(true);
+      if (!track) return;
+
+      (track as any)?.setVolume?.(this.musicVolume);
+      if (typeof (track as any).volume === "number") (track as any).volume = this.musicVolume;
+
+      if (typeof (track as any).resume === "function" && (track as any).isPaused) {
+        (track as any).resume();
+        return;
+      }
+
+      if (!track.isPlaying) track.play();
+    } catch {
+      // ignore
+    }
+  }
+
+  private getMainMusicTrack(create: boolean): Phaser.Sound.BaseSound | null {
+    const existing = ((this.music ?? (this.sound as any).get?.("music_main")) as Phaser.Sound.BaseSound | undefined) ?? null;
+    if (existing) {
+      this.music = existing;
+      return existing;
+    }
+
+    if (!create) return null;
+
+    this.music = this.sound.add("music_main", { loop: true, volume: this.musicVolume });
+    return this.music;
+  }
+
+  private resolveLocaleSetting(setting: LanguageSetting): Locale {
+    const platformLanguageHint = (this.registry.get("platformLanguageHint") as string | undefined) ?? null;
+    return resolveLocale(setting, platformLanguageHint ? [platformLanguageHint] : null);
   }
 
   private releaseControls(): void {

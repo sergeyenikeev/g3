@@ -39,8 +39,19 @@
 
 - Для релиза: `npm run build:release`
   - прогоняет `bom-check`, `lint`, `typecheck`, unit+integration
-  - делает production build для `web`, `yandex`, `vk`
+  - делает production build для `web`, `generic`, `yandex`, `vk`
   - формирует ZIP архивы в `dist/releases/`
+
+- Для финального пакета Яндекс Игр: `npm run package:yandex`
+  - пересобирает `yandex` release
+  - собирает `dist/upload_ready/yandex/`
+  - дополнительно упаковывает весь upload-kit в `dist/upload_ready/magnet-caravan_yandex_upload-ready.zip`
+
+- Для адресной сборки под одну витрину:
+  - `npm run build:web`
+  - `npm run build:generic`
+  - `npm run build:yandex`
+  - `npm run build:vk`
 
 ## Структура проекта (коротко)
 
