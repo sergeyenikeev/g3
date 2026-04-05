@@ -45,7 +45,8 @@
 - Для финального пакета Яндекс Игр: `npm run package:yandex`
   - пересобирает `yandex` release
   - собирает `dist/upload_ready/yandex/`
-  - дополнительно упаковывает весь upload-kit в `dist/upload_ready/magnet-caravan_yandex_upload-ready.zip`
+  - кладёт отдельный архив для консоли: `dist/upload_ready/yandex/UPLOAD_THIS_TO_YANDEX_magnet-caravan_yandex.zip`
+  - дополнительно упаковывает весь publishing-kit в `dist/upload_ready/magnet-caravan_yandex_publishing-kit.zip`
 
 - Для адресной сборки под одну витрину:
   - `npm run build:web`

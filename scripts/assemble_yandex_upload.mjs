@@ -13,8 +13,11 @@ const archiver = require("archiver");
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const distDir = join(rootDir, "dist");
 const uploadRoot = join(distDir, "upload_ready", "yandex");
-const uploadZip = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.zip");
-const uploadZipChecksum = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.sha256.txt");
+const uploadZip = join(distDir, "upload_ready", "magnet-caravan_yandex_publishing-kit.zip");
+const uploadZipChecksum = join(distDir, "upload_ready", "magnet-caravan_yandex_publishing-kit.sha256.txt");
+const consoleUploadArchiveName = "UPLOAD_THIS_TO_YANDEX_magnet-caravan_yandex.zip";
+const legacyUploadZip = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.zip");
+const legacyUploadZipChecksum = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.sha256.txt");
 
 const packageJson = JSON.parse(await readFile(join(rootDir, "package.json"), "utf8"));
 const version = String(packageJson.version ?? "0.0.0");
@@ -80,6 +83,8 @@ const releaseDirs = await ensureReleaseDirs(rootDir);
 const { zipPath: gameArchivePath } = await buildReleaseTarget("yandex", releaseDirs, rootDir);
 
 await rm(uploadRoot, { recursive: true, force: true });
+await rm(legacyUploadZip, { force: true });
+await rm(legacyUploadZipChecksum, { force: true });
 await mkdir(uploadRoot, { recursive: true });
 
 await ensureFilesExist([
@@ -98,6 +103,7 @@ await mkdir(join(uploadRoot, "metadata"), { recursive: true });
 await mkdir(join(uploadRoot, "instructions"), { recursive: true });
 
 await copyFile(gameArchivePath, join(uploadRoot, "game", "magnet-caravan_yandex.zip"));
+await copyFile(gameArchivePath, join(uploadRoot, consoleUploadArchiveName));
 await copyFile(
   join(rootDir, "docs", "platform_texts", "yandex_ru.md"),
   join(uploadRoot, "texts", "source", "yandex_ru.md")
@@ -128,6 +134,7 @@ await writeFile(
       generatedAt,
       version,
       buildArchive: "game/magnet-caravan_yandex.zip",
+      preferredConsoleUploadArchive: consoleUploadArchiveName,
       card,
       primaryMedia,
     },
@@ -144,7 +151,7 @@ await writeChecksums(uploadRoot, join(uploadRoot, "metadata", "checksums.sha256"
 
 await zipDirectory(uploadRoot, uploadZip);
 const uploadZipSha256 = await createFileHash(uploadZip);
-await writeFile(uploadZipChecksum, `${uploadZipSha256}  magnet-caravan_yandex_upload-ready.zip\n`, "utf8");
+await writeFile(uploadZipChecksum, `${uploadZipSha256}  magnet-caravan_yandex_publishing-kit.zip\n`, "utf8");
 
 console.log(`package_yandex: folder -> ${uploadRoot}`);
 console.log(`package_yandex: zip -> ${uploadZip}`);
@@ -192,7 +199,12 @@ function buildReadme({ version: currentVersion, generatedAt: generatedIso, archi
 
 Этот каталог уже собран для ручной загрузки в консоль Яндекс Игр.
 
+## Важно
+- В консоль Яндекс Игр загружайте только \`${consoleUploadArchiveName}\`.
+- Не загружайте \`../magnet-caravan_yandex_publishing-kit.zip\`: это контейнер со всеми материалами, а не игровой билд.
+
 ## Что Внутри
+- \`${consoleUploadArchiveName}\` — главный файл для загрузки в консоль.
 - \`game/magnet-caravan_yandex.zip\` — игровой архив для загрузки.
 - \`texts/\` — готовые тексты по отдельным полям карточки.
 - \`texts/source/\` — исходные markdown-версии RU и EN текстов.
@@ -203,7 +215,7 @@ function buildReadme({ version: currentVersion, generatedAt: generatedIso, archi
 - \`instructions/UPLOAD_CHECKLIST.md\` — короткий порядок действий при ручной публикации.
 
 ## Что Загружать В Консоль
-1. Архив игры: \`game/magnet-caravan_yandex.zip\`
+1. Архив игры: \`${consoleUploadArchiveName}\`
 2. Иконка: \`${primaryMedia.icon}\`
 3. Обложка: \`${primaryMedia.cover}\`
 4. Desktop screenshots:
@@ -224,8 +236,8 @@ function buildReadme({ version: currentVersion, generatedAt: generatedIso, archi
 - Версия игры: \`${currentVersion}\`
 - Сгенерировано: \`${generatedIso}\`
 - Размер игрового архива: \`${archiveSizeBytes}\` bytes
-- Архив всего upload-пакета: \`../magnet-caravan_yandex_upload-ready.zip\`
-- SHA256 upload-пакета: \`../magnet-caravan_yandex_upload-ready.sha256.txt\`
+- Архив всего publishing-kit: \`../magnet-caravan_yandex_publishing-kit.zip\`
+- SHA256 publishing-kit: \`../magnet-caravan_yandex_publishing-kit.sha256.txt\`
 `;
 }
 
@@ -234,12 +246,12 @@ function buildUploadChecklist() {
 
 ## Перед Загрузкой
 1. Откройте \`metadata/yandex_game_card.json\` или \`texts/console_fields_ru.md\`.
-2. Подготовьте под рукой \`game/magnet-caravan_yandex.zip\`.
+2. Подготовьте под рукой \`${consoleUploadArchiveName}\`.
 3. Подготовьте медиа из \`media/\`.
 
 ## В Консоли Яндекс Игр
 1. Создайте новый draft игры.
-2. Загрузите \`game/magnet-caravan_yandex.zip\`.
+2. Загрузите \`${consoleUploadArchiveName}\`.
 3. Убедитесь, что у игры включены \`landscape\`, \`desktop\`, \`mobile\`, \`cloud save\`.
 4. Вставьте название, short/full description и how to play из \`texts/\`.
 5. Добавьте keywords, жанры, теги и developer comment.

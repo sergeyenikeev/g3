@@ -35,7 +35,10 @@
 
 Готовый upload-kit:
 - `dist/upload_ready/yandex/`
-- `dist/upload_ready/magnet-caravan_yandex_upload-ready.zip`
+- `dist/upload_ready/magnet-caravan_yandex_publishing-kit.zip`
+
+Архив, который нужно загружать именно в консоль Яндекс Игр:
+- `dist/upload_ready/yandex/UPLOAD_THIS_TO_YANDEX_magnet-caravan_yandex.zip`
 
 Готовые тексты:
 - `docs/platform_texts/yandex_ru.md`
@@ -198,7 +201,8 @@ Move with the joystick or WASD. Collect scrap to grow your tail. Press Flip to p
 На текущий момент в репозитории уже собирается полный publish-kit:
 - игровой архив в `dist/releases/magnet-caravan_yandex.zip`;
 - upload-ready каталог в `dist/upload_ready/yandex/`;
-- единый ZIP upload-пакета в `dist/upload_ready/magnet-caravan_yandex_upload-ready.zip`;
+- отдельный архив для консоли в `dist/upload_ready/yandex/UPLOAD_THIS_TO_YANDEX_magnet-caravan_yandex.zip`;
+- единый ZIP publishing-kit в `dist/upload_ready/magnet-caravan_yandex_publishing-kit.zip`;
 - медиа-набор в `docs/promo/yandex/`.
 
 Если нужно пересобрать всё заново одной командой:
@@ -214,7 +218,7 @@ The game uses the official Yandex Games SDK only. Rewarded ads are user-initiate
 
 ## Финальный Чеклист Перед Отправкой
 
-- загрузить `dist/releases/magnet-caravan_yandex.zip`;
+- загрузить `dist/upload_ready/yandex/UPLOAD_THIS_TO_YANDEX_magnet-caravan_yandex.zip`;
 - проверить, что `index.html` находится в корне архива;
 - включить `landscape`;
 - включить `desktop` и `mobile`;
