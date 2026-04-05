@@ -14,6 +14,7 @@ export const GAME_EVENTS = {
   UPGRADE_OFFER_SHOWN: "upgrade_offer_shown",
   UPGRADE_PICKED: "upgrade_picked",
   UPGRADE_REROLL: "upgrade_reroll",
+  SETTINGS_CHANGED: "settings_changed",
   TUTORIAL_STEP_CHANGED: "tutorial_step_changed",
   TUTORIAL_FINISHED: "tutorial_finished",
   TUTORIAL_EXITED: "tutorial_exited",

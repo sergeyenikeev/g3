@@ -56,6 +56,11 @@ type ScrapMineState = {
   triggerRadius: number;
 };
 
+type SettingsChangedPayload = {
+  locale?: Locale;
+  visualQuality?: SaveData["settings"]["visualQuality"];
+};
+
 type ArcadeImage = Phaser.Physics.Arcade.Image & { body: Phaser.Physics.Arcade.Body };
 type ArcadeStaticImage = Phaser.Physics.Arcade.Image & { body: Phaser.Physics.Arcade.StaticBody };
 
@@ -211,14 +216,7 @@ export class GameScene extends Phaser.Scene {
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
     const pref = save?.settings?.visualQuality ?? "auto";
-    if (pref === "low" || pref === "medium" || pref === "high") {
-      this.visualQuality = pref;
-      this.visualQualityAuto = false;
-      this.fpsProbe.done = true;
-    } else {
-      this.visualQuality = this.pickInitialQuality();
-      this.visualQualityAuto = true;
-    }
+    this.applyVisualQualityPreference(pref);
     this.registry.set("visualQuality", this.visualQuality);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -251,12 +249,14 @@ export class GameScene extends Phaser.Scene {
 
     this.game.events.on(GAME_EVENTS.REVIVE_ACCEPTED, this.onReviveAccepted, this);
     this.game.events.on(GAME_EVENTS.REVIVE_DECLINED, this.onReviveDeclined, this);
+    this.game.events.on(GAME_EVENTS.SETTINGS_CHANGED, this.onSettingsChanged, this);
     this.game.events.on(GAME_EVENTS.TUTORIAL_STEP_CHANGED, this.onTutorialStepChanged, this);
     this.game.events.on(GAME_EVENTS.TUTORIAL_FINISHED, this.onTutorialFinished, this);
     this.game.events.on(GAME_EVENTS.TUTORIAL_EXITED, this.onTutorialExited, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.REVIVE_ACCEPTED, this.onReviveAccepted, this);
       this.game.events.off(GAME_EVENTS.REVIVE_DECLINED, this.onReviveDeclined, this);
+      this.game.events.off(GAME_EVENTS.SETTINGS_CHANGED, this.onSettingsChanged, this);
       this.game.events.off(GAME_EVENTS.TUTORIAL_STEP_CHANGED, this.onTutorialStepChanged, this);
       this.game.events.off(GAME_EVENTS.TUTORIAL_FINISHED, this.onTutorialFinished, this);
       this.game.events.off(GAME_EVENTS.TUTORIAL_EXITED, this.onTutorialExited, this);
@@ -1295,6 +1295,13 @@ export class GameScene extends Phaser.Scene {
       enemy.sprite.body.velocity.x += nx * mine.pushForce;
       enemy.sprite.body.velocity.y += ny * mine.pushForce;
       enemy.hp -= mine.damage;
+      this.vfx?.emit("enemy_hit", {
+        x: enemy.sprite.x,
+        y: enemy.sprite.y,
+        enemyType: enemy.type,
+        damage: mine.damage,
+        source: "mine",
+      });
       if (enemy.hp <= 0) this.killEnemy(enemy);
     }
 
@@ -1341,7 +1348,15 @@ export class GameScene extends Phaser.Scene {
     if (!proj || proj.owner !== "player") return;
     const ent = this.enemies.find((e) => e.sprite === enemySpr);
     if (!ent) return;
-    ent.hp -= Math.max(1, proj.damage);
+    const damage = Math.max(1, proj.damage);
+    ent.hp -= damage;
+    this.vfx?.emit("enemy_hit", {
+      x: enemySpr.x,
+      y: enemySpr.y,
+      enemyType: ent.type,
+      damage,
+      source: "projectile",
+    });
     pr.destroy();
     if (ent.hp <= 0) this.killEnemy(ent);
   }
@@ -1349,7 +1364,15 @@ export class GameScene extends Phaser.Scene {
   private onEnemyHitByShrapnel(enemySpr: Phaser.Physics.Arcade.Image, sh: Phaser.Physics.Arcade.Image): void {
     const ent = this.enemies.find((e) => e.sprite === enemySpr);
     if (!ent) return;
-    ent.hp -= Math.max(1, this.state.config.flip.shrapnel.damage);
+    const damage = Math.max(1, this.state.config.flip.shrapnel.damage);
+    ent.hp -= damage;
+    this.vfx?.emit("enemy_hit", {
+      x: enemySpr.x,
+      y: enemySpr.y,
+      enemyType: ent.type,
+      damage,
+      source: "shrapnel",
+    });
     sh.destroy();
     if (ent.hp <= 0) this.killEnemy(ent);
   }
@@ -1357,6 +1380,7 @@ export class GameScene extends Phaser.Scene {
   private killEnemy(ent: EnemyEntity): void {
     const x = ent.sprite.x;
     const y = ent.sprite.y;
+    this.vfx?.emit("enemy_killed", { x, y, enemyType: ent.type });
     ent.sprite.destroy();
     if (this.rng.next() < this.state.config.tuning.scrapSpawn.enemyKillDropChance) this.spawnScrapAt(x, y);
   }
@@ -1575,6 +1599,32 @@ export class GameScene extends Phaser.Scene {
 
     this.registry.set("uiStatusPrimary", waveStatus);
     this.registry.set("uiStatusSecondary", buffs.join(" | "));
+  }
+
+  private onSettingsChanged(payload: SettingsChangedPayload = {}): void {
+    if (payload.locale) {
+      this.locale = payload.locale;
+      this.refreshWaveHudLabel();
+      this.updateHudStatus();
+    }
+
+    if (payload.visualQuality) {
+      this.applyVisualQualityPreference(payload.visualQuality);
+    }
+  }
+
+  private refreshWaveHudLabel(): void {
+    if (this.state.mode === "tutorial") {
+      this.waveHudLabel = t(this.locale, "wave.trainingLoop");
+      return;
+    }
+
+    if (import.meta.env.VITE_E2E === "1") {
+      this.waveHudLabel = t(this.locale, "wave.quickTest");
+      return;
+    }
+
+    this.waveHudLabel = this.wavePlan ? describeWavePlan(this.wavePlan, this.locale) : "";
   }
 
   private finishTutorialMode(_reason: string): void {
@@ -2003,6 +2053,26 @@ export class GameScene extends Phaser.Scene {
 
     const fps = this.fpsProbe.frames / Math.max(0.001, this.fpsProbe.t);
     if (fps < 50) this.setVisualQuality(downgradeQuality(this.visualQuality));
+  }
+
+  private applyVisualQualityPreference(pref: SaveData["settings"]["visualQuality"]): void {
+    const prev = this.visualQuality;
+    if (pref === "low" || pref === "medium" || pref === "high") {
+      this.visualQuality = pref;
+      this.visualQualityAuto = false;
+      this.fpsProbe = { t: 0, frames: 0, done: true };
+    } else {
+      this.visualQuality = this.pickInitialQuality();
+      this.visualQualityAuto = true;
+      this.fpsProbe = { t: 0, frames: 0, done: false };
+    }
+
+    this.registry.set("visualQuality", this.visualQuality);
+    this.vfx?.setQuality(this.visualQuality);
+    if (this.bgTile && prev !== this.visualQuality) {
+      this.createBackgroundLayers();
+      this.onResize();
+    }
   }
 
   private setVisualQuality(next: VfxQuality): void {

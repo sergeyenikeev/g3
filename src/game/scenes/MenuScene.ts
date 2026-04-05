@@ -9,6 +9,7 @@ import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import type { SaveData } from "../../platform/save/saveManager";
 import type { SaveManager } from "../../platform/save/saveManager";
+import { createEntityTextures } from "../../visual/EntityTextureFactory";
 import {
   type LanguageSetting,
   type Locale,
@@ -44,6 +45,26 @@ export class MenuScene extends Phaser.Scene {
   private workshopBusy = false;
   private locale: Locale = "en";
   private languageSetting: LanguageSetting = "auto";
+  private audioEnabled = false;
+  private menuMusic: Phaser.Sound.BaseSound | null = null;
+  private menuTime = 0;
+  private bgFar!: Phaser.GameObjects.TileSprite;
+  private bgTile!: Phaser.GameObjects.TileSprite;
+  private menuGlowLeft!: Phaser.GameObjects.Image;
+  private menuGlowRight!: Phaser.GameObjects.Image;
+  private menuPanel!: Phaser.GameObjects.Rectangle;
+  private dailyPanel!: Phaser.GameObjects.Rectangle;
+  private heroPanel!: Phaser.GameObjects.Rectangle;
+  private heroRecycler!: Phaser.GameObjects.Image;
+  private heroTruck!: Phaser.GameObjects.Image;
+  private heroEscortA!: Phaser.GameObjects.Image;
+  private heroEscortB!: Phaser.GameObjects.Image;
+  private heroThreatA!: Phaser.GameObjects.Image;
+  private heroThreatB!: Phaser.GameObjects.Image;
+  private heroCaptionText!: Phaser.GameObjects.Text;
+  private heroHintText!: Phaser.GameObjects.Text;
+  private heroBaseX = 0;
+  private heroBaseY = 0;
 
   constructor() {
     super("menu");
@@ -60,17 +81,35 @@ export class MenuScene extends Phaser.Scene {
     this.locale = resolveLocale(this.languageSetting);
     this.registry.set("languageSetting", this.languageSetting);
     this.registry.set("locale", this.locale);
+    createEntityTextures(this);
+    this.cameras.main.setBackgroundColor(0x060a10);
+    this.createMenuBackdrop();
+    this.input.once("pointerdown", () => this.enableAudio());
+    this.input.keyboard?.once("keydown", () => this.enableAudio());
+    if (!(this.sound as any)?.locked) this.enableAudio();
     const stats = save?.stats ?? { bestWave: 0, bestBolts: 0 };
     const boosterCfg = this.staticData.balances.ads?.rewarded?.startBooster;
     const boosterEnabled = Boolean(boosterCfg?.enabled);
 
     const title = this.add
       .text(0, 0, t(this.locale, "app.title"), {
-        fontSize: "42px",
+        fontSize: "52px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
+      .setShadow(0, 0, "#5cc8ff", 24, true, true)
       .setOrigin(0.5);
+
+    const taglineText = this.add
+      .text(0, 0, t(this.locale, "menu.tagline"), {
+        fontSize: "18px",
+        color: "#7fdfff",
+        fontStyle: "700",
+        align: "center",
+        wordWrap: { width: 520 },
+      })
+      .setOrigin(0.5)
+      .setLineSpacing(4);
 
     const bestText = this.add
       .text(
@@ -83,6 +122,7 @@ export class MenuScene extends Phaser.Scene {
         {
         fontSize: "16px",
         color: "#98b7c7",
+        align: "center",
         }
       )
       .setOrigin(0.5);
@@ -233,20 +273,21 @@ export class MenuScene extends Phaser.Scene {
     });
 
     const btnPlay = this.add
-      .rectangle(0, 0, 280, 64, 0x1b2635)
-      .setStrokeStyle(2, 0x5cc8ff, 0.9)
+      .rectangle(0, 0, 308, 68, 0x13283d, 0.98)
+      .setStrokeStyle(2, 0xffd166, 0.94)
       .setInteractive({ useHandCursor: true });
     const labelPlay = this.add
-      .text(0, 0, t(this.locale, "menu.play"), { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "menu.play"), { fontSize: "30px", color: "#f7fbff", fontStyle: "700" })
       .setOrigin(0.5);
 
     btnPlay.on("pointerdown", () => {
+      this.stopMenuMusic();
       this.scene.start("game", { mode: "run" });
       this.scene.launch("ui");
     });
 
     const btnPlayBoost = this.add
-      .rectangle(0, 0, 280, 52, 0x121a24, 0.95)
+      .rectangle(0, 0, 308, 52, 0x13221e, 0.96)
       .setStrokeStyle(2, 0x57c27d, 0.9)
       .setInteractive({ useHandCursor: true });
     const labelPlayBoost = this.add
@@ -257,7 +298,7 @@ export class MenuScene extends Phaser.Scene {
     btnPlayBoost.on("pointerdown", () => void this.startRunBoosted());
 
     const btnTraining = this.add
-      .rectangle(0, 0, 280, 46, 0x0f1720, 0.95)
+      .rectangle(0, 0, 308, 46, 0x0f1720, 0.96)
       .setStrokeStyle(2, 0xffd166, 0.78)
       .setInteractive({ useHandCursor: true });
     const labelTraining = this.add
@@ -265,6 +306,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     btnTraining.on("pointerdown", () => {
+      this.stopMenuMusic();
       this.scene.start("game", { mode: "tutorial" });
       this.scene.launch("ui");
     });
@@ -272,7 +314,7 @@ export class MenuScene extends Phaser.Scene {
     btnWorkshop.on("pointerdown", () => this.showWorkshop());
 
     const btnDaily = this.add
-      .rectangle(0, 0, 280, 56, 0x121a24)
+      .rectangle(0, 0, 308, 56, 0x121a24, 0.96)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true });
     const labelDaily = this.add
@@ -280,7 +322,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const btnDailyBoost = this.add
-      .rectangle(0, 0, 280, 46, 0x0f1720, 0.95)
+      .rectangle(0, 0, 308, 46, 0x0f1720, 0.96)
       .setStrokeStyle(2, 0x57c27d, 0.75)
       .setInteractive({ useHandCursor: true });
     const labelDailyBoost = this.add
@@ -294,9 +336,9 @@ export class MenuScene extends Phaser.Scene {
     labelDailyBoost.setVisible(boosterEnabled);
 
     const dailyInfo = this.add
-      .text(0, 0, "", { fontSize: "14px", color: "#98b7c7", align: "center", wordWrap: { width: 520 } })
+      .text(0, 0, "", { fontSize: "14px", color: "#c9dbe6", align: "center", wordWrap: { width: 520 } })
       .setOrigin(0.5)
-      .setLineSpacing(4);
+      .setLineSpacing(5);
 
     const controlsText = this.add
       .text(0, 0, t(this.locale, "menu.controls"), {
@@ -347,8 +389,13 @@ export class MenuScene extends Phaser.Scene {
     this.createWorkshopUi();
 
     const layoutMenu = (s: { width: number; height: number }) => {
-      title.setPosition(s.width / 2, s.height * 0.25);
-      bestText.setPosition(s.width / 2, s.height * 0.36);
+      const compact = s.width < 1100;
+      const leftX = compact ? s.width / 2 : Math.round(s.width * 0.31);
+      const titleY = compact ? Math.round(s.height * 0.13) : Math.round(s.height * 0.2);
+
+      title.setPosition(leftX, titleY);
+      taglineText.setPosition(leftX, titleY + 58);
+      bestText.setPosition(leftX, titleY + 110);
       this.walletText?.setPosition(16, 16);
       btnWorkshop.setPosition(16, 46);
       labelWorkshop.setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
@@ -362,19 +409,23 @@ export class MenuScene extends Phaser.Scene {
       btnLanguage.setPosition(s.width - 16, 136);
       labelLanguage.setPosition(btnLanguage.x - btnLanguage.width / 2, btnLanguage.y + btnLanguage.height / 2);
 
-      btnPlay.setPosition(s.width / 2, s.height * 0.47);
+      this.layoutMenuBackdrop(s.width, s.height, compact, leftX);
+
+      const ctaStartY = compact ? Math.round(s.height * 0.42) : Math.round(s.height * 0.43);
+      const rowGap = compact ? 72 : 68;
+      btnPlay.setPosition(leftX, ctaStartY);
       labelPlay.setPosition(btnPlay.x, btnPlay.y);
-      btnPlayBoost.setPosition(s.width / 2, s.height * 0.56);
+      btnPlayBoost.setPosition(leftX, ctaStartY + rowGap);
       labelPlayBoost.setPosition(btnPlayBoost.x, btnPlayBoost.y);
-      btnTraining.setPosition(s.width / 2, s.height * 0.65);
+      btnTraining.setPosition(leftX, ctaStartY + rowGap * 2);
       labelTraining.setPosition(btnTraining.x, btnTraining.y);
-      btnDaily.setPosition(s.width / 2, s.height * 0.75);
+      btnDaily.setPosition(leftX, ctaStartY + rowGap * 3 + 6);
       labelDaily.setPosition(btnDaily.x, btnDaily.y);
-      btnDailyBoost.setPosition(s.width / 2, s.height * 0.84);
+      btnDailyBoost.setPosition(leftX, ctaStartY + rowGap * 4 + 4);
       labelDailyBoost.setPosition(btnDailyBoost.x, btnDailyBoost.y);
-      dailyInfo.setPosition(s.width / 2, s.height * 0.92);
-      dailyInfo.setWordWrapWidth(Math.max(280, Math.min(580, s.width - 48)), true);
-      controlsText.setPosition(s.width / 2, s.height * 0.975);
+      dailyInfo.setPosition(leftX, compact ? s.height - 114 : s.height - 112);
+      dailyInfo.setWordWrapWidth(compact ? Math.max(280, Math.min(580, s.width - 54)) : 360, true);
+      controlsText.setPosition(leftX, compact ? s.height - 44 : s.height - 42);
       if (this.toastText) this.toastText.setPosition(s.width / 2, s.height * 0.93);
       this.layoutWorkshop();
     };
@@ -390,6 +441,145 @@ export class MenuScene extends Phaser.Scene {
     void this.ensureDailyNormalizedAndRefresh(dailyInfo).then((info) => refreshDailyButtons(info));
   }
 
+  update(_time: number, dtMs: number): void {
+    const dt = Math.min(0.05, Math.max(0, dtMs / 1000));
+    this.menuTime += dt;
+
+    if (this.bgFar) {
+      this.bgFar.tilePositionX = this.menuTime * 10;
+      this.bgFar.tilePositionY = 24 + Math.sin(this.menuTime * 0.12) * 18;
+    }
+    if (this.bgTile) {
+      this.bgTile.tilePositionX = this.menuTime * 18;
+      this.bgTile.tilePositionY = this.menuTime * 6;
+    }
+
+    if (this.menuGlowLeft) {
+      this.menuGlowLeft.setAlpha(0.16 + Math.sin(this.menuTime * 1.3) * 0.03);
+      this.menuGlowLeft.setRotation(this.menuTime * 0.03);
+    }
+    if (this.menuGlowRight) {
+      this.menuGlowRight.setAlpha(0.14 + Math.cos(this.menuTime * 1.05) * 0.035);
+      this.menuGlowRight.setRotation(-this.menuTime * 0.025);
+    }
+
+    if (!this.heroRecycler) return;
+
+    this.heroRecycler.setRotation(this.menuTime * 0.15);
+    this.heroTruck.setPosition(
+      this.heroBaseX - 8 + Math.sin(this.menuTime * 1.4) * 10,
+      this.heroBaseY + 126 + Math.cos(this.menuTime * 1.1) * 6
+    );
+    this.heroTruck.setRotation(-0.08 + Math.sin(this.menuTime * 0.9) * 0.04);
+
+    this.heroEscortA.setPosition(
+      this.heroBaseX - 82 + Math.cos(this.menuTime * 1.8) * 8,
+      this.heroBaseY + 38 + Math.sin(this.menuTime * 1.2) * 12
+    );
+    this.heroEscortB.setPosition(
+      this.heroBaseX + 94 + Math.cos(this.menuTime * 1.35 + 1.1) * 10,
+      this.heroBaseY - 16 + Math.sin(this.menuTime * 1.55 + 0.7) * 10
+    );
+    this.heroThreatA.setPosition(
+      this.heroBaseX - 122 + Math.sin(this.menuTime * 1.5) * 12,
+      this.heroBaseY - 102 + Math.cos(this.menuTime * 1.8) * 10
+    );
+    this.heroThreatA.setRotation(0.25 + Math.sin(this.menuTime * 1.25) * 0.1);
+    this.heroThreatB.setPosition(
+      this.heroBaseX + 132 + Math.cos(this.menuTime * 1.1) * 12,
+      this.heroBaseY + 84 + Math.sin(this.menuTime * 1.6) * 10
+    );
+    this.heroThreatB.setRotation(-this.menuTime * 0.8);
+  }
+
+  private createMenuBackdrop(): void {
+    const { width, height } = this.scale;
+    this.bgFar = this.add
+      .tileSprite(0, 0, width, height, "bg_far_silhouette")
+      .setOrigin(0, 0)
+      .setDepth(-20)
+      .setAlpha(0.88);
+    this.bgTile = this.add.tileSprite(0, 0, width, height, "bg_tile_256").setOrigin(0, 0).setDepth(-19).setAlpha(0.82);
+
+    this.menuGlowLeft = this.add
+      .image(0, 0, "vfx_glow_blob")
+      .setDepth(-18)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(0x2d7bff)
+      .setAlpha(0.16)
+      .setScale(8.5, 6.4);
+    this.menuGlowRight = this.add
+      .image(0, 0, "vfx_glow_blob")
+      .setDepth(-18)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(0xffd166)
+      .setAlpha(0.14)
+      .setScale(9.4, 7.2);
+
+    this.menuPanel = this.add.rectangle(0, 0, 420, 446, 0x08111a, 0.76).setDepth(-12).setStrokeStyle(2, 0x3aa4d4, 0.42);
+    this.dailyPanel = this.add.rectangle(0, 0, 420, 148, 0x0b141d, 0.82).setDepth(-12).setStrokeStyle(2, 0x5cc8ff, 0.32);
+    this.heroPanel = this.add.rectangle(0, 0, 470, 470, 0x08111a, 0.72).setDepth(-12).setStrokeStyle(2, 0xffd166, 0.36);
+
+    this.heroRecycler = this.add.image(0, 0, "recycler").setDepth(-10).setScale(1.28);
+    this.heroTruck = this.add.image(0, 0, "player").setDepth(-9).setScale(4.4);
+    this.heroEscortA = this.add.image(0, 0, "scrap_heavy").setDepth(-9).setScale(1.7).setAlpha(0.92);
+    this.heroEscortB = this.add.image(0, 0, "scrap_rare").setDepth(-9).setScale(1.7).setAlpha(0.92);
+    this.heroThreatA = this.add.image(0, 0, "enemy_chaser").setDepth(-9).setScale(2.2).setAlpha(0.95);
+    this.heroThreatB = this.add.image(0, 0, "enemy_cutter").setDepth(-9).setScale(2.1).setAlpha(0.95);
+
+    this.heroCaptionText = this.add
+      .text(0, 0, t(this.locale, "menu.tagline"), {
+        fontSize: "18px",
+        color: "#f3f7fb",
+        fontStyle: "700",
+        align: "center",
+      })
+      .setDepth(-8)
+      .setOrigin(0.5);
+    this.heroHintText = this.add
+      .text(0, 0, t(this.locale, "menu.heroLead"), {
+        fontSize: "14px",
+        color: "#9eb6c4",
+        align: "center",
+        wordWrap: { width: 340 },
+      })
+      .setDepth(-8)
+      .setOrigin(0.5);
+  }
+
+  private layoutMenuBackdrop(width: number, height: number, compact: boolean, leftX: number): void {
+    this.bgFar.setSize(width, height).setDisplaySize(width, height);
+    this.bgTile.setSize(width, height).setDisplaySize(width, height);
+    this.menuGlowLeft.setPosition(Math.round(width * 0.2), Math.round(height * 0.2));
+    this.menuGlowRight.setPosition(Math.round(width * 0.83), Math.round(height * 0.66));
+
+    this.menuPanel.setPosition(leftX, compact ? Math.round(height * 0.48) : Math.round(height * 0.55));
+    this.menuPanel.setSize(compact ? Math.min(width - 44, 480) : 432, compact ? 410 : 432);
+
+    this.dailyPanel.setPosition(leftX, compact ? height - 106 : height - 104);
+    this.dailyPanel.setSize(compact ? Math.min(width - 44, 520) : 432, compact ? 140 : 148);
+
+    this.heroBaseX = compact ? Math.round(width / 2) : Math.round(width * 0.74);
+    this.heroBaseY = compact ? Math.round(height * 0.8) : Math.round(height * 0.48);
+
+    this.heroPanel.setVisible(!compact);
+    this.heroRecycler.setVisible(!compact);
+    this.heroTruck.setVisible(!compact);
+    this.heroEscortA.setVisible(!compact);
+    this.heroEscortB.setVisible(!compact);
+    this.heroThreatA.setVisible(!compact);
+    this.heroThreatB.setVisible(!compact);
+    this.heroCaptionText.setVisible(!compact);
+    this.heroHintText.setVisible(!compact);
+
+    if (!compact) {
+      this.heroPanel.setPosition(this.heroBaseX, this.heroBaseY + 18);
+      this.heroCaptionText.setPosition(this.heroBaseX, this.heroBaseY - 184);
+      this.heroHintText.setPosition(this.heroBaseX, this.heroBaseY + 200);
+      this.heroRecycler.setPosition(this.heroBaseX, this.heroBaseY);
+    }
+  }
+
   private createWorkshopUi(): void {
     this.workshopDim = this.add
       .rectangle(0, 0, 10, 10, 0x000000, 0.74)
@@ -400,9 +590,11 @@ export class MenuScene extends Phaser.Scene {
     this.workshopDim.setVisible(false);
     this.workshopDim.on("pointerdown", () => this.hideWorkshop());
 
-    const panel = this.add.rectangle(0, 0, 620, 760, 0x0f1720, 0.98).setStrokeStyle(2, 0x5cc8ff, 0.9);
+    const panel = this.add.rectangle(0, 0, 620, 760, 0x0f1720, 0.98).setStrokeStyle(2, 0xffd166, 0.82);
+    const accent = this.add.rectangle(0, -314, 520, 2, 0x5cc8ff, 0.84);
     const title = this.add
       .text(0, -338, t(this.locale, "menu.workshop"), { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
+      .setShadow(0, 0, "#5cc8ff", 18, true, true)
       .setOrigin(0.5);
     this.workshopWalletText = this.add
       .text(-270, -304, "", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700", wordWrap: { width: 540 } })
@@ -433,7 +625,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0, 0);
 
     this.workshopBox = this.add
-      .container(0, 0, [panel, title, this.workshopWalletText, this.workshopHintText, btnClose, labelClose, this.workshopFooterText])
+      .container(0, 0, [panel, accent, title, this.workshopWalletText, this.workshopHintText, btnClose, labelClose, this.workshopFooterText])
       .setDepth(1401)
       .setScrollFactor(0);
     this.workshopBox.setVisible(false);
@@ -493,9 +685,11 @@ export class MenuScene extends Phaser.Scene {
       const costAmount = cost?.amount ?? Number.POSITIVE_INFINITY;
       const affordable = Boolean(cost) && currencyAmount >= costAmount;
       const maxed = level >= node.maxLevel || !cost;
-      const y = -172 + idx * 104;
+      const y = -170 + idx * 102;
+      const accentColor = maxed ? 0x57c27d : cost?.currency === "cores" ? 0xffd166 : idx % 2 === 0 ? 0x5cc8ff : 0x3aa4d4;
 
-      const bg = this.add.rectangle(0, 0, 548, 86, 0x121a24, 0.96).setStrokeStyle(2, maxed ? 0x57c27d : 0x3aa4d4, 0.74);
+      const bg = this.add.rectangle(0, 0, 548, 90, 0x121a24, 0.97).setStrokeStyle(2, accentColor, maxed ? 0.72 : 0.58);
+      const accent = this.add.rectangle(-268, 0, 8, 90, accentColor, 0.92);
       const title = this.add
         .text(-256, -28, getMetaNodeName(this.locale, node.id, node.name), {
           fontSize: "17px",
@@ -518,6 +712,10 @@ export class MenuScene extends Phaser.Scene {
           fontStyle: "700",
         })
         .setOrigin(0, 0);
+      const progressBg = this.add.rectangle(-110, 31, 148, 6, 0x0b141d, 0.95).setOrigin(0, 0.5);
+      const progressFill = this.add
+        .rectangle(-110, 31, 148 * Phaser.Math.Clamp(node.maxLevel <= 0 ? 1 : level / node.maxLevel, 0, 1), 6, accentColor, 0.98)
+        .setOrigin(0, 0.5);
 
       const btn = this.add
         .rectangle(180, 0, 130, 42, affordable ? 0x1b2635 : 0x0d131b, 0.98)
@@ -540,7 +738,7 @@ export class MenuScene extends Phaser.Scene {
         btn.on("pointerdown", () => void this.buyMetaNode(node.id));
       }
 
-      const card = this.add.container(0, y, [bg, title, desc, levelText, btn, btnLabel, costLabel]).setDepth(1402);
+      const card = this.add.container(0, y, [bg, accent, title, desc, levelText, progressBg, progressFill, btn, btnLabel, costLabel]).setDepth(1402);
       this.workshopCards.push(card);
       this.workshopBox.add(card);
     });
@@ -632,6 +830,7 @@ export class MenuScene extends Phaser.Scene {
     const res = await this.ads.showRewarded(AD_PLACEMENTS.START_BOOSTER);
     if (res.ok && res.rewarded) {
       this.registry.set("pendingStartBooster", true);
+      this.stopMenuMusic();
       this.scene.start("game", { mode: "run" });
       this.scene.launch("ui");
       return;
@@ -701,6 +900,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     if (boosterGranted) this.registry.set("pendingStartBooster", true);
+    this.stopMenuMusic();
     this.scene.start("game", { mode: "daily" });
     this.scene.launch("ui");
   }
@@ -719,6 +919,10 @@ export class MenuScene extends Phaser.Scene {
     await this.saveManager.save(next);
     this.registry.set("saveData", this.saveManager.get());
     this.saveData = this.saveManager.get();
+    if (key === "musicVolume") {
+      (this.menuMusic as any)?.setVolume?.(value);
+      if (this.menuMusic && typeof (this.menuMusic as any).volume === "number") (this.menuMusic as any).volume = value;
+    }
   }
 
   private async setLanguage(language: LanguageSetting): Promise<void> {
@@ -737,6 +941,40 @@ export class MenuScene extends Phaser.Scene {
       this.toastText?.destroy();
       this.toastText = null;
     });
+  }
+
+  private enableAudio(): void {
+    if (this.audioEnabled) return;
+    this.audioEnabled = true;
+
+    try {
+      const sm: any = this.sound;
+      if (sm?.locked && typeof sm.unlock === "function") sm.unlock();
+    } catch {
+      // ignore
+    }
+
+    try {
+      const battleMusic = (this.sound as any).get?.("music_main") as Phaser.Sound.BaseSound | undefined;
+      if (battleMusic?.isPlaying) battleMusic.stop();
+      const volume = this.saveData?.settings?.musicVolume ?? 0.6;
+      const existing = (this.sound as any).get?.("music_menu") as Phaser.Sound.BaseSound | undefined;
+      this.menuMusic = existing ?? this.sound.add("music_menu", { loop: true, volume });
+      (this.menuMusic as any)?.setVolume?.(volume);
+      if (this.menuMusic && typeof (this.menuMusic as any).volume === "number") (this.menuMusic as any).volume = volume;
+      if (!this.menuMusic?.isPlaying) this.menuMusic?.play();
+    } catch {
+      // ignore
+    }
+  }
+
+  private stopMenuMusic(): void {
+    try {
+      const track = (this.sound as any).get?.("music_menu") as Phaser.Sound.BaseSound | undefined;
+      if (track?.isPlaying) track.stop();
+    } catch {
+      // ignore
+    }
   }
 }
 

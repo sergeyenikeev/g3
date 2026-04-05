@@ -9,7 +9,19 @@ import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import type { StaticGameData } from "../../data/staticGameData";
 import { VISUAL_PALETTE, createLightGradient, createVfxTextures, createVignette } from "../../visual/TextureFactory";
-import { type Locale, formatNumber, getDailyVariantCopy, resolveLocale, t } from "../../i18n/localization";
+import { languageStroke, nextVolumeStep, qualityStroke, snapVolumeStep } from "./uiSettingsHelpers";
+import {
+  type LanguageSetting,
+  type Locale,
+  formatNumber,
+  formatQualityLabel,
+  formatVolume,
+  getDailyVariantCopy,
+  getLanguageSettingLabel,
+  normalizeLanguageSetting,
+  resolveLocale,
+  t,
+} from "../../i18n/localization";
 
 type TutorialStep = 1 | 2 | 3;
 
@@ -21,6 +33,8 @@ export class UIScene extends Phaser.Scene {
   private ads: AdsManager | null = null;
   private analytics: AnalyticsAdapter | null = null;
   private locale: Locale = "en";
+  private languageSetting: LanguageSetting = "auto";
+  private qualityPref: SaveData["settings"]["visualQuality"] = "auto";
 
   private overlayVignette!: Phaser.GameObjects.Image;
   private overlayLight!: Phaser.GameObjects.Image;
@@ -42,6 +56,8 @@ export class UIScene extends Phaser.Scene {
   private dashLabel!: Phaser.GameObjects.Text;
   private flipGlow!: Phaser.GameObjects.Image;
   private dashGlow!: Phaser.GameObjects.Image;
+  private pauseButton!: Phaser.GameObjects.Rectangle;
+  private pauseLabel!: Phaser.GameObjects.Text;
   private flipPulseT = 0;
 
   private tutorialActive = false;
@@ -49,6 +65,7 @@ export class UIScene extends Phaser.Scene {
   private tutorialScrap = 0;
   private tutorialBox!: Phaser.GameObjects.Container;
   private tutorialText!: Phaser.GameObjects.Text;
+  private tutorialActionLabel!: Phaser.GameObjects.Text;
 
   private modalActive = false;
   private reviveBusy = false;
@@ -57,6 +74,25 @@ export class UIScene extends Phaser.Scene {
   private revivePanel!: Phaser.GameObjects.Rectangle;
   private reviveTitle!: Phaser.GameObjects.Text;
   private reviveHint!: Phaser.GameObjects.Text;
+  private reviveAcceptLabel!: Phaser.GameObjects.Text;
+  private reviveDeclineLabel!: Phaser.GameObjects.Text;
+  private settingsVisible = false;
+  private settingsDim!: Phaser.GameObjects.Rectangle;
+  private settingsBox!: Phaser.GameObjects.Container;
+  private settingsTitle!: Phaser.GameObjects.Text;
+  private settingsHint!: Phaser.GameObjects.Text;
+  private settingsQualityButton!: Phaser.GameObjects.Rectangle;
+  private settingsQualityLabel!: Phaser.GameObjects.Text;
+  private settingsSfxButton!: Phaser.GameObjects.Rectangle;
+  private settingsSfxLabel!: Phaser.GameObjects.Text;
+  private settingsMusicButton!: Phaser.GameObjects.Rectangle;
+  private settingsMusicLabel!: Phaser.GameObjects.Text;
+  private settingsLanguageButton!: Phaser.GameObjects.Rectangle;
+  private settingsLanguageLabel!: Phaser.GameObjects.Text;
+  private settingsResumeButton!: Phaser.GameObjects.Rectangle;
+  private settingsResumeLabel!: Phaser.GameObjects.Text;
+  private settingsMenuButton!: Phaser.GameObjects.Rectangle;
+  private settingsMenuLabel!: Phaser.GameObjects.Text;
 
   private audioEnabled = false;
   private music: Phaser.Sound.BaseSound | null = null;
@@ -84,10 +120,14 @@ export class UIScene extends Phaser.Scene {
     this.saveData = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.ads = (this.registry.get("adsManager") as AdsManager | undefined) ?? null;
     this.analytics = (this.registry.get("analytics") as AnalyticsAdapter | undefined) ?? null;
-    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(this.saveData?.settings?.language ?? "auto"));
+    this.languageSetting = normalizeLanguageSetting(this.saveData?.settings?.language ?? "auto");
+    this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(this.languageSetting));
+    this.qualityPref = this.saveData?.settings?.visualQuality ?? "auto";
 
-    this.sfxVolume = this.saveData?.settings?.sfxVolume ?? 0.8;
-    this.musicVolume = this.saveData?.settings?.musicVolume ?? 0.6;
+    this.sfxVolume = snapVolumeStep(this.saveData?.settings?.sfxVolume ?? 0.8);
+    this.musicVolume = snapVolumeStep(this.saveData?.settings?.musicVolume ?? 0.6);
+    this.registry.set("languageSetting", this.languageSetting);
+    this.registry.set("locale", this.locale);
 
     this.input.once("pointerdown", () => this.enableAudio());
     this.input.keyboard?.once("keydown", () => this.enableAudio());
@@ -116,10 +156,14 @@ export class UIScene extends Phaser.Scene {
     this.createControls();
     this.createTutorial();
     this.createReviveOverlay();
+    this.createSettingsOverlay();
+    this.refreshLocalizedUi();
     this.bindTutorialEvents();
     this.bindAudioEvents();
     this.bindReviveEvents();
     this.bindAnalyticsEvents();
+    this.input.keyboard?.on("keydown-ESC", this.onEscapePressed, this);
+    if (!(this.sound as any)?.locked) this.enableAudio();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.SCRAP_COLLECTED, this.onTutorialScrap, this);
@@ -137,6 +181,7 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.FLIP_USED, this.onAnalyticsFlip, this);
       this.game.events.off(GAME_EVENTS.BANK_COMPLETE, this.onAnalyticsBank, this);
       this.game.events.off(GAME_EVENTS.UPGRADE_PICKED, this.onAnalyticsUpgradePick, this);
+      this.input.keyboard?.off("keydown-ESC", this.onEscapePressed, this);
     });
 
     this.scale.on("resize", () => this.layout());
@@ -277,6 +322,25 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(1001)
       .setScrollFactor(0);
+
+    this.pauseButton = this.add
+      .rectangle(0, 0, 116, 34, 0x121a24, 0.92)
+      .setStrokeStyle(2, 0xffd166, 0.78)
+      .setDepth(1000)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true });
+    this.pauseButton.on("pointerdown", () => {
+      if (this.reviveBox.visible) return;
+      this.enableAudio();
+      this.playSfx("sfx_ui_click");
+      if (this.settingsVisible) this.closeSettings();
+      else this.openSettings();
+    });
+    this.pauseLabel = this.add
+      .text(0, 0, t(this.locale, "pause.open"), { fontSize: "13px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5)
+      .setDepth(1001)
+      .setScrollFactor(0);
   }
 
   private layout(): void {
@@ -303,9 +367,14 @@ export class UIScene extends Phaser.Scene {
     this.dashLabel.setPosition(dashX, dashY);
     this.dashGlow.setPosition(dashX, dashY);
 
+    this.pauseButton.setPosition(width - margin - 58, margin + 18);
+    this.pauseLabel.setPosition(this.pauseButton.x, this.pauseButton.y);
+
     this.tutorialBox.setPosition(width / 2, margin + 62);
     this.reviveBox.setPosition(width / 2, height / 2);
     this.reviveDim.setSize(width, height);
+    this.settingsBox.setPosition(width / 2, height / 2);
+    this.settingsDim.setSize(width, height);
 
     this.layoutHud();
   }
@@ -353,10 +422,7 @@ export class UIScene extends Phaser.Scene {
   private onPointerUp(p: Phaser.Input.Pointer): void {
     if (this.modalActive) return;
     if (this.joyPointerId !== p.id) return;
-    this.joyPointerId = null;
-    inputState.moveX = 0;
-    inputState.moveY = 0;
-    this.joyKnob.setPosition(this.joyBase.x, this.joyBase.y);
+    this.releaseControls();
   }
 
   private updateJoystick(x: number, y: number): void {
@@ -385,7 +451,7 @@ export class UIScene extends Phaser.Scene {
       .rectangle(220, 0, 70, 34, 0x1b2635, 0.95)
       .setStrokeStyle(2, 0x5cc8ff, 0.8)
       .setInteractive({ useHandCursor: true });
-    const btnTxt = this.add
+    this.tutorialActionLabel = this.add
       .text(220, 0, tutorialMode ? t(this.locale, "tutorial.exit") : t(this.locale, "tutorial.skip"), {
         fontSize: "12px",
         color: "#d9f2ff",
@@ -395,7 +461,7 @@ export class UIScene extends Phaser.Scene {
 
     btn.on("pointerdown", () => void (tutorialMode ? this.exitTrainingMode() : this.skipTutorial()));
 
-    this.tutorialBox = this.add.container(0, 0, [bg, this.tutorialText, btn, btnTxt]).setDepth(1200).setScrollFactor(0);
+    this.tutorialBox = this.add.container(0, 0, [bg, this.tutorialText, btn, this.tutorialActionLabel]).setDepth(1200).setScrollFactor(0);
     this.tutorialBox.setVisible(this.tutorialActive);
     this.refreshTutorialText();
 
@@ -461,7 +527,7 @@ export class UIScene extends Phaser.Scene {
       .rectangle(0, 42, 260, 54, 0x1b2635, 0.95)
       .setStrokeStyle(2, 0x57c27d, 0.9)
       .setInteractive({ useHandCursor: true });
-    const txtYes = this.add
+    this.reviveAcceptLabel = this.add
       .text(0, 42, t(this.locale, "revive.accept"), { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
 
@@ -469,7 +535,7 @@ export class UIScene extends Phaser.Scene {
       .rectangle(0, 104, 260, 46, 0x121a24, 0.95)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true });
-    const txtNo = this.add
+    this.reviveDeclineLabel = this.add
       .text(0, 104, t(this.locale, "revive.decline"), { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
 
@@ -477,10 +543,115 @@ export class UIScene extends Phaser.Scene {
     btnNo.on("pointerdown", () => this.handleRevive(false));
 
     this.reviveBox = this.add
-      .container(0, 0, [this.reviveDim, this.revivePanel, this.reviveTitle, this.reviveHint, btnYes, txtYes, btnNo, txtNo])
+      .container(0, 0, [this.reviveDim, this.revivePanel, this.reviveTitle, this.reviveHint, btnYes, this.reviveAcceptLabel, btnNo, this.reviveDeclineLabel])
       .setDepth(1400)
       .setScrollFactor(0);
     this.reviveBox.setVisible(false);
+  }
+
+  private createSettingsOverlay(): void {
+    this.settingsDim = this.add
+      .rectangle(0, 0, 10, 10, 0x000000, 0.76)
+      .setDepth(1450)
+      .setScrollFactor(0)
+      .setInteractive();
+    this.settingsDim.on("pointerdown", () => this.closeSettings());
+
+    const panel = this.add.rectangle(0, 0, 468, 410, 0x0f1720, 0.97).setStrokeStyle(2, 0xffd166, 0.82);
+    const accent = this.add.rectangle(0, -150, 380, 2, 0x5cc8ff, 0.85);
+    this.settingsTitle = this.add
+      .text(0, -178, t(this.locale, "pause.title"), { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
+    this.settingsHint = this.add
+      .text(0, -132, t(this.locale, "pause.hint"), {
+        fontSize: "13px",
+        color: "#98b7c7",
+        align: "center",
+        wordWrap: { width: 380 },
+      })
+      .setOrigin(0.5);
+
+    const createSettingsButton = (y: number, accentColor: number, onPress: () => void) => {
+      const button = this.add
+        .rectangle(0, y, 360, 46, 0x121a24, 0.96)
+        .setStrokeStyle(2, accentColor, 0.78)
+        .setInteractive({ useHandCursor: true });
+      const label = this.add
+        .text(0, y, "", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
+        .setOrigin(0.5);
+      button.on("pointerdown", () => {
+        this.enableAudio();
+        this.playSfx("sfx_ui_click");
+        onPress();
+      });
+      return { button, label };
+    };
+
+    const qualityButton = createSettingsButton(-72, 0x3aa4d4, () => void this.cycleQualitySetting());
+    this.settingsQualityButton = qualityButton.button;
+    this.settingsQualityLabel = qualityButton.label;
+
+    const sfxButton = createSettingsButton(-14, 0x3aa4d4, () => void this.cycleAudioSetting("sfxVolume"));
+    this.settingsSfxButton = sfxButton.button;
+    this.settingsSfxLabel = sfxButton.label;
+
+    const musicButton = createSettingsButton(44, 0x57c27d, () => void this.cycleAudioSetting("musicVolume"));
+    this.settingsMusicButton = musicButton.button;
+    this.settingsMusicLabel = musicButton.label;
+
+    const languageButton = createSettingsButton(102, 0xffd166, () => void this.cycleLanguageSetting());
+    this.settingsLanguageButton = languageButton.button;
+    this.settingsLanguageLabel = languageButton.label;
+
+    this.settingsResumeButton = this.add
+      .rectangle(-92, 172, 172, 44, 0x1b2635, 0.96)
+      .setStrokeStyle(2, 0x57c27d, 0.82)
+      .setInteractive({ useHandCursor: true });
+    this.settingsResumeButton.on("pointerdown", () => {
+      this.enableAudio();
+      this.playSfx("sfx_ui_click");
+      this.closeSettings();
+    });
+    this.settingsResumeLabel = this.add
+      .text(-92, 172, t(this.locale, "pause.resume"), { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
+
+    this.settingsMenuButton = this.add
+      .rectangle(92, 172, 172, 44, 0x121a24, 0.96)
+      .setStrokeStyle(2, 0x5f6b76, 0.82)
+      .setInteractive({ useHandCursor: true });
+    this.settingsMenuButton.on("pointerdown", () => {
+      this.enableAudio();
+      this.playSfx("sfx_ui_click");
+      this.returnToMenu();
+    });
+    this.settingsMenuLabel = this.add
+      .text(92, 172, t(this.locale, "pause.menu"), { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
+
+    this.settingsBox = this.add
+      .container(0, 0, [
+        this.settingsDim,
+        panel,
+        accent,
+        this.settingsTitle,
+        this.settingsHint,
+        this.settingsQualityButton,
+        this.settingsQualityLabel,
+        this.settingsSfxButton,
+        this.settingsSfxLabel,
+        this.settingsMusicButton,
+        this.settingsMusicLabel,
+        this.settingsLanguageButton,
+        this.settingsLanguageLabel,
+        this.settingsResumeButton,
+        this.settingsResumeLabel,
+        this.settingsMenuButton,
+        this.settingsMenuLabel,
+      ])
+      .setDepth(1451)
+      .setScrollFactor(0);
+    this.settingsBox.setVisible(false);
   }
 
   private onReviveOffer(): void {
@@ -516,10 +687,7 @@ export class UIScene extends Phaser.Scene {
   private hideReviveOverlay(): void {
     this.modalActive = false;
     this.reviveBox.setVisible(false);
-    this.joyPointerId = null;
-    inputState.moveX = 0;
-    inputState.moveY = 0;
-    this.joyKnob.setPosition(this.joyBase.x, this.joyBase.y);
+    this.releaseControls();
   }
 
   private onTutorialScrap(): void {
@@ -595,6 +763,8 @@ export class UIScene extends Phaser.Scene {
     }
 
     try {
+      const menuMusic = (this.sound as any).get?.("music_menu") as Phaser.Sound.BaseSound | undefined;
+      if (menuMusic?.isPlaying) menuMusic.stop();
       const existing = (this.sound as any).get?.("music_main") as Phaser.Sound.BaseSound | undefined;
       this.music = existing ?? this.sound.add("music_main", { loop: true, volume: this.musicVolume });
       (this.music as any).setVolume?.(this.musicVolume);
@@ -618,6 +788,126 @@ export class UIScene extends Phaser.Scene {
     if (!this.runState?.daily?.variantId) return "?";
     const variant = this.staticData?.daily.dailyVariants.find((entry) => entry.id === this.runState?.daily?.variantId);
     return getDailyVariantCopy(this.locale, this.runState.daily.variantId, variant?.ui?.title ?? this.runState.daily.variantId).title;
+  }
+
+  private onEscapePressed(): void {
+    if (this.reviveBox.visible) return;
+    if (this.scene.isActive("upgrade")) return;
+    if (this.settingsVisible) {
+      this.closeSettings();
+      return;
+    }
+    if (!this.modalActive) this.openSettings();
+  }
+
+  private openSettings(): void {
+    if (this.settingsVisible || this.modalActive || this.scene.isActive("upgrade")) return;
+    this.settingsVisible = true;
+    this.modalActive = true;
+    this.releaseControls();
+    this.scene.pause("game");
+    this.pauseButton.setVisible(false);
+    this.pauseLabel.setVisible(false);
+    this.settingsBox.setVisible(true);
+    this.refreshLocalizedUi();
+    this.layout();
+  }
+
+  private closeSettings(): void {
+    if (!this.settingsVisible) return;
+    this.settingsVisible = false;
+    this.modalActive = false;
+    this.settingsBox.setVisible(false);
+    this.pauseButton.setVisible(true);
+    this.pauseLabel.setVisible(true);
+    this.scene.resume("game");
+  }
+
+  private returnToMenu(): void {
+    this.settingsVisible = false;
+    this.modalActive = false;
+    this.settingsBox.setVisible(false);
+    this.scene.stop("upgrade");
+    this.scene.stop("game");
+    this.scene.start("menu");
+  }
+
+  private async cycleQualitySetting(): Promise<void> {
+    const order: SaveData["settings"]["visualQuality"][] = ["auto", "low", "medium", "high"];
+    const idx = order.indexOf(this.qualityPref);
+    this.qualityPref = order[(idx + 1) % order.length] ?? "auto";
+    await this.saveSettings({ visualQuality: this.qualityPref });
+    this.game.events.emit(GAME_EVENTS.SETTINGS_CHANGED, { visualQuality: this.qualityPref });
+    this.refreshLocalizedUi();
+  }
+
+  private async cycleAudioSetting(key: "sfxVolume" | "musicVolume"): Promise<void> {
+    const next = nextVolumeStep(key === "sfxVolume" ? this.sfxVolume : this.musicVolume);
+    if (key === "sfxVolume") {
+      this.sfxVolume = next;
+    } else {
+      this.musicVolume = next;
+      (this.music as any)?.setVolume?.(next);
+      if (this.music && typeof (this.music as any).volume === "number") (this.music as any).volume = next;
+    }
+
+    await this.saveSettings({ [key]: next });
+    this.refreshLocalizedUi();
+  }
+
+  private async cycleLanguageSetting(): Promise<void> {
+    const order: LanguageSetting[] = ["auto", "ru", "en"];
+    const idx = order.indexOf(this.languageSetting);
+    this.languageSetting = order[(idx + 1) % order.length] ?? "auto";
+    this.locale = resolveLocale(this.languageSetting);
+    this.registry.set("languageSetting", this.languageSetting);
+    this.registry.set("locale", this.locale);
+    await this.saveSettings({ language: this.languageSetting });
+    this.game.events.emit(GAME_EVENTS.SETTINGS_CHANGED, { locale: this.locale });
+    this.refreshLocalizedUi();
+    this.layoutHud();
+  }
+
+  private async saveSettings(patch: Partial<SaveData["settings"]>): Promise<void> {
+    if (!this.saveManager) return;
+    const save = this.saveManager.get();
+    const next: SaveData = { ...save, settings: { ...save.settings, ...patch } };
+    await this.saveManager.save(next);
+    this.saveData = this.saveManager.get();
+    this.registry.set("saveData", this.saveData);
+  }
+
+  private refreshLocalizedUi(): void {
+    this.pauseLabel.setText(t(this.locale, "pause.open"));
+    this.settingsTitle.setText(t(this.locale, "pause.title"));
+    this.settingsHint.setText(t(this.locale, "pause.hint"));
+    this.settingsQualityLabel.setText(`${t(this.locale, "settings.gfx")}: ${formatQualityLabel(this.locale, this.qualityPref)}`);
+    this.settingsSfxLabel.setText(`${t(this.locale, "settings.sfx")}: ${formatVolume(this.locale, this.sfxVolume)}`);
+    this.settingsMusicLabel.setText(`${t(this.locale, "settings.music")}: ${formatVolume(this.locale, this.musicVolume)}`);
+    this.settingsLanguageLabel.setText(`${t(this.locale, "settings.language")}: ${getLanguageSettingLabel(this.locale, this.languageSetting)}`);
+    this.settingsResumeLabel.setText(t(this.locale, "pause.resume"));
+    this.settingsMenuLabel.setText(t(this.locale, "pause.menu"));
+
+    this.settingsQualityButton.setStrokeStyle(2, qualityStroke(this.qualityPref), 0.82);
+    this.settingsSfxButton.setStrokeStyle(2, this.sfxVolume <= 0 ? 0x5f6b76 : 0x3aa4d4, this.sfxVolume <= 0 ? 0.58 : 0.82);
+    this.settingsMusicButton.setStrokeStyle(2, this.musicVolume <= 0 ? 0x5f6b76 : 0x57c27d, this.musicVolume <= 0 ? 0.58 : 0.82);
+    this.settingsLanguageButton.setStrokeStyle(2, languageStroke(this.languageSetting), 0.82);
+
+    this.flipLabel.setText(t(this.locale, "hud.flip"));
+    this.dashLabel.setText(t(this.locale, "hud.dash"));
+    this.tutorialActionLabel.setText(this.isTrainingMode() ? t(this.locale, "tutorial.exit") : t(this.locale, "tutorial.skip"));
+    this.reviveTitle.setText(t(this.locale, "revive.title"));
+    this.reviveHint.setText(t(this.locale, "revive.hint"));
+    this.reviveAcceptLabel.setText(t(this.locale, "revive.accept"));
+    this.reviveDeclineLabel.setText(t(this.locale, "revive.decline"));
+    this.refreshTutorialText();
+  }
+
+  private releaseControls(): void {
+    this.joyPointerId = null;
+    inputState.moveX = 0;
+    inputState.moveY = 0;
+    this.joyKnob.setPosition(this.joyBase.x, this.joyBase.y);
   }
 }
 

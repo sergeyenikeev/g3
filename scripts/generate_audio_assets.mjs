@@ -77,7 +77,9 @@ await writeToneMp3(join(OUT_DIR, "upgrade_select.mp3"), {
   env: { attackSec: 0.003, decaySec: 0.03, sustain: 0.25, releaseSec: 0.08 },
 });
 
-await writeMusicLoopMp3(join(OUT_DIR, "music_loop.mp3"));
+await writeMusicLoopMp3(join(OUT_DIR, "music_battle_loop.mp3"), "battle");
+await writeMusicLoopMp3(join(OUT_DIR, "music_menu_loop.mp3"), "menu");
+await writeMusicLoopMp3(join(OUT_DIR, "music_loop.mp3"), "battle");
 
 console.log(`Audio MP3 generated in ${OUT_DIR}`);
 
@@ -86,8 +88,8 @@ async function writeToneMp3(filePath, spec) {
   await writeSamplesMp3(filePath, samples, spec.ffmpegQ ?? 6);
 }
 
-async function writeMusicLoopMp3(filePath) {
-  const samples = composeMusicLoop();
+async function writeMusicLoopMp3(filePath, kind) {
+  const samples = kind === "menu" ? composeMenuLoop() : composeBattleLoop();
   await writeSamplesMp3(filePath, samples, 4);
 }
 
@@ -174,7 +176,7 @@ function synth(spec) {
   return out;
 }
 
-function composeMusicLoop() {
+function composeBattleLoop() {
   const bpm = 118;
   const beatSec = 60 / bpm;
   const bars = 4;
@@ -301,6 +303,119 @@ function composeMusicLoop() {
 
   const rendered = new Int16Array(out.length);
   for (let i = 0; i < out.length; i++) rendered[i] = floatToInt16(softClip(out[i] * 0.82));
+  return rendered;
+}
+
+function composeMenuLoop() {
+  const bpm = 92;
+  const beatSec = 60 / bpm;
+  const bars = 4;
+  const beatsPerBar = 4;
+  const durationSec = beatSec * beatsPerBar * bars;
+  const frames = Math.max(1, Math.floor(durationSec * SAMPLE_RATE));
+  const out = new Float32Array(frames);
+
+  const chords = [
+    [196.0, 246.94, 329.63],
+    [220.0, 261.63, 329.63],
+    [174.61, 220.0, 293.66],
+    [196.0, 246.94, 329.63],
+  ];
+
+  const arpPattern = [0, 0.5, 1, 1.5, 2.25, 2.75, 3.25, 3.75];
+  const bellBars = [
+    [
+      { beat: 0.25, note: 392.0, len: 0.75 },
+      { beat: 1.5, note: 493.88, len: 0.75 },
+      { beat: 2.75, note: 587.33, len: 1.0 },
+    ],
+    [
+      { beat: 0.5, note: 440.0, len: 0.75 },
+      { beat: 1.75, note: 523.25, len: 0.75 },
+      { beat: 3.0, note: 659.25, len: 0.75 },
+    ],
+    [
+      { beat: 0.25, note: 349.23, len: 0.75 },
+      { beat: 1.5, note: 440.0, len: 0.75 },
+      { beat: 2.75, note: 523.25, len: 1.0 },
+    ],
+    [
+      { beat: 0.5, note: 392.0, len: 0.75 },
+      { beat: 1.75, note: 493.88, len: 0.75 },
+      { beat: 3.0, note: 659.25, len: 1.0 },
+    ],
+  ];
+
+  for (let bar = 0; bar < bars; bar++) {
+    const barStart = bar * beatsPerBar * beatSec;
+    const chord = chords[bar] ?? chords[0];
+    if (!chord) continue;
+
+    for (const note of chord) {
+      mixNote(out, {
+        startSec: barStart,
+        durationSec: beatsPerBar * beatSec + 0.08,
+        freqHz: note / 2,
+        gain: 0.048,
+        wave: "triangle",
+        env: { attackSec: 0.04, decaySec: 0.2, sustain: 0.82, releaseSec: 0.18 },
+        vibratoHz: 3.6,
+        vibratoDepth: 0.0022,
+      });
+      mixNote(out, {
+        startSec: barStart,
+        durationSec: beatsPerBar * beatSec + 0.08,
+        freqHz: note,
+        gain: 0.026,
+        wave: "sine",
+        env: { attackSec: 0.05, decaySec: 0.2, sustain: 0.8, releaseSec: 0.16 },
+      });
+    }
+
+    for (let i = 0; i < arpPattern.length; i++) {
+      const note = chord[i % chord.length];
+      mixNote(out, {
+        startSec: barStart + arpPattern[i] * beatSec,
+        durationSec: beatSec * 0.42,
+        freqHz: note * (i % 2 === 0 ? 1 : 2),
+        gain: 0.052,
+        wave: "triangle",
+        env: { attackSec: 0.01, decaySec: 0.08, sustain: 0.34, releaseSec: 0.1 },
+      });
+    }
+
+    for (const bell of bellBars[bar] ?? []) {
+      mixNote(out, {
+        startSec: barStart + bell.beat * beatSec,
+        durationSec: bell.len * beatSec,
+        freqHz: bell.note,
+        gain: 0.058,
+        wave: "sine",
+        env: { attackSec: 0.008, decaySec: 0.1, sustain: 0.24, releaseSec: 0.22 },
+        vibratoHz: 5.5,
+        vibratoDepth: 0.0025,
+      });
+      mixNote(out, {
+        startSec: barStart + bell.beat * beatSec,
+        durationSec: bell.len * beatSec,
+        freqHz: bell.note * 2,
+        gain: 0.015,
+        wave: "triangle",
+        env: { attackSec: 0.01, decaySec: 0.08, sustain: 0.18, releaseSec: 0.18 },
+      });
+    }
+
+    mixKick(out, barStart, 0.42);
+    mixKick(out, barStart + beatSec * 2, 0.34);
+    mixHat(out, barStart + beatSec * 1.5, 0.06);
+    mixHat(out, barStart + beatSec * 3.5, 0.05);
+  }
+
+  applyDelay(out, Math.floor(beatSec * SAMPLE_RATE * 0.75), 0.26);
+  applyShortCrossfade(out, Math.floor(SAMPLE_RATE * 0.04));
+
+  const rendered = new Int16Array(out.length);
+  for (let i = 0; i < out.length; i++) rendered[i] = floatToInt16(softClip(out[i] * 0.76));
   return rendered;
 }
 

@@ -1,4 +1,5 @@
 import { VISUAL_PALETTE } from "./TextureFactory";
+import { formatNumber, formatResource, type Locale } from "../i18n/localization";
 
 export type VfxQuality = "low" | "medium" | "high";
 
@@ -125,6 +126,12 @@ export class VfxManager {
         return;
       case "bank_complete":
         this.onBankComplete(params);
+        return;
+      case "enemy_hit":
+        this.onEnemyHit(params);
+        return;
+      case "enemy_killed":
+        this.onEnemyKilled(params);
         return;
       case "wave_start":
         this.onWaveStart(params);
@@ -366,7 +373,13 @@ export class VfxManager {
     const y = num(p?.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
+    const bolts = Math.max(0, Math.floor(num(p?.bolts) || 0));
+    const hpHealed = Math.max(0, Math.floor(num(p?.hpHealed) || 0));
+    const locale = this.getLocale();
+
+    this.cameraShake(110, 0.0024);
     this.spawnGlow(x, y, VISUAL_PALETTE.successGreen, 0.35, 1.35, 0.28);
+    this.spawnGlow(x, y, VISUAL_PALETTE.warningAmber, 0.24, 1.05, 0.2);
     const count = this.quality === "low" ? 14 : this.quality === "high" ? 28 : 20;
     this.spawnInwardBurst(x, y, count, {
       rMin: 40,
@@ -375,6 +388,111 @@ export class VfxManager {
       tintB: VISUAL_PALETTE.warningAmber,
       life: 0.38,
     });
+
+    this.spawnSparkBurst(x, y, this.quality === "low" ? 10 : this.quality === "high" ? 18 : 14, {
+      tintA: VISUAL_PALETTE.successGreen,
+      tintB: VISUAL_PALETTE.warningAmber,
+      speed: 180,
+      life: 0.28,
+      spread: 1,
+    });
+
+    const uiOrigin = this.worldToUi(x, y);
+    if (uiOrigin && bolts > 0) {
+      this.spawnUiText(uiOrigin.x, uiOrigin.y - 26, `+${formatResource(locale, "bolts", bolts)}`, "#ffd166", 0.9);
+    }
+    if (uiOrigin && hpHealed > 0) {
+      this.spawnUiText(uiOrigin.x, uiOrigin.y + 2, `+${formatNumber(locale, hpHealed)} HP`, "#57c27d", 0.72);
+    }
+
+    const uiTarget = this.getUiBoltsTarget();
+    if (uiTarget && bolts > 0) {
+      const flyCount = clampInt(Math.ceil(Math.min(7, 2 + bolts / 6)), 2, 7);
+      for (let i = 0; i < flyCount; i++) {
+        const angle = (i / Math.max(1, flyCount)) * Math.PI * 2 + Math.random() * 0.5;
+        const sx = x + Math.cos(angle) * (18 + Math.random() * 28);
+        const sy = y + Math.sin(angle) * (18 + Math.random() * 28);
+        this.spawnUiFlyIcon(sx, sy, uiTarget.x + (Math.random() * 12 - 6), uiTarget.y + (Math.random() * 8 - 4), "vfx_spark", VISUAL_PALETTE.warningAmber);
+      }
+    }
+  }
+
+  private onEnemyHit(p: any): void {
+    const x = num(p?.x);
+    const y = num(p?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    const enemyType = typeof p?.enemyType === "string" ? p.enemyType : "chaser";
+    const palette = getEnemyPalette(enemyType);
+
+    const flash = this.world?.add?.image?.(x, y, "vfx_hit_flash");
+    if (flash) {
+      safeSet(flash, "setDepth", 73);
+      safeSet(flash, "setBlendMode", "ADD");
+      safeSet(flash, "setTint", palette.primary);
+      safeSet(flash, "setAlpha", 0.68);
+      safeSet(flash, "setScale", enemyType === "cutter" ? 0.88 : 0.76);
+      this.fx.push({ kind: "ring", obj: flash, age: 0, life: 0.14, x, y, s0: enemyType === "cutter" ? 0.88 : 0.76, s1: 1.18, a0: 0.68, a1: 0 });
+    }
+
+    if (enemyType === "shooter") {
+      this.spawnSparkBurst(x, y, 6, { tintA: palette.primary, tintB: palette.secondary, speed: 170, life: 0.18, spread: 1 });
+      this.spawnRadialSparks(x, y, 16, this.quality === "low" ? 4 : 6, palette.secondary, 0.16);
+    } else if (enemyType === "cutter") {
+      this.spawnSparkBurst(x, y, this.quality === "low" ? 6 : 9, {
+        tintA: palette.primary,
+        tintB: palette.secondary,
+        speed: 210,
+        life: 0.22,
+        spread: 1,
+      });
+      this.spawnGlow(x, y, palette.primary, 0.18, 0.72, 0.12);
+    } else {
+      this.spawnSparkBurst(x, y, 7, { tintA: palette.primary, tintB: palette.secondary, speed: 220, life: 0.2, spread: 1 });
+    }
+  }
+
+  private onEnemyKilled(p: any): void {
+    const x = num(p?.x);
+    const y = num(p?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    const enemyType = typeof p?.enemyType === "string" ? p.enemyType : "chaser";
+    const palette = getEnemyPalette(enemyType);
+    const enemyTex = enemyTextureForType(enemyType);
+
+    this.spawnGlow(x, y, palette.primary, 0.28, 1.02, 0.22);
+    this.spawnGlow(x, y, palette.secondary, 0.22, 0.82, 0.18);
+    this.spawnSparkBurst(x, y, this.quality === "low" ? 10 : this.quality === "high" ? 18 : 14, {
+      tintA: palette.primary,
+      tintB: palette.secondary,
+      speed: enemyType === "cutter" ? 280 : 240,
+      life: 0.26,
+      spread: 1,
+    });
+    this.spawnRadialSparks(x, y, enemyType === "shooter" ? 22 : 18, this.quality === "low" ? 6 : this.quality === "high" ? 12 : 9, palette.primary, 0.24);
+
+    const silhouette = this.world?.add?.image?.(x, y, enemyTex);
+    if (silhouette) {
+      safeSet(silhouette, "setDepth", 72);
+      safeSet(silhouette, "setBlendMode", "ADD");
+      safeSet(silhouette, "setTint", palette.primary);
+      safeSet(silhouette, "setAlpha", 0.4);
+      safeSet(silhouette, "setScale", 0.92);
+      this.fx.push({ kind: "ring", obj: silhouette, age: 0, life: 0.18, x, y, s0: 0.92, s1: 1.38, a0: 0.4, a1: 0 });
+    }
+
+    if (enemyType === "shooter") {
+      const smoke = this.world?.add?.image?.(x, y, "vfx_smoke_puff");
+      if (smoke) {
+        safeSet(smoke, "setDepth", 68);
+        safeSet(smoke, "setBlendMode", "SCREEN");
+        safeSet(smoke, "setTint", VISUAL_PALETTE.neonBlue);
+        safeSet(smoke, "setAlpha", 0.18);
+        safeSet(smoke, "setScale", 0.86);
+        this.fx.push({ kind: "ring", obj: smoke, age: 0, life: 0.32, x, y, s0: 0.86, s1: 1.5, a0: 0.18, a1: 0 });
+      }
+    }
   }
 
   private onWaveStart(p: any): void {
@@ -645,6 +763,11 @@ export class VfxManager {
     return { x, y };
   }
 
+  private getLocale(): Locale {
+    const candidate = this.ui?.registry?.get?.("locale");
+    return candidate === "ru" ? "ru" : "en";
+  }
+
   private spawnTailFragments(segments: any[]): void {
     if (!segments || segments.length === 0) return;
     const cap = this.getMaxParticles();
@@ -701,15 +824,10 @@ export class VfxManager {
 
   private spawnUiFlyIcon(worldX: number, worldY: number, uiX: number, uiY: number, key: string, tint: number): void {
     const ui = this.ui;
-    const world = this.world;
-    if (!ui || !world) return;
-    const cam = world.cameras?.main;
-    if (!cam) return;
+    const origin = this.worldToUi(worldX, worldY);
+    if (!ui || !origin) return;
 
-    const x0 = (worldX - cam.scrollX) * cam.zoom;
-    const y0 = (worldY - cam.scrollY) * cam.zoom;
-
-    const obj = ui.add?.image?.(x0, y0, key);
+    const obj = ui.add?.image?.(origin.x, origin.y, key);
     if (!obj) return;
 
     safeSet(obj, "setScrollFactor", 0);
@@ -719,7 +837,63 @@ export class VfxManager {
     safeSet(obj, "setAlpha", 0.85);
     safeSet(obj, "setScale", 0.9);
 
-    this.fx.push({ kind: "tween", obj, age: 0, life: 0.6, x0, y0, x1: uiX, y1: uiY, s0: 0.9, s1: 0.1, a0: 0.85, a1: 0, ease: "inOut" });
+    this.fx.push({
+      kind: "tween",
+      obj,
+      age: 0,
+      life: 0.6,
+      x0: origin.x,
+      y0: origin.y,
+      x1: uiX,
+      y1: uiY,
+      s0: 0.9,
+      s1: 0.1,
+      a0: 0.85,
+      a1: 0,
+      ease: "inOut",
+    });
+  }
+
+  private spawnUiText(x: number, y: number, text: string, color: string, life: number): void {
+    if (!this.ui) return;
+    const obj = this.ui.add?.text?.(x, y, text, {
+      fontSize: "16px",
+      color,
+      fontStyle: "700",
+      align: "center",
+    });
+    if (!obj) return;
+    safeSet(obj, "setScrollFactor", 0);
+    safeSet(obj, "setDepth", 1010);
+    safeSet(obj, "setOrigin", 0.5);
+    safeSet(obj, "setAlpha", 0.95);
+    this.fx.push({
+      kind: "tween",
+      obj,
+      age: 0,
+      life,
+      x0: x,
+      y0: y,
+      x1: x,
+      y1: y - 26,
+      s0: 0.92,
+      s1: 1.02,
+      a0: 0.95,
+      a1: 0,
+      ease: "out",
+    });
+  }
+
+  private worldToUi(worldX: number, worldY: number): { x: number; y: number } | null {
+    const ui = this.ui;
+    const world = this.world;
+    if (!ui || !world) return null;
+    const cam = world.cameras?.main;
+    if (!cam) return null;
+    return {
+      x: (worldX - cam.scrollX) * cam.zoom,
+      y: (worldY - cam.scrollY) * cam.zoom,
+    };
   }
 
   private spawnRedVignettePulse(alphaPeak: number, durationSec: number): void {
@@ -800,4 +974,26 @@ function easeInOutQuad(t: number): number {
 
 function num(v: any): number {
   return typeof v === "number" && Number.isFinite(v) ? v : NaN;
+}
+
+function getEnemyPalette(enemyType: string): { primary: number; secondary: number } {
+  switch (enemyType) {
+    case "shooter":
+      return { primary: VISUAL_PALETTE.neonBlue, secondary: VISUAL_PALETTE.white };
+    case "cutter":
+      return { primary: VISUAL_PALETTE.neonMagenta, secondary: VISUAL_PALETTE.warningAmber };
+    default:
+      return { primary: VISUAL_PALETTE.hpRed, secondary: VISUAL_PALETTE.warningAmber };
+  }
+}
+
+function enemyTextureForType(enemyType: string): string {
+  switch (enemyType) {
+    case "shooter":
+      return "enemy_shooter";
+    case "cutter":
+      return "enemy_cutter";
+    default:
+      return "enemy_chaser";
+  }
 }
