@@ -8,6 +8,7 @@ import type { EnemyType } from "../../data/types";
 import { computePressure } from "../director/pressure";
 import { buildWavePlan, type WavePlan, type WaveSpawnEvent } from "../director/waveDirector";
 import { applyDailyToConfig, getUtcYyyymmdd, pickDailyVariant } from "../daily/daily";
+import { addEnemyDisruption, createEnemyDisruptionState, resolveEnemyVelocity, type EnemyDisruptionState } from "../effects/enemyDisruption";
 import { Tail, type ScrapType } from "../entities/tail";
 import { GAME_EVENTS } from "../events";
 import { consumeActions, inputState } from "../input/inputState";
@@ -25,6 +26,9 @@ type EnemyEntity = {
   hp: number;
   nextFireAt: number;
   cutReadyAt: number;
+  disruption: EnemyDisruptionState;
+  shockTime: number;
+  shockTint: number;
 };
 
 type ProjectileEntity = {
@@ -145,6 +149,7 @@ export class GameScene extends Phaser.Scene {
   private drone: DroneState | null = null;
   private scrapMines: ScrapMineState[] = [];
   private waveHudLabel = "";
+  private hitStopMs = 0;
 
   private captureCooldown = 0;
   private banking = { active: false, t: 0 };
@@ -260,6 +265,12 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.TUTORIAL_STEP_CHANGED, this.onTutorialStepChanged, this);
       this.game.events.off(GAME_EVENTS.TUTORIAL_FINISHED, this.onTutorialFinished, this);
       this.game.events.off(GAME_EVENTS.TUTORIAL_EXITED, this.onTutorialExited, this);
+      this.hitStopMs = 0;
+      try {
+        this.physics.world.resume();
+      } catch {
+        // ignore
+      }
     });
 
     this.events.on(Phaser.Scenes.Events.RESUME, () => {
@@ -281,6 +292,16 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (this.hitStopMs > 0) {
+      this.hitStopMs = Math.max(0, this.hitStopMs - dtMs);
+      this.updateEnemyPresentation(dt * 0.6);
+      this.updatePlayerGlow(dt * 0.2);
+      this.updateBackgroundLayers(dt * 0.08);
+      this.vfx?.update(dt * 0.25);
+      if (this.hitStopMs <= 0) this.resumeAfterHitStop();
+      return;
+    }
+
     this.updateTimers(dt);
     this.updateMovement(dt);
     this.updatePerkSystems(dt);
@@ -289,6 +310,7 @@ export class GameScene extends Phaser.Scene {
     this.updateMagnet(dt);
     this.updateFlipPulse(dt);
     this.updateEnemyAI(dt);
+    this.updateEnemyPresentation(dt);
     this.updateProjectiles();
     this.updateScrapMines(dt);
     this.updateBanking(dt);
@@ -486,21 +508,30 @@ export class GameScene extends Phaser.Scene {
     for (let i = this.flipPulses.length - 1; i >= 0; i--) {
       const pulse = this.flipPulses[i]!;
       pulse.tLeft -= dt;
+      let impactCount = 0;
 
-      this.enemyGroup.children.iterate((o) => {
-        const e = o as ArcadeImage | null;
-        if (!e) return null;
-        const dx = e.x - this.player.x;
-        const dy = e.y - this.player.y;
+      for (const enemy of this.enemies) {
+        const spr = enemy.sprite;
+        if (!spr.active) continue;
+        const dx = spr.x - this.player.x;
+        const dy = spr.y - this.player.y;
         const d2 = dx * dx + dy * dy;
-        if (d2 > pulse.radius * pulse.radius || d2 < 0.001) return null;
+        if (d2 > pulse.radius * pulse.radius || d2 < 0.001) continue;
         const d = Math.sqrt(d2);
         const nx = dx / d;
         const ny = dy / d;
-        e.body.velocity.x += nx * pulse.pushForce * dt;
-        e.body.velocity.y += ny * pulse.pushForce * dt;
-        return null;
-      });
+        const freshImpact = enemy.disruption.controlLockSec <= 0.001;
+        enemy.disruption = addEnemyDisruption(enemy.disruption, nx * pulse.pushForce * dt, ny * pulse.pushForce * dt, 0.08);
+        if (freshImpact) {
+          impactCount += 1;
+          this.applyEnemyShock(enemy, 0.12, VISUAL_PALETTE.neonCyan);
+          this.vfx?.emit("enemy_hit", { x: spr.x, y: spr.y, enemyType: enemy.type, source: "flip" });
+        }
+      }
+
+      if (impactCount > 0) {
+        this.triggerHitStop(Math.min(42, 12 + impactCount * 6));
+      }
 
       if (pulse.deflectProjectiles) {
         this.projectileGroup.children.iterate((o) => {
@@ -549,20 +580,22 @@ export class GameScene extends Phaser.Scene {
       const d = Math.sqrt(dx * dx + dy * dy);
       const nx = d > 0.001 ? dx / d : 0;
       const ny = d > 0.001 ? dy / d : 0;
+      let desiredVx = 0;
+      let desiredVy = 0;
 
       if (e.type === "chaser") {
-        spr.body.velocity.x = nx * cfg.enemies.chaser.speed * speedMult;
-        spr.body.velocity.y = ny * cfg.enemies.chaser.speed * speedMult;
+        desiredVx = nx * cfg.enemies.chaser.speed * speedMult;
+        desiredVy = ny * cfg.enemies.chaser.speed * speedMult;
       } else if (e.type === "shooter") {
         const keep = cfg.enemies.shooter.keepDistance;
         const spd = cfg.enemies.shooter.speed * speedMult;
         const wantAway = d < keep * cfg.tuning.shooterAi.keepAwayMult;
         const wantToward = d > keep * cfg.tuning.shooterAi.keepTowardMult;
         const dir = wantAway ? -1 : wantToward ? 1 : 0;
-        spr.body.velocity.x = nx * spd * dir;
-        spr.body.velocity.y = ny * spd * dir;
+        desiredVx = nx * spd * dir;
+        desiredVy = ny * spd * dir;
 
-        if (now >= e.nextFireAt) {
+        if (e.disruption.controlLockSec <= 0.001 && now >= e.nextFireAt) {
           e.nextFireAt = now + cfg.enemies.shooter.fireCooldownSec;
           const pr = cfg.enemies.shooter.projectile;
           this.spawnProjectile("enemy", spr.x, spr.y, nx, ny, pr.speed * speedMult, pr.damage, pr.lifetimeSec);
@@ -576,12 +609,62 @@ export class GameScene extends Phaser.Scene {
         const dd = Math.sqrt(ddx * ddx + ddy * ddy);
         const nnx = dd > 0.001 ? ddx / dd : 0;
         const nny = dd > 0.001 ? ddy / dd : 0;
-        spr.body.velocity.x = nnx * cfg.enemies.cutter.speed * speedMult;
-        spr.body.velocity.y = nny * cfg.enemies.cutter.speed * speedMult;
+        desiredVx = nnx * cfg.enemies.cutter.speed * speedMult;
+        desiredVy = nny * cfg.enemies.cutter.speed * speedMult;
       }
+
+      const resolved = resolveEnemyVelocity(desiredVx, desiredVy, e.disruption, dt);
+      e.disruption = resolved.next;
+      spr.body.velocity.x = resolved.velocityX;
+      spr.body.velocity.y = resolved.velocityY;
 
       if (e.type === "cutter") spr.rotation += dt * 8;
       else spr.setRotation(Math.atan2(spr.body.velocity.y, spr.body.velocity.x));
+    }
+  }
+
+  private updateEnemyPresentation(dt: number): void {
+    const safeDt = Math.max(0, dt);
+    const pulseT = this.time.now / 1000;
+    for (const enemy of this.enemies) {
+      const spr = enemy.sprite;
+      if (!spr.active) continue;
+
+      enemy.shockTime = Math.max(0, enemy.shockTime - safeDt);
+      if (enemy.shockTime > 0) {
+        const intensity = clamp(enemy.shockTime / 0.12, 0.35, 1);
+        const pulse = 0.55 + Math.sin(pulseT * 42) * 0.45;
+        const scale = 1 + 0.06 * intensity + 0.03 * pulse;
+        spr.setScale(scale);
+        spr.setTintFill(enemy.shockTint);
+      } else {
+        spr.setScale(1);
+        spr.clearTint();
+      }
+    }
+  }
+
+  private applyEnemyShock(enemy: EnemyEntity, durationSec: number, tint: number): void {
+    enemy.shockTime = Math.max(enemy.shockTime, Math.max(0, durationSec));
+    enemy.shockTint = tint;
+  }
+
+  private triggerHitStop(durationMs: number): void {
+    if (durationMs <= 0 || this.revivePending || !this.scene.isActive()) return;
+    this.hitStopMs = Math.max(this.hitStopMs, durationMs);
+    try {
+      this.physics.world.pause();
+    } catch {
+      // ignore
+    }
+  }
+
+  private resumeAfterHitStop(): void {
+    if (this.revivePending || !this.scene.isActive()) return;
+    try {
+      this.physics.world.resume();
+    } catch {
+      // ignore
     }
   }
 
@@ -787,7 +870,16 @@ export class GameScene extends Phaser.Scene {
       this.state.config.waves.enemyHpMultCap
     );
     const hp = base.hp * waveMultHp;
-    this.enemies.push({ sprite: spr, type, hp, nextFireAt: 0, cutReadyAt: 0 });
+    this.enemies.push({
+      sprite: spr,
+      type,
+      hp,
+      nextFireAt: 0,
+      cutReadyAt: 0,
+      disruption: createEnemyDisruptionState(),
+      shockTime: 0,
+      shockTint: VISUAL_PALETTE.neonCyan,
+    });
   }
 
   private applyCaps(type: EnemyType): EnemyType {
@@ -1292,8 +1384,8 @@ export class GameScene extends Phaser.Scene {
       const dist = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
       const nx = dx / dist;
       const ny = dy / dist;
-      enemy.sprite.body.velocity.x += nx * mine.pushForce;
-      enemy.sprite.body.velocity.y += ny * mine.pushForce;
+      enemy.disruption = addEnemyDisruption(enemy.disruption, nx * mine.pushForce, ny * mine.pushForce, 0.12);
+      this.applyEnemyShock(enemy, 0.1, VISUAL_PALETTE.warningAmber);
       enemy.hp -= mine.damage;
       this.vfx?.emit("enemy_hit", {
         x: enemy.sprite.x,

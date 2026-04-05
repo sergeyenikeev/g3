@@ -85,6 +85,13 @@ function makeUi() {
   const ui: any = {
     created,
     scale: { width: 1280, height: 720 },
+    registry: {
+      get: (key: string) => {
+        if (key === "locale") return "ru";
+        if (key === "uiBoltsPos") return { x: 1180, y: 42 };
+        return undefined;
+      },
+    },
     add: {
       image: (x: number, y: number, key: string) => {
         const o = makeObj(key, x, y);
@@ -146,5 +153,19 @@ describe("VfxManager", () => {
 
     vfx.update(0.01); // +10ms => 120ms с момента последнего апдейта
     expect(line.calls.setPosition).toBe(2);
+  });
+  it("combat and bank events spawn readable hit, kill, and reward feedback", () => {
+    const world = makeWorld();
+    const ui = makeUi();
+    const vfx = new VfxManager(world, ui, { quality: "medium" });
+
+    vfx.emit("enemy_hit", { x: 120, y: 160, enemyType: "shooter" });
+    vfx.emit("enemy_killed", { x: 140, y: 180, enemyType: "cutter" });
+    vfx.emit("bank_complete", { x: 220, y: 260, bolts: 12, hpHealed: 6 });
+
+    expect(world.created.some((o: any) => o.kind === "vfx_hit_flash")).toBe(true);
+    expect(world.created.some((o: any) => o.kind === "enemy_cutter")).toBe(true);
+    expect(ui.created.some((o: any) => o.kind === "text")).toBe(true);
+    expect(ui.created.some((o: any) => o.kind === "vfx_spark")).toBe(true);
   });
 });

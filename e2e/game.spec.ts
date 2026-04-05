@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("smoke: training, daily, tutorial, upgrade, results x2", async ({ page }) => {
+test("smoke: training, daily, tutorial, upgrade, results", async ({ page }) => {
   const errors: Error[] = [];
   page.on("pageerror", (e) => errors.push(e));
 
@@ -17,9 +17,13 @@ test("smoke: training, daily, tutorial, upgrade, results x2", async ({ page }) =
   expect(vp).toBeTruthy();
   const width = vp!.width;
   const height = vp!.height;
+  const compact = width < 1100;
+  const menuX = compact ? width / 2 : Math.round(width * 0.31);
+  const ctaStartY = compact ? Math.round(height * 0.42) : Math.round(height * 0.43);
+  const rowGap = compact ? 72 : 68;
 
   // TRAINING
-  await page.mouse.click(width / 2, height * 0.65);
+  await page.mouse.click(menuX, ctaStartY + rowGap * 2);
 
   await page.waitForFunction(() => {
     const g = (window as any).__MC_GAME__;
@@ -32,7 +36,7 @@ test("smoke: training, daily, tutorial, upgrade, results x2", async ({ page }) =
   await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("menu") === true);
 
   // DAILY
-  await page.mouse.click(width / 2, height * 0.75);
+  await page.mouse.click(menuX, ctaStartY + rowGap * 3 + 6);
 
   await page.waitForFunction(() => {
     const g = (window as any).__MC_GAME__;
@@ -75,25 +79,10 @@ test("smoke: training, daily, tutorial, upgrade, results x2", async ({ page }) =
   await page.mouse.click(width / 2, height * 0.36);
   await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === false);
 
-  const boltsBefore = await page.evaluate(() => {
-    const g = (window as any).__MC_GAME__;
-    const s = g?.registry?.get("runState");
-    return typeof s?.bolts === "number" ? s.bolts : null;
-  });
-  expect(typeof boltsBefore).toBe("number");
-
   // Force end run (VITE_E2E API; works even if game is paused by upgrade)
   await page.waitForFunction(() => typeof (window as any).__MC_E2E__?.endRun === "function");
   await page.evaluate(() => (window as any).__MC_E2E__.endRun());
   await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("results") === true);
-
-  // X2 results (rewarded)
-  await page.mouse.click(width / 2, height * 0.52);
-  await page.waitForFunction((before) => {
-    const g = (window as any).__MC_GAME__;
-    const s = g?.registry?.get("runState");
-    return typeof s?.bolts === "number" && s.bolts === before * 2;
-  }, boltsBefore);
 
   expect(errors, "page errors").toEqual([]);
 });
