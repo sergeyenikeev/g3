@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDashHudBadgeSpecs, getUpgradeBadgeSpecs } from "../../src/game/upgrades/upgradeBadges";
+import { getDashHudBadgeSpecs, getMetaNodeBadgeSpecs, getUpgradeBadgeSpecs } from "../../src/game/upgrades/upgradeBadges";
 import type { RunUpgradeDef } from "../../src/data/types";
 
 describe("upgradeBadges", () => {
@@ -46,5 +46,12 @@ describe("upgradeBadges", () => {
     });
 
     expect(badges.map((badge) => badge.key)).toEqual(["ion", "siphon"]);
+  });
+
+  it("maps workshop meta nodes to localized branch badges", () => {
+    const badges = getMetaNodeBadgeSpecs("ru", "meta_recycler_overdrive");
+
+    expect(badges.map((badge) => badge.key)).toEqual(["recycler", "economy"]);
+    expect(badges[0]?.label).toBe("ПЕРЕРАБ");
   });
 });

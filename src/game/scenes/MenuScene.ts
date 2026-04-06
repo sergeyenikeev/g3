@@ -14,6 +14,7 @@ import { getPlatformNowMs, signalPlatformGameReady, addPlatformLifecycleListener
 import { sanitizePilotName, type LeaderboardDivisionId, type SaveData } from "../../platform/save/saveManager";
 import type { SaveManager } from "../../platform/save/saveManager";
 import { createEntityTextures } from "../../visual/EntityTextureFactory";
+import { getMetaNodeBadgeSpecs } from "../upgrades/upgradeBadges";
 import {
   type LanguageSetting,
   type Locale,
@@ -1014,8 +1015,9 @@ export class MenuScene extends Phaser.Scene {
       const costAmount = cost?.amount ?? Number.POSITIVE_INFINITY;
       const affordable = Boolean(cost) && currencyAmount >= costAmount;
       const maxed = level >= node.maxLevel || !cost;
+      const badge = getMetaNodeBadgeSpecs(this.locale, node.id, 1)[0];
       const y = -170 + idx * 102;
-      const accentColor = maxed ? 0x57c27d : cost?.currency === "cores" ? 0xffd166 : idx % 2 === 0 ? 0x5cc8ff : 0x3aa4d4;
+      const accentColor = maxed ? 0x57c27d : badge?.stroke ?? (cost?.currency === "cores" ? 0xffd166 : idx % 2 === 0 ? 0x5cc8ff : 0x3aa4d4);
 
       const bg = this.add.rectangle(0, 0, 548, 90, 0x121a24, 0.97).setStrokeStyle(2, accentColor, maxed ? 0.72 : 0.58);
       const accent = this.add.rectangle(-268, 0, 8, 90, accentColor, 0.92);
@@ -1024,9 +1026,12 @@ export class MenuScene extends Phaser.Scene {
           fontSize: "17px",
           color: "#d9f2ff",
           fontStyle: "700",
-          wordWrap: { width: 330 },
+          wordWrap: { width: 272 },
         })
         .setOrigin(0, 0);
+      const badgeNode = badge
+        ? createMenuBadge(this, 56, -18, badge.label, badge.fill, badge.stroke, badge.textColor)
+        : null;
       const desc = this.add
         .text(-256, -2, getMetaNodeDescription(this.locale, node.id), {
           fontSize: "13px",
@@ -1067,7 +1072,9 @@ export class MenuScene extends Phaser.Scene {
         btn.on("pointerdown", () => void this.buyMetaNode(node.id));
       }
 
-      const card = this.add.container(0, y, [bg, accent, title, desc, levelText, progressBg, progressFill, btn, btnLabel, costLabel]).setDepth(1402);
+      const card = this.add
+        .container(0, y, [bg, accent, title, ...(badgeNode ? [badgeNode] : []), desc, levelText, progressBg, progressFill, btn, btnLabel, costLabel])
+        .setDepth(1402);
       this.workshopCards.push(card);
       this.workshopBox.add(card);
     });
@@ -1411,9 +1418,33 @@ function buildInstalledMetaSummary(
   const active = nodes
     .map((node) => ({ node, level: Math.max(0, Math.floor(levels[node.id] ?? 0)) }))
     .filter((entry) => entry.level > 0)
-    .map((entry) => `${getMetaNodeName(locale, entry.node.id, entry.node.name)} ${locale === "ru" ? "ур." : "Lv."}${entry.level}`);
+    .map((entry) => {
+      const badge = getMetaNodeBadgeSpecs(locale, entry.node.id, 1)[0];
+      const label = badge?.label ?? getMetaNodeName(locale, entry.node.id, entry.node.name);
+      return `${label} ${locale === "ru" ? "ур." : "Lv."}${entry.level}`;
+    });
 
   return active.length > 0
     ? t(locale, "menu.installedList", { items: active.join(" | ") })
     : t(locale, "menu.installedNone");
+}
+
+function createMenuBadge(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  label: string,
+  fill: number,
+  stroke: number,
+  textColor: string
+): Phaser.GameObjects.Container {
+  const text = scene.add
+    .text(0, 0, label, {
+      fontSize: "10px",
+      color: textColor,
+      fontStyle: "700",
+    })
+    .setOrigin(0.5);
+  const bg = scene.add.rectangle(0, 0, text.width + 16, 20, fill, 0.96).setStrokeStyle(1, stroke, 0.92);
+  return scene.add.container(x, y, [bg, text]);
 }

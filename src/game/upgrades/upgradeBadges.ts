@@ -28,6 +28,8 @@ const BADGE_THEMES: Record<string, BadgeTheme> = {
   wake: { fill: 0x3b3014, stroke: 0xffd166, textColor: "#fff4d8" },
   ion: { fill: 0x2f1b4a, stroke: 0xd66dff, textColor: "#f7e5ff" },
   siphon: { fill: 0x1f3b19, stroke: 0xa6f05d, textColor: "#efffdc" },
+  frame: { fill: 0x24303b, stroke: 0x9ec6d8, textColor: "#eef7ff" },
+  recycler: { fill: 0x183321, stroke: 0x8cf07a, textColor: "#eeffe8" },
 };
 
 const BRANCH_BADGES_BY_UPGRADE_ID: Record<string, string[]> = {
@@ -36,6 +38,15 @@ const BRANCH_BADGES_BY_UPGRADE_ID: Record<string, string[]> = {
   magnet_wake: ["wake"],
   ion_ram: ["ion"],
   salvage_siphon: ["siphon"],
+};
+
+const META_BADGES_BY_NODE_ID: Record<string, string[]> = {
+  meta_core_1: ["core", "collection"],
+  meta_coil_1: ["flip", "combat"],
+  meta_frame_1: ["frame", "survival"],
+  meta_tail_1: ["tail", "mobility"],
+  meta_dash_unlock: ["dash", "mobility"],
+  meta_recycler_overdrive: ["recycler", "economy"],
 };
 
 type DashPerks = Partial<Record<"dash_module" | "dash_ram" | "dash_wake" | "dash_arc" | "dash_siphon", unknown>>;
@@ -55,6 +66,10 @@ export function getDashHudBadgeSpecs(locale: Locale, perks: DashPerks | null | u
 
   if (keys.length === 0 && perks?.dash_module) keys.push("dash");
   return uniqueTagKeys(keys).slice(0, limit).map((key) => makeBadge(locale, key));
+}
+
+export function getMetaNodeBadgeSpecs(locale: Locale, nodeId: string, limit = 2): UpgradeBadgeSpec[] {
+  return uniqueTagKeys(META_BADGES_BY_NODE_ID[nodeId] ?? []).slice(0, limit).map((key) => makeBadge(locale, key));
 }
 
 function makeBadge(locale: Locale, key: string): UpgradeBadgeSpec {
