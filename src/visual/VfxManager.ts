@@ -118,6 +118,12 @@ export class VfxManager {
       case "dash_used":
         this.onDashUsed(params);
         return;
+      case "dash_arc":
+        this.onDashArc(params);
+        return;
+      case "dash_siphon":
+        this.onDashSiphon(params);
+        return;
       case "projectile_deflected":
         this.onProjectileDeflected(params);
         return;
@@ -366,6 +372,129 @@ export class VfxManager {
         a0: 0.72 - i * 0.12,
         a1: 0,
         ease: "out",
+      });
+    }
+  }
+
+  private onDashArc(p: any): void {
+    const x = num(p?.x);
+    const y = num(p?.y);
+    const targetX = num(p?.targetX);
+    const targetY = num(p?.targetY);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
+
+    const dx = targetX - x;
+    const dy = targetY - y;
+    const len = Math.max(8, Math.sqrt(dx * dx + dy * dy));
+    const midX = x + dx * 0.5;
+    const midY = y + dy * 0.5;
+    const rot = Math.atan2(dy, dx) - Math.PI / 2;
+
+    const line = this.world?.add?.image?.(midX, midY, "vfx_line");
+    if (line) {
+      safeSet(line, "setDepth", 77);
+      safeSet(line, "setBlendMode", "ADD");
+      safeSet(line, "setTint", VISUAL_PALETTE.neonMagenta);
+      safeSet(line, "setAlpha", 0.86);
+      safeSet(line, "setDisplaySize", 3, len);
+      safeSet(line, "setRotation", rot);
+      this.fx.push({
+        kind: "tween",
+        obj: line,
+        age: 0,
+        life: 0.14,
+        x0: midX,
+        y0: midY,
+        x1: midX,
+        y1: midY,
+        s0: 1,
+        s1: 0.55,
+        a0: 0.86,
+        a1: 0,
+        ease: "out",
+      });
+    }
+
+    this.spawnGlow(targetX, targetY, VISUAL_PALETTE.neonMagenta, 0.18, 0.7, 0.12);
+    this.spawnSparkBurst(targetX, targetY, this.quality === "low" ? 4 : 6, {
+      tintA: VISUAL_PALETTE.neonMagenta,
+      tintB: VISUAL_PALETTE.neonCyan,
+      speed: 180,
+      life: 0.16,
+      spread: 1,
+    });
+  }
+
+  private onDashSiphon(p: any): void {
+    const x = num(p?.x);
+    const y = num(p?.y);
+    const targetX = num(p?.targetX);
+    const targetY = num(p?.targetY);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
+
+    const type = typeof p?.type === "string" ? p.type : "common";
+    const tint =
+      type === "rareShard"
+        ? VISUAL_PALETTE.neonMagenta
+        : type === "heavy"
+          ? VISUAL_PALETTE.warningAmber
+          : VISUAL_PALETTE.successGreen;
+
+    this.spawnGlow(x, y, tint, 0.14, 0.48, 0.12);
+
+    const dx = targetX - x;
+    const dy = targetY - y;
+    const len = Math.max(4, Math.sqrt(dx * dx + dy * dy));
+    if (len > 10) {
+      const line = this.world?.add?.image?.(x + dx * 0.5, y + dy * 0.5, "vfx_line");
+      if (line) {
+        safeSet(line, "setDepth", 71);
+        safeSet(line, "setBlendMode", "ADD");
+        safeSet(line, "setTint", tint);
+        safeSet(line, "setAlpha", 0.28);
+        safeSet(line, "setDisplaySize", 2, len);
+        safeSet(line, "setRotation", Math.atan2(dy, dx) - Math.PI / 2);
+        this.fx.push({
+          kind: "tween",
+          obj: line,
+          age: 0,
+          life: 0.16,
+          x0: x + dx * 0.5,
+          y0: y + dy * 0.5,
+          x1: x + dx * 0.5,
+          y1: y + dy * 0.5,
+          s0: 1,
+          s1: 0.42,
+          a0: 0.28,
+          a1: 0,
+          ease: "out",
+        });
+      }
+    }
+
+    const flyCount = this.quality === "low" ? 1 : this.quality === "high" ? 3 : 2;
+    for (let i = 0; i < flyCount; i++) {
+      const obj = this.world?.add?.image?.(x, y, "vfx_spark");
+      if (!obj) continue;
+      safeSet(obj, "setDepth", 76);
+      safeSet(obj, "setBlendMode", "ADD");
+      safeSet(obj, "setTint", tint);
+      safeSet(obj, "setAlpha", 0.8);
+      safeSet(obj, "setScale", 0.78 - i * 0.08);
+      this.fx.push({
+        kind: "tween",
+        obj,
+        age: 0,
+        life: 0.2 + i * 0.04,
+        x0: x,
+        y0: y,
+        x1: targetX + (Math.random() * 10 - 5),
+        y1: targetY + (Math.random() * 10 - 5),
+        s0: 0.78 - i * 0.08,
+        s1: 0.1,
+        a0: 0.8,
+        a1: 0,
+        ease: "inOut",
       });
     }
   }

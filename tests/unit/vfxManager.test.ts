@@ -160,11 +160,14 @@ describe("VfxManager", () => {
     const vfx = new VfxManager(world, ui, { quality: "medium" });
 
     vfx.emit("dash_used", { x: 96, y: 128, dirX: 1, dirY: 0 });
+    vfx.emit("dash_arc", { x: 96, y: 128, targetX: 148, targetY: 132, enemyType: "shooter" });
+    vfx.emit("dash_siphon", { x: 180, y: 210, targetX: 120, targetY: 140, type: "rareShard" });
     vfx.emit("enemy_hit", { x: 120, y: 160, enemyType: "shooter" });
     vfx.emit("enemy_killed", { x: 140, y: 180, enemyType: "cutter" });
     vfx.emit("bank_complete", { x: 220, y: 260, bolts: 12, hpHealed: 6 });
 
     expect(world.created.some((o: any) => o.kind === "vfx_trail")).toBe(true);
+    expect(world.created.some((o: any) => o.kind === "vfx_line")).toBe(true);
     expect(world.created.some((o: any) => o.kind === "vfx_hit_flash")).toBe(true);
     expect(world.created.some((o: any) => o.kind === "enemy_cutter")).toBe(true);
     expect(ui.created.some((o: any) => o.kind === "text")).toBe(true);

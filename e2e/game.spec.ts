@@ -89,7 +89,7 @@ test("smoke: training, daily, tutorial, upgrade, results", async ({ page }) => {
   await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === true);
 
   // Pick first upgrade to resume game
-  await page.mouse.click(width / 2, height * 0.36);
+  await page.mouse.click(width / 2, height * 0.49);
   await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === false);
 
   // Force end run (VITE_E2E API; works even if game is paused by upgrade)

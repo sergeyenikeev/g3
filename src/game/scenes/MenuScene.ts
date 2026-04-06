@@ -5,12 +5,13 @@ import type { StaticGameData } from "../../data/staticGameData";
 import { getUtcYyyymmdd, pickDailyVariant } from "../daily/daily";
 import { consumeDailyAttempt, getDailyAttemptsInfo, normalizeDailySave, planDailyStart, type DailyAttemptsInfo } from "../daily/dailyAttempts";
 import { getMetaNodeCost, getMetaNodeLevel, getMetaWalletAmount, purchaseMetaNode } from "../meta/metaProgression";
+import { filterLeaderboardEntries, getLeaderboardDivision, getLeaderboardNextDivision, type LeaderboardFilter } from "../run/leaderboard";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import { bindPageLifecycle } from "../../platform/pageLifecycle";
 import type { PlatformAdapter } from "../../platform/platformAdapter";
 import { getPlatformNowMs, signalPlatformGameReady, addPlatformLifecycleListener } from "../../platform/platformRuntime";
-import type { SaveData } from "../../platform/save/saveManager";
+import { sanitizePilotName, type LeaderboardDivisionId, type SaveData } from "../../platform/save/saveManager";
 import type { SaveManager } from "../../platform/save/saveManager";
 import { createEntityTextures } from "../../visual/EntityTextureFactory";
 import {
@@ -46,6 +47,26 @@ export class MenuScene extends Phaser.Scene {
   private workshopHintText!: Phaser.GameObjects.Text;
   private workshopFooterText!: Phaser.GameObjects.Text;
   private workshopCards: Phaser.GameObjects.Container[] = [];
+  private leaderboardDim!: Phaser.GameObjects.Rectangle;
+  private leaderboardBox!: Phaser.GameObjects.Container;
+  private leaderboardHintText!: Phaser.GameObjects.Text;
+  private leaderboardFooterText!: Phaser.GameObjects.Text;
+  private leaderboardFilterButtons: Array<{
+    filter: LeaderboardFilter;
+    button: Phaser.GameObjects.Rectangle;
+    label: Phaser.GameObjects.Text;
+  }> = [];
+  private leaderboardRows: Array<{
+    bg: Phaser.GameObjects.Rectangle;
+    text: Phaser.GameObjects.Text;
+  }> = [];
+  private leaderboardFilter: LeaderboardFilter = "all";
+  private latestLeaderboardFilter: LeaderboardFilter = "all";
+  private latestLeaderboardEntryId: string | null = null;
+  private latestLeaderboardRank: number | null = null;
+  private latestLeaderboardIsRecord = false;
+  private latestPromotionDivision: LeaderboardDivisionId | null = null;
+  private latestPromotionReward = { bolts: 0, cores: 0 };
   private workshopBusy = false;
   private locale: Locale = "en";
   private languageSetting: LanguageSetting = "auto";
@@ -87,6 +108,18 @@ export class MenuScene extends Phaser.Scene {
     this.locale = this.resolveLocaleSetting(this.languageSetting);
     this.registry.set("languageSetting", this.languageSetting);
     this.registry.set("locale", this.locale);
+    this.latestLeaderboardEntryId = ((this.registry.get("lastLeaderboardEntryId") as string | undefined) ?? null) || null;
+    this.latestLeaderboardRank = (this.registry.get("lastLeaderboardRank") as number | undefined) ?? null;
+    this.latestLeaderboardIsRecord = Boolean(this.registry.get("lastLeaderboardIsRecord"));
+    this.latestPromotionDivision = ((this.registry.get("lastLeaderboardPromotionDivision") as LeaderboardDivisionId | undefined) ?? null) || null;
+    this.latestPromotionReward = {
+      bolts: (this.registry.get("lastLeaderboardPromotionBolts") as number | undefined) ?? 0,
+      cores: (this.registry.get("lastLeaderboardPromotionCores") as number | undefined) ?? 0,
+    };
+    const storedLeaderboardFilter =
+      (this.registry.get("lastLeaderboardFilter") as LeaderboardFilter | undefined) ?? (this.latestLeaderboardIsRecord ? "run" : "all");
+    this.latestLeaderboardFilter = this.normalizeLeaderboardFilter(this.saveData?.leaderboard.entries ?? [], storedLeaderboardFilter);
+    this.leaderboardFilter = this.normalizeLeaderboardFilter(this.saveData?.leaderboard.entries ?? [], this.latestLeaderboardFilter);
     createEntityTextures(this);
     this.cameras.main.setBackgroundColor(0x060a10);
     this.createMenuBackdrop();
@@ -129,17 +162,30 @@ export class MenuScene extends Phaser.Scene {
       .text(
         0,
         0,
-        t(this.locale, "menu.best", {
-          bestWave: formatNumber(this.locale, stats.bestWave),
-          bestBolts: formatNumber(this.locale, stats.bestBolts),
-        }),
+        [
+          t(this.locale, "menu.best", {
+            bestWave: formatNumber(this.locale, stats.bestWave),
+            bestBolts: formatNumber(this.locale, stats.bestBolts),
+          }),
+          t(this.locale, "menu.leaderboardTitle"),
+          ...((save?.leaderboard?.entries?.length ?? 0) > 0
+            ? (save?.leaderboard?.entries ?? []).slice(0, 3).map((entry, index) => {
+                const modeLabel = entry.mode === "daily" ? t(this.locale, "leaderboard.mode.daily") : t(this.locale, "leaderboard.mode.run");
+                const divisionLabel = t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`);
+                return `${index + 1}. ${entry.pilot} [${modeLabel} | ${divisionLabel}] | ${formatNumber(this.locale, entry.score)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`;
+              })
+            : [t(this.locale, "menu.leaderboardEmpty")]),
+        ]
+          .join("\n"),
         {
-        fontSize: "16px",
-        color: "#98b7c7",
-        align: "center",
+          fontSize: "16px",
+          color: "#98b7c7",
+          align: "center",
+          wordWrap: { width: 560 },
         }
       )
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setLineSpacing(4);
 
     this.walletText = this.add
       .text(0, 0, "", {
@@ -157,6 +203,30 @@ export class MenuScene extends Phaser.Scene {
     const labelWorkshop = this.add
       .text(0, 0, t(this.locale, "menu.workshop"), {
         fontSize: "16px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+    const btnLeaderboard = this.add
+      .rectangle(0, 0, 196, 36, 0x0f1720, 0.95)
+      .setOrigin(0, 0)
+      .setStrokeStyle(2, this.latestLeaderboardIsRecord ? 0x57c27d : 0x5cc8ff, 0.82)
+      .setInteractive({ useHandCursor: true });
+    const labelLeaderboard = this.add
+      .text(0, 0, t(this.locale, "menu.leaderboard"), {
+        fontSize: "14px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+    const btnPilot = this.add
+      .rectangle(0, 0, 196, 36, 0x0f1720, 0.95)
+      .setOrigin(0, 0)
+      .setStrokeStyle(2, 0xffd166, 0.78)
+      .setInteractive({ useHandCursor: true });
+    const labelPilot = this.add
+      .text(0, 0, "", {
+        fontSize: "13px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -219,6 +289,7 @@ export class MenuScene extends Phaser.Scene {
     let sfxVolume = snapVolumeStep(save?.settings?.sfxVolume ?? 0.8);
     let musicVolume = snapVolumeStep(save?.settings?.musicVolume ?? 0.6);
     const languageOrder: LanguageSetting[] = ["auto", "ru", "en"];
+    const pilotNamePref = save?.settings?.pilotName ?? "";
 
     const applyQualityLabel = (q: SaveData["settings"]["visualQuality"]) => {
       const label = formatQualityLabel(this.locale, q);
@@ -241,10 +312,14 @@ export class MenuScene extends Phaser.Scene {
       const stroke = setting === "auto" ? 0xffd166 : setting === "ru" ? 0x57c27d : 0x5cc8ff;
       btnLanguage.setStrokeStyle(2, stroke, 0.82);
     };
+    const applyPilotLabel = (pilotName: string) => {
+      labelPilot.setText(t(this.locale, "menu.pilotButton", { name: pilotName || t(this.locale, "menu.pilotAuto") }));
+    };
     applyQualityLabel(qualityPref);
     applyVolumeLabel(btnSfx, labelSfx, "settings.sfx", sfxVolume);
     applyVolumeLabel(btnMusic, labelMusic, "settings.music", musicVolume);
     applyLanguageLabel(this.languageSetting);
+    applyPilotLabel(pilotNamePref);
 
     btnQuality.on("pointerdown", () => {
       const idx = order.indexOf(qualityPref);
@@ -285,6 +360,7 @@ export class MenuScene extends Phaser.Scene {
         this.scene.restart();
       });
     });
+    btnPilot.on("pointerdown", () => void this.editPilotName());
 
     const btnPlay = this.add
       .rectangle(0, 0, 308, 68, 0x13283d, 0.98)
@@ -326,6 +402,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     btnWorkshop.on("pointerdown", () => this.showWorkshop());
+    btnLeaderboard.on("pointerdown", () => this.showLeaderboard());
 
     const btnDaily = this.add
       .rectangle(0, 0, 308, 56, 0x121a24, 0.96)
@@ -401,6 +478,7 @@ export class MenuScene extends Phaser.Scene {
     btnDaily.on("pointerdown", () => void this.startDaily(false));
     btnDailyBoost.on("pointerdown", () => void this.startDaily(true));
     this.createWorkshopUi();
+    this.createLeaderboardUi();
 
     const layoutMenu = (s: { width: number; height: number }) => {
       const compact = s.width < 1100;
@@ -413,6 +491,10 @@ export class MenuScene extends Phaser.Scene {
       this.walletText?.setPosition(16, 16);
       btnWorkshop.setPosition(16, 46);
       labelWorkshop.setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
+      btnLeaderboard.setPosition(16, 88);
+      labelLeaderboard.setPosition(btnLeaderboard.x + btnLeaderboard.width / 2, btnLeaderboard.y + btnLeaderboard.height / 2);
+      btnPilot.setPosition(16, 130);
+      labelPilot.setPosition(btnPilot.x + btnPilot.width / 2, btnPilot.y + btnPilot.height / 2);
 
       btnQuality.setPosition(s.width - 16, 16);
       labelQuality.setPosition(btnQuality.x - btnQuality.width / 2, btnQuality.y + btnQuality.height / 2);
@@ -442,6 +524,7 @@ export class MenuScene extends Phaser.Scene {
       controlsText.setPosition(leftX, compact ? s.height - 44 : s.height - 42);
       if (this.toastText) this.toastText.setPosition(s.width / 2, s.height * 0.93);
       this.layoutWorkshop();
+      this.layoutLeaderboard();
     };
 
     const onResize = (s: Phaser.Structs.Size) => layoutMenu(s);
@@ -651,14 +734,124 @@ export class MenuScene extends Phaser.Scene {
     this.workshopBox.setVisible(false);
   }
 
+  private createLeaderboardUi(): void {
+    this.leaderboardDim = this.add
+      .rectangle(0, 0, 10, 10, 0x000000, 0.78)
+      .setOrigin(0, 0)
+      .setDepth(1450)
+      .setScrollFactor(0)
+      .setInteractive();
+    this.leaderboardDim.setVisible(false);
+    this.leaderboardDim.on("pointerdown", () => this.hideLeaderboard());
+
+    const panel = this.add.rectangle(0, 0, 700, 780, 0x0f1720, 0.98).setStrokeStyle(2, 0x5cc8ff, 0.82);
+    const accent = this.add.rectangle(0, -336, 592, 2, 0xffd166, 0.9);
+    const title = this.add
+      .text(0, -360, t(this.locale, "menu.leaderboardTitle"), {
+        fontSize: "28px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setShadow(0, 0, "#5cc8ff", 18, true, true)
+      .setOrigin(0.5);
+    this.leaderboardHintText = this.add
+      .text(0, -318, "", {
+        fontSize: "13px",
+        color: "#98b7c7",
+        align: "center",
+        wordWrap: { width: 600 },
+      })
+      .setOrigin(0.5);
+
+    const btnClose = this.add
+      .rectangle(292, -360, 72, 34, 0x121a24, 0.95)
+      .setStrokeStyle(2, 0x3aa4d4, 0.75)
+      .setInteractive({ useHandCursor: true });
+    const labelClose = this.add
+      .text(292, -360, t(this.locale, "menu.close"), { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5);
+    btnClose.on("pointerdown", () => this.hideLeaderboard());
+
+    this.leaderboardFilterButtons = [];
+    const filters: LeaderboardFilter[] = ["all", "run", "daily"];
+    filters.forEach((filter, index) => {
+      const x = -184 + index * 184;
+      const button = this.add
+        .rectangle(x, -270, 148, 38, 0x121a24, 0.96)
+        .setStrokeStyle(2, 0x5f6b76, 0.58)
+        .setInteractive({ useHandCursor: true });
+      const label = this.add
+        .text(x, -270, t(this.locale, `leaderboard.filter.${filter}`), {
+          fontSize: "14px",
+          color: "#d9f2ff",
+          fontStyle: "700",
+        })
+        .setOrigin(0.5);
+      button.on("pointerdown", () => {
+        this.leaderboardFilter = filter;
+        this.refreshLeaderboardSummary();
+      });
+      this.leaderboardFilterButtons.push({ filter, button, label });
+    });
+
+    this.leaderboardRows = [];
+    for (let i = 0; i < 10; i++) {
+      const y = -208 + i * 54;
+      const bg = this.add.rectangle(0, y, 620, 46, 0x121a24, 0.96).setStrokeStyle(2, 0x2a556d, 0.55);
+      const text = this.add
+        .text(-290, y - 16, "", {
+          fontSize: "13px",
+          color: "#d9f2ff",
+          wordWrap: { width: 580 },
+        })
+        .setOrigin(0, 0)
+        .setLineSpacing(3);
+      this.leaderboardRows.push({ bg, text });
+    }
+
+    this.leaderboardFooterText = this.add
+      .text(0, 332, "", {
+        fontSize: "13px",
+        color: "#98b7c7",
+        align: "center",
+        wordWrap: { width: 600 },
+      })
+      .setOrigin(0.5);
+
+    const children: Phaser.GameObjects.GameObject[] = [
+      panel,
+      accent,
+      title,
+      this.leaderboardHintText,
+      btnClose,
+      labelClose,
+      this.leaderboardFooterText,
+      ...this.leaderboardFilterButtons.flatMap((entry) => [entry.button, entry.label]),
+      ...this.leaderboardRows.flatMap((row) => [row.bg, row.text]),
+    ];
+
+    this.leaderboardBox = this.add.container(0, 0, children).setDepth(1451).setScrollFactor(0);
+    this.leaderboardBox.setVisible(false);
+  }
+
   private layoutWorkshop(): void {
     if (!this.workshopDim || !this.workshopBox) return;
     const { width, height } = this.scale;
     this.workshopDim.setSize(width, height);
-    this.workshopBox.setPosition(width / 2, height / 2);
+    const scale = Math.min(1, (width - 32) / 620, (height - 32) / 760);
+    this.workshopBox.setScale(scale).setPosition(width / 2, height / 2);
+  }
+
+  private layoutLeaderboard(): void {
+    if (!this.leaderboardDim || !this.leaderboardBox) return;
+    const { width, height } = this.scale;
+    this.leaderboardDim.setSize(width, height);
+    const scale = Math.min(1, (width - 32) / 700, (height - 32) / 780);
+    this.leaderboardBox.setScale(scale).setPosition(width / 2, height / 2);
   }
 
   private showWorkshop(): void {
+    this.hideLeaderboard();
     this.refreshWorkshopSummary();
     this.workshopDim.setVisible(true);
     this.workshopBox.setVisible(true);
@@ -668,6 +861,122 @@ export class MenuScene extends Phaser.Scene {
   private hideWorkshop(): void {
     this.workshopDim.setVisible(false);
     this.workshopBox.setVisible(false);
+  }
+
+  private showLeaderboard(): void {
+    this.hideWorkshop();
+    this.refreshLeaderboardSummary();
+    this.leaderboardDim.setVisible(true);
+    this.leaderboardBox.setVisible(true);
+    this.layoutLeaderboard();
+  }
+
+  private hideLeaderboard(): void {
+    this.leaderboardDim.setVisible(false);
+    this.leaderboardBox.setVisible(false);
+  }
+
+  private refreshLeaderboardSummary(): void {
+    const save = this.saveManager.get();
+    this.saveData = save;
+    this.refreshWalletSummary();
+
+    const hasDaily = save.leaderboard.entries.some((entry) => entry.mode === "daily");
+    const hasRun = save.leaderboard.entries.some((entry) => entry.mode === "run");
+    this.leaderboardFilter = this.normalizeLeaderboardFilter(save.leaderboard.entries, this.leaderboardFilter);
+    this.latestLeaderboardFilter = this.normalizeLeaderboardFilter(save.leaderboard.entries, this.latestLeaderboardFilter);
+    const filtered = filterLeaderboardEntries(save.leaderboard.entries, this.leaderboardFilter);
+    const bestScore = save.leaderboard.entries.reduce((best, entry) => Math.max(best, entry.score), 0);
+    const nextDivision = getLeaderboardNextDivision(bestScore);
+
+    for (const entry of this.leaderboardFilterButtons) {
+      const selected = entry.filter === this.leaderboardFilter;
+      const disabled = (entry.filter === "daily" && !hasDaily) || (entry.filter === "run" && !hasRun);
+      entry.button.setFillStyle(selected ? 0x183246 : 0x121a24, selected ? 0.98 : 0.94);
+      entry.button.setStrokeStyle(2, selected ? 0xffd166 : disabled ? 0x5f6b76 : 0x3aa4d4, selected ? 0.9 : disabled ? 0.45 : 0.72);
+      entry.button.setAlpha(disabled ? 0.55 : 1);
+      entry.label.setAlpha(disabled ? 0.65 : 1);
+      entry.label.setText(t(this.locale, `leaderboard.filter.${entry.filter}`));
+    }
+
+    this.leaderboardHintText.setText(
+      t(this.locale, "menu.leaderboardHint", {
+        mode: t(this.locale, `leaderboard.filter.${this.leaderboardFilter}`),
+        pilot: save.settings.pilotName || t(this.locale, "menu.pilotAuto"),
+      })
+    );
+
+    for (let i = 0; i < this.leaderboardRows.length; i++) {
+      const row = this.leaderboardRows[i]!;
+      const entry = filtered[i];
+      if (!entry) {
+        row.bg.setVisible(false);
+        row.text.setVisible(false);
+        continue;
+      }
+
+      const rank = i + 1;
+      const isLatest = entry.id === this.latestLeaderboardEntryId;
+      const accent =
+        rank === 1
+          ? 0xffd166
+          : rank === 2
+            ? 0x5cc8ff
+            : rank === 3
+              ? 0x57c27d
+              : isLatest
+                ? 0xffd166
+                : 0x2a556d;
+      const modeLabel = entry.mode === "daily" ? t(this.locale, "leaderboard.mode.daily") : t(this.locale, "leaderboard.mode.run");
+      const divisionLabel = t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`);
+      const badge = isLatest ? (this.latestLeaderboardIsRecord ? t(this.locale, "leaderboard.recordBadge") : t(this.locale, "leaderboard.lastRun")) : "";
+      const secondary = entry.mode === "daily" && entry.dailyDateUtc ? entry.dailyDateUtc : `${t(this.locale, "hud.level")} ${formatNumber(this.locale, entry.level)}`;
+
+      row.bg
+        .setVisible(true)
+        .setFillStyle(isLatest ? 0x173028 : 0x121a24, isLatest ? 0.98 : 0.94)
+        .setStrokeStyle(2, accent, isLatest ? 0.92 : 0.72);
+      row.text.setVisible(true).setText(
+        `${rank}. ${entry.pilot} [${modeLabel} | ${divisionLabel}]  ${formatNumber(this.locale, entry.score)}\n${secondary} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)} | ${t(this.locale, "hud.bolts")} ${formatNumber(this.locale, entry.bolts)} | ${t(this.locale, "results.cores")} ${formatNumber(this.locale, entry.cores)}${badge ? ` | ${badge}` : ""}`
+      );
+    }
+
+    this.leaderboardFooterText.setText(
+      this.latestPromotionDivision && (this.latestPromotionReward.bolts > 0 || this.latestPromotionReward.cores > 0)
+        ? t(this.locale, "menu.leaderboardPromotion", {
+            division: t(this.locale, `leaderboard.division.${this.latestPromotionDivision}`),
+            reward: formatLeaderboardReward(this.locale, this.latestPromotionReward),
+          })
+        : this.latestLeaderboardEntryId && this.latestLeaderboardRank
+        ? this.latestLeaderboardIsRecord
+          ? t(this.locale, "menu.leaderboardRecord", {
+              rank: formatNumber(this.locale, this.latestLeaderboardRank),
+              mode: t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`),
+            })
+          : t(this.locale, "menu.leaderboardLatest", {
+              rank: formatNumber(this.locale, this.latestLeaderboardRank),
+              mode: t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`),
+            })
+        : save.leaderboard.entries.length > 0
+          ? nextDivision
+            ? t(this.locale, "menu.leaderboardCareerNext", {
+                division: t(this.locale, `leaderboard.division.${save.leaderboard.highestDivision}`),
+                nextDivision: t(this.locale, `leaderboard.division.${nextDivision.id}`),
+                score: formatNumber(this.locale, nextDivision.minScore),
+              })
+            : t(this.locale, "menu.leaderboardCareerTop", {
+                division: t(this.locale, `leaderboard.division.${save.leaderboard.highestDivision}`),
+              })
+        : t(this.locale, "menu.leaderboardScoring")
+    );
+  }
+
+  private normalizeLeaderboardFilter(entries: readonly SaveData["leaderboard"]["entries"][number][], filter: LeaderboardFilter): LeaderboardFilter {
+    if (filter === "all") return "all";
+    const hasRequestedMode = entries.some((entry) => entry.mode === filter);
+    if (hasRequestedMode) return filter;
+    if (filter === "daily") return entries.some((entry) => entry.mode === "run") ? "run" : "all";
+    return entries.some((entry) => entry.mode === "daily") ? "daily" : "all";
   }
 
   private refreshWalletSummary(): void {
@@ -953,6 +1262,33 @@ export class MenuScene extends Phaser.Scene {
     this.saveData = this.saveManager.get();
   }
 
+  private async setPilotName(pilotName: string): Promise<void> {
+    const save = this.saveManager.get();
+    const next: SaveData = { ...save, settings: { ...save.settings, pilotName: sanitizePilotName(pilotName) } };
+    await this.saveManager.save(next);
+    this.registry.set("saveData", this.saveManager.get());
+    this.saveData = this.saveManager.get();
+  }
+
+  private async editPilotName(): Promise<void> {
+    const promptFn = typeof window !== "undefined" && typeof window.prompt === "function" ? window.prompt.bind(window) : null;
+    if (!promptFn) {
+      this.toast(t(this.locale, "menu.pilotUnsupported"));
+      return;
+    }
+
+    const current = this.saveManager.get().settings.pilotName ?? "";
+    const submitted = promptFn(t(this.locale, "menu.pilotPrompt"), current);
+    if (submitted === null) return;
+
+    const next = sanitizePilotName(submitted);
+    if (next === current) return;
+
+    await this.setPilotName(next);
+    this.toast(t(this.locale, "toast.pilot", { value: next || t(this.locale, "menu.pilotAuto") }));
+    this.scene.restart();
+  }
+
   private toast(msg: string): void {
     const { width, height } = this.scale;
     if (this.toastText) this.toastText.destroy();
@@ -1058,6 +1394,13 @@ function nextVolumeStep(current: number): number {
 
 function formatVolumeLabel(locale: Locale, prefixKey: "settings.sfx" | "settings.music", value: number): string {
   return `${t(locale, prefixKey)}: ${formatVolume(locale, value)}`;
+}
+
+function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores: number }): string {
+  const parts = [];
+  if (reward.bolts > 0) parts.push(formatResource(locale, "bolts", reward.bolts));
+  if (reward.cores > 0) parts.push(formatResource(locale, "cores", reward.cores));
+  return parts.join(" | ");
 }
 
 function buildInstalledMetaSummary(

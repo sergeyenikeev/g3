@@ -13,11 +13,32 @@ import { Tail, type ScrapType } from "../entities/tail";
 import { GAME_EVENTS } from "../events";
 import { consumeActions, inputState } from "../input/inputState";
 import type { RunMode, RunState } from "../run/runState";
+import {
+  createEndlessLevelProgress,
+  getCurrentEndlessLevelFinale,
+  getCurrentEndlessLevelModifier,
+  getCurrentEndlessLevelObjective,
+  getWaveInEndlessLevel,
+  isEndlessLevelObjectiveComplete,
+  isEndlessLevelFinalWave,
+  promotePendingEndlessLevel,
+  queueNextEndlessLevel,
+} from "../run/endlessLevels";
 import { applyTrainingModeConfig, TRAINING_STARTING_SCRAP } from "../tutorial/trainingMode";
 import type { SaveData } from "../../platform/save/saveManager";
 import { VISUAL_PALETTE, createBgFarSilhouette, createBgTile256, createDecals, createVfxTextures } from "../../visual/TextureFactory";
 import { VfxManager, type VfxQuality } from "../../visual/VfxManager";
-import { type Locale, getEnemyLabel, getPatternTitle, resolveLocale, t } from "../../i18n/localization";
+import {
+  type Locale,
+  formatNumber,
+  getEnemyLabel,
+  getLevelFinaleCopy,
+  getLevelModifierCopy,
+  getLevelObjectiveCopy,
+  getPatternTitle,
+  resolveLocale,
+  t,
+} from "../../i18n/localization";
 import { createEntityTextures } from "../../visual/EntityTextureFactory";
 import type { PlatformAdapter } from "../../platform/platformAdapter";
 import { getPlatformNowMs, signalPlatformGameplayStart, signalPlatformGameplayStop } from "../../platform/platformRuntime";
@@ -62,6 +83,22 @@ type ScrapMineState = {
   triggerRadius: number;
 };
 
+type FinaleScrapBurstState = {
+  t: number;
+  clusters: number;
+  scrapType?: ScrapType;
+};
+
+type FinaleProjectileBurstState = {
+  t: number;
+  count: number;
+  formation: "arc" | "opposite" | "corners" | "random_ring" | "behind_tail_bias";
+  speedMult: number;
+  damageMult: number;
+  lifetimeSec: number;
+  spreadDeg: number;
+};
+
 type SettingsChangedPayload = {
   locale?: Locale;
   visualQuality?: SaveData["settings"]["visualQuality"];
@@ -98,6 +135,8 @@ export class GameScene extends Phaser.Scene {
 
   private readonly onVfxScrapCollected = (p: any) => this.vfx?.emit(GAME_EVENTS.SCRAP_COLLECTED, p);
   private readonly onVfxFlipUsed = (p: any) => this.vfx?.emit(GAME_EVENTS.FLIP_USED, p);
+  private readonly onVfxDashArc = (p: any) => this.vfx?.emit(GAME_EVENTS.DASH_ARC, p);
+  private readonly onVfxDashSiphon = (p: any) => this.vfx?.emit(GAME_EVENTS.DASH_SIPHON, p);
   private readonly onVfxProjectileDeflected = (p: any) => this.vfx?.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, p);
   private readonly onVfxPlayerHit = (p: any) => this.vfx?.emit(GAME_EVENTS.PLAYER_HIT, p);
   private readonly onVfxTailCut = (p: any) => this.vfx?.emit(GAME_EVENTS.TAIL_CUT, p);
@@ -135,6 +174,13 @@ export class GameScene extends Phaser.Scene {
   private spawnCursor = 0;
   private pendingTelegraphs: Array<{ x: number; y: number; type: EnemyType; tLeft: number }> = [];
   private awaitingUpgrade = false;
+  private activeLevelFinaleId: string | null = null;
+  private activeLevelFinaleKind: "miniBoss" | "sectorEvent" | null = null;
+  private activeLevelFinaleEnemyHpMult = 1;
+  private activeLevelFinaleEnemySpeedMult = 1;
+  private activeLevelFinaleProjectileSpeedMult = 1;
+  private pendingFinaleScrapBursts: FinaleScrapBurstState[] = [];
+  private pendingFinaleProjectileBursts: FinaleProjectileBurstState[] = [];
 
   private playerInvuln = 0;
   private flipCooldown = 0;
@@ -204,6 +250,7 @@ export class GameScene extends Phaser.Scene {
       recentHits: [],
       pickedUpgrades: {},
       pityNoRareOrEpicPicks: 0,
+      endless: createEndlessLevelProgress(this.rng),
     };
 
     if (mode === "daily") {
@@ -287,6 +334,7 @@ export class GameScene extends Phaser.Scene {
       void signalPlatformGameplayStart(this.platformAdapter);
       if (this.awaitingUpgrade) {
         this.awaitingUpgrade = false;
+        this.state.endless = promotePendingEndlessLevel(this.state.endless);
         this.state.waveIndex += 1;
         this.startWave(this.state.waveIndex);
       }
@@ -337,6 +385,7 @@ export class GameScene extends Phaser.Scene {
     this.flipCooldown = Math.max(0, this.flipCooldown - dt);
     this.dashCooldown = Math.max(0, this.dashCooldown - dt);
     this.dashTime = Math.max(0, this.dashTime - dt);
+    this.dashWakeTime = Math.max(0, this.dashWakeTime - dt);
     this.captureCooldown = Math.max(0, this.captureCooldown - dt);
     this.shieldTime = Math.max(0, this.shieldTime - dt);
     if (this.shieldTime <= 0) this.shieldHp = 0;
@@ -445,7 +494,7 @@ export class GameScene extends Phaser.Scene {
 
     const tailPenalty = this.state.config.player.tailSpeedPenaltyPerSegment * this.tail.length;
     const baseSpeed = Math.max(this.state.config.player.speedMin, this.state.config.player.speedBase * (1 - tailPenalty));
-    const speed = baseSpeed * (this.dashTime > 0 ? this.state.config.dash.speedMult : 1);
+    const speed = baseSpeed * this.getPlayerSpeedMult() * (this.dashTime > 0 ? this.state.config.dash.speedMult : 1);
 
     const targetVx = move.x * speed;
     const targetVy = move.y * speed;
@@ -464,13 +513,19 @@ export class GameScene extends Phaser.Scene {
 
   private updateMagnet(dt: number): void {
     const magnet = this.state.config.magnet;
-    const radius = clamp(magnet.radiusBase, 0, magnet.radiusMax);
+    const wakeRadiusMult = this.dashWakeTime > 0 ? this.getDashWakeRadiusMult() : 1;
+    const radius = clamp(magnet.radiusBase * wakeRadiusMult, 0, Math.max(magnet.radiusMax, magnet.radiusBase * wakeRadiusMult));
     const r2 = radius * radius;
     const enabled = radius > 0;
     const corePullMult = this.getCorePullMult();
     const perkPullMult = this.vacuumBurstTime > 0 ? this.getVacuumPullMult() : 1;
+    const wakePullMult = this.dashWakeTime > 0 ? this.getDashWakePullMult() : 1;
+    const siphonPerk = this.dashWakeTime > 0 ? this.state.perks.dash_siphon?.params : undefined;
+    const siphonRadius = positiveNum(siphonPerk?.autoCaptureRadius, 96);
+    const siphonRadiusSq = siphonRadius * siphonRadius;
 
     const candidates: Array<{ x: number; y: number; d2: number }> = [];
+    const autoCapture: ArcadeImage[] = [];
 
     this.scrapGroup.children.iterate((o) => {
       const spr = o as ArcadeImage | null;
@@ -495,17 +550,35 @@ export class GameScene extends Phaser.Scene {
 
       if (!inRange) return null;
       candidates.push({ x: spr.x, y: spr.y, d2 });
+      const scrapType = (spr.getData("scrapType") as ScrapType | undefined) ?? "common";
+      if (siphonPerk && scrapType !== "common" && d2 <= siphonRadiusSq) autoCapture.push(spr);
       const d = Math.sqrt(d2);
       if (d < 0.001) return null;
       const nx = dx / d;
       const ny = dy / d;
-      const pull = magnet.pullAccelBase * corePullMult * perkPullMult * (1 - d / radius);
+      const pull = magnet.pullAccelBase * corePullMult * perkPullMult * wakePullMult * (1 - d / radius);
       spr.body.velocity.x += nx * pull * dt;
       spr.body.velocity.y += ny * pull * dt;
       const spd = spr.body.velocity.length();
       if (spd > magnet.pullMaxSpeed) spr.body.velocity.scale(magnet.pullMaxSpeed / spd);
       return null;
     });
+
+    if (autoCapture.length > 0) {
+      autoCapture.sort((a, b) => {
+        const typeA = ((a.getData("scrapType") as ScrapType | undefined) ?? "common") === "rareShard" ? 0 : 1;
+        const typeB = ((b.getData("scrapType") as ScrapType | undefined) ?? "common") === "rareShard" ? 0 : 1;
+        if (typeA !== typeB) return typeA - typeB;
+        const da = (this.player.x - a.x) ** 2 + (this.player.y - a.y) ** 2;
+        const db = (this.player.x - b.x) ** 2 + (this.player.y - b.y) ** 2;
+        return da - db;
+      });
+
+      const cooldownSec = Math.max(0, numOrDefault(siphonPerk?.captureCooldownSec, 0.015));
+      for (const spr of autoCapture) {
+        this.collectScrap(spr, cooldownSec, "dash_siphon");
+      }
+    }
 
     if (this.vfx) {
       candidates.sort((a, b) => a.d2 - b.d2);
@@ -562,6 +635,7 @@ export class GameScene extends Phaser.Scene {
           if (ent && ent.owner === "enemy") {
             ent.owner = "player";
             this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: p.x, y: p.y });
+            this.addLevelObjectiveProgress("deflect_projectiles", 1);
           } else if (ent) {
             ent.owner = "player";
           }
@@ -577,9 +651,9 @@ export class GameScene extends Phaser.Scene {
     const now = this.time.now / 1000;
     const cfg = this.state.config;
     const speedMult = clamp(
-      1 + cfg.waves.enemySpeedMultPerWave * Math.max(0, this.state.waveIndex - 1),
+      (1 + cfg.waves.enemySpeedMultPerWave * Math.max(0, this.state.waveIndex - 1)) * this.getEnemySpeedMult(),
       1,
-      cfg.waves.enemySpeedMultCap
+      cfg.waves.enemySpeedMultCap * Math.max(1, this.getEnemySpeedMult())
     );
 
     for (const e of this.enemies) {
@@ -609,7 +683,16 @@ export class GameScene extends Phaser.Scene {
         if (e.disruption.controlLockSec <= 0.001 && now >= e.nextFireAt) {
           e.nextFireAt = now + cfg.enemies.shooter.fireCooldownSec;
           const pr = cfg.enemies.shooter.projectile;
-          this.spawnProjectile("enemy", spr.x, spr.y, nx, ny, pr.speed * speedMult, pr.damage, pr.lifetimeSec);
+          this.spawnProjectile(
+            "enemy",
+            spr.x,
+            spr.y,
+            nx,
+            ny,
+            pr.speed * speedMult * this.getProjectileSpeedMult(),
+            pr.damage,
+            pr.lifetimeSec
+          );
         }
       } else if (e.type === "cutter") {
         const target = this.pickTailTarget();
@@ -725,6 +808,7 @@ export class GameScene extends Phaser.Scene {
     const ready = this.pendingTelegraphs.filter((t) => t.tLeft <= 0);
     this.pendingTelegraphs = this.pendingTelegraphs.filter((t) => t.tLeft > 0);
     for (const s of ready) this.spawnEnemy(s.type, s.x, s.y);
+    this.updateEndlessFinaleEvents();
 
     while (this.spawnCursor < this.wavePlan.spawns.length && this.wavePlan.spawns[this.spawnCursor]!.t <= this.waveTime) {
       const ev = this.wavePlan.spawns[this.spawnCursor]!;
@@ -751,7 +835,7 @@ export class GameScene extends Phaser.Scene {
         this.banking.t = 0;
       }
       this.banking.t += dt;
-      if (this.banking.t >= this.state.config.recycler.bankTimeSec) {
+      if (this.banking.t >= this.getBankTimeSec()) {
         this.bankTail();
         this.banking.active = false;
         this.banking.t = 0;
@@ -769,6 +853,7 @@ export class GameScene extends Phaser.Scene {
     this.pendingTelegraphs = [];
     this.flipPulses = [];
     this.clampCharges = this.getChainClampCharges();
+    this.resetActiveLevelFinale();
 
     const waveSet = this.state.config.waveSets.default;
     if (!waveSet) throw new Error("wave_sets.json: missing 'default'");
@@ -785,7 +870,23 @@ export class GameScene extends Phaser.Scene {
       ctx,
       this.rng
     );
-    this.waveHudLabel = describeWavePlan(this.wavePlan, this.locale);
+    if (this.state.mode !== "tutorial" && isEndlessLevelFinalWave(waveIndex, this.state.endless.wavesPerLevel)) {
+      const finale = getCurrentEndlessLevelFinale(this.state.endless);
+      if (finale) this.applyEndlessLevelFinaleToWavePlan(waveIndex, finale);
+    }
+    if (this.state.mode !== "tutorial") {
+      const levelModifier = getCurrentEndlessLevelModifier(this.state.endless);
+      this.wavePlan.extraScrapClusters += Math.max(0, Math.floor(levelModifier.extraScrapClusters ?? 0));
+      this.wavePlan.durationSec += Math.max(0, levelModifier.durationBonusSec ?? 0);
+      this.wavePlan.caps.maxShooters += Math.max(0, Math.floor(levelModifier.shooterCapBonus ?? 0));
+      this.wavePlan.caps.maxCutters += Math.max(0, Math.floor(levelModifier.cutterCapBonus ?? 0));
+      this.wavePlan.caps.maxTotal += Math.max(
+        Math.floor(levelModifier.shooterCapBonus ?? 0),
+        Math.floor(levelModifier.cutterCapBonus ?? 0),
+        0
+      );
+    }
+    this.waveHudLabel = this.buildWaveHudLabel();
     this.registry.set("uiStatusPrimary", this.waveHudLabel);
 
     this.game.events.emit(GAME_EVENTS.WAVE_START, { waveIndex });
@@ -816,6 +917,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.spawnScrapClusters(this.wavePlan.extraScrapClusters);
+    this.refreshCurrentLevelObjectiveProgress();
   }
 
   private scheduleSpawnEvent(ev: WaveSpawnEvent): void {
@@ -864,6 +966,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnEnemy(type: EnemyType, x: number, y: number): void {
+    type = this.applyLevelSpawnPromotion(type);
     type = this.applyCaps(type);
     const tex = type === "shooter" ? "enemy_shooter" : type === "cutter" ? "enemy_cutter" : "enemy_chaser";
     const spr = this.enemyGroup.create(x, y, tex) as ArcadeImage;
@@ -880,7 +983,7 @@ export class GameScene extends Phaser.Scene {
       1,
       this.state.config.waves.enemyHpMultCap
     );
-    const hp = base.hp * waveMultHp;
+    const hp = base.hp * waveMultHp * this.getEnemyHpMult();
     this.enemies.push({
       sprite: spr,
       type,
@@ -1107,7 +1210,7 @@ export class GameScene extends Phaser.Scene {
 
   private doFlip(): void {
     const cfg = this.state.config.flip;
-    this.flipCooldown = cfg.cooldownBaseSec;
+    this.flipCooldown = cfg.cooldownBaseSec * this.getFlipCooldownMult();
     this.queueFlipPulse(1, 1, true, true);
     this.playerInvuln = Math.max(this.playerInvuln, cfg.postFlipInvulnSec);
     this.flipCount += 1;
@@ -1142,7 +1245,7 @@ export class GameScene extends Phaser.Scene {
 
   private doDash(): void {
     const cfg = this.state.config.dash;
-    this.dashCooldown = cfg.cooldownSec;
+    this.dashCooldown = cfg.cooldownSec * this.getDashCooldownMult();
     this.dashTime = cfg.durationSec;
     this.playerInvuln = Math.max(this.playerInvuln, cfg.iframesSec);
 
@@ -1167,19 +1270,27 @@ export class GameScene extends Phaser.Scene {
     const burstSpeed = Math.max(this.state.config.player.speedBase * (cfg.speedMult + 0.45), 520);
     this.player.setVelocity(dirX * burstSpeed, dirY * burstSpeed);
     this.applyDashBurst(dirX, dirY);
+    this.activateDashWake();
     this.vfx?.emit("dash_used", { x: this.player.x, y: this.player.y, dirX, dirY });
     this.track(ANALYTICS_EVENTS.DASH_USED, {});
   }
 
   private applyDashBurst(dirX: number, dirY: number): void {
+    const ramStacks = Math.max(0, this.state.perks.dash_ram?.stacks ?? 0);
+    const ramParams = this.state.perks.dash_ram?.params;
     const enemyRadius = 108;
     const enemyRadiusSq = enemyRadius * enemyRadius;
     const projectileRadius = 118;
     const projectileRadiusSq = projectileRadius * projectileRadius;
     const coneDot = -0.2;
-    const enemyDamage = 7;
-    const enemyPush = 540;
-    const forwardPush = 220;
+    const enemyDamage = 7 + Math.max(0, Math.floor(numOrDefault(ramParams?.damageBonusPerStack, 5))) * ramStacks;
+    const enemyPush = 540 * (1 + Math.max(0, numOrDefault(ramParams?.pushMultPerStack, 0.16)) * ramStacks);
+    const forwardPush = 220 + Math.max(0, numOrDefault(ramParams?.forwardPushPerStack, 60)) * ramStacks;
+    const controlLockSec = 0.18 + Math.max(0, numOrDefault(ramParams?.lockBonusPerStack, 0.05)) * ramStacks;
+    const shieldPerHit = Math.max(0, numOrDefault(ramParams?.shieldPerHit, 2)) * ramStacks;
+    const shieldCap = positiveNum(ramParams?.shieldCap, 18);
+    const shieldDurationSec = positiveNum(ramParams?.shieldDurationSec, 2.4);
+    const shockSources: Array<{ x: number; y: number; enemy: EnemyEntity }> = [];
     let enemyHits = 0;
     let projectileHits = 0;
 
@@ -1196,13 +1307,21 @@ export class GameScene extends Phaser.Scene {
       const ny = dy / dist;
       if (nx * dirX + ny * dirY < coneDot) continue;
 
-      enemy.disruption = addEnemyDisruption(enemy.disruption, nx * enemyPush + dirX * forwardPush, ny * enemyPush + dirY * forwardPush, 0.18);
+      enemy.disruption = addEnemyDisruption(
+        enemy.disruption,
+        nx * enemyPush + dirX * forwardPush,
+        ny * enemyPush + dirY * forwardPush,
+        controlLockSec
+      );
       this.applyEnemyShock(enemy, 0.14, VISUAL_PALETTE.successGreen);
       enemy.hp -= enemyDamage;
+      shockSources.push({ x: spr.x, y: spr.y, enemy });
       if (enemy.hp <= 0) this.killEnemy(enemy);
       else this.vfx?.emit("enemy_hit", { x: spr.x, y: spr.y, enemyType: enemy.type, damage: enemyDamage, source: "dash" });
       enemyHits += 1;
     }
+
+    enemyHits += this.applyDashShockChain(shockSources, dirX, dirY);
 
     for (const projectile of this.projectiles) {
       const spr = projectile.sprite;
@@ -1223,12 +1342,79 @@ export class GameScene extends Phaser.Scene {
       spr.setRotation(Math.atan2(spr.body.velocity.y, spr.body.velocity.x));
       projectile.owner = "player";
       this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: spr.x, y: spr.y });
+      this.addLevelObjectiveProgress("deflect_projectiles", 1);
       projectileHits += 1;
+    }
+
+    if (enemyHits > 0 && shieldPerHit > 0) {
+      this.shieldHp = Math.min(shieldCap, this.shieldHp + enemyHits * shieldPerHit);
+      this.shieldTime = Math.max(this.shieldTime, shieldDurationSec);
     }
 
     if (enemyHits > 0 || projectileHits > 0) {
       this.triggerHitStop(Math.min(34, 10 + enemyHits * 4 + projectileHits * 3));
     }
+  }
+
+  private applyDashShockChain(sources: Array<{ x: number; y: number; enemy: EnemyEntity }>, dirX: number, dirY: number): number {
+    const perk = this.state.perks.dash_arc?.params;
+    if (!perk || sources.length <= 0) return 0;
+
+    const radius = positiveNum(perk.chainRadius, 128);
+    const radiusSq = radius * radius;
+    const maxChainsPerImpact = Math.max(1, Math.floor(numOrDefault(perk.maxChainsPerImpact, 2)));
+    const damage = Math.max(1, Math.floor(numOrDefault(perk.damage, 6)));
+    const pushForce = positiveNum(perk.pushForce, 320);
+    const controlLockSec = clamp(numOrDefault(perk.controlLockSec, 0.12), 0.04, 0.45);
+    const alreadyHit = new Set<EnemyEntity>(sources.map((entry) => entry.enemy));
+    let hits = 0;
+
+    for (const source of sources) {
+      let remaining = maxChainsPerImpact;
+      const candidates = this.enemies
+        .filter((enemy) => {
+          if (!enemy.sprite.active || alreadyHit.has(enemy)) return false;
+          const dx = enemy.sprite.x - source.x;
+          const dy = enemy.sprite.y - source.y;
+          return dx * dx + dy * dy <= radiusSq;
+        })
+        .sort((a, b) => {
+          const da = (a.sprite.x - source.x) ** 2 + (a.sprite.y - source.y) ** 2;
+          const db = (b.sprite.x - source.x) ** 2 + (b.sprite.y - source.y) ** 2;
+          return da - db;
+        });
+
+      for (const enemy of candidates) {
+        if (remaining <= 0) break;
+        const dx = enemy.sprite.x - source.x;
+        const dy = enemy.sprite.y - source.y;
+        const dist = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
+        const nx = dx / dist;
+        const ny = dy / dist;
+        enemy.disruption = addEnemyDisruption(
+          enemy.disruption,
+          nx * pushForce + dirX * 80,
+          ny * pushForce + dirY * 80,
+          controlLockSec
+        );
+        this.applyEnemyShock(enemy, 0.16, VISUAL_PALETTE.neonMagenta);
+        enemy.hp -= damage;
+        this.game.events.emit(GAME_EVENTS.DASH_ARC, {
+          x: source.x,
+          y: source.y,
+          targetX: enemy.sprite.x,
+          targetY: enemy.sprite.y,
+          enemyType: enemy.type,
+        });
+        if (enemy.hp <= 0) this.killEnemy(enemy);
+        else this.vfx?.emit("enemy_hit", { x: enemy.sprite.x, y: enemy.sprite.y, enemyType: enemy.type, damage, source: "dash_chain" });
+        alreadyHit.add(enemy);
+        hits += 1;
+        remaining -= 1;
+      }
+    }
+
+    return hits;
   }
 
   private isDashEnabled(): boolean {
@@ -1261,7 +1447,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private spawnScrapBurst(clusters: number): void {
+  private spawnScrapBurst(clusters: number, forcedType?: ScrapType): void {
     const cfg = this.state.config;
     for (let i = 0; i < clusters; i++) {
       const center = this.pickScrapCenter();
@@ -1269,13 +1455,112 @@ export class GameScene extends Phaser.Scene {
       for (let j = 0; j < size; j++) {
         const a = this.rng.next() * Math.PI * 2;
         const r = this.rng.float(0, cfg.scrap.clusterRadius);
-        this.spawnScrapAt(center.x + Math.cos(a) * r, center.y + Math.sin(a) * r);
+        this.spawnScrapAt(center.x + Math.cos(a) * r, center.y + Math.sin(a) * r, forcedType);
       }
+    }
+  }
+
+  private resetActiveLevelFinale(): void {
+    this.activeLevelFinaleId = null;
+    this.activeLevelFinaleKind = null;
+    this.activeLevelFinaleEnemyHpMult = 1;
+    this.activeLevelFinaleEnemySpeedMult = 1;
+    this.activeLevelFinaleProjectileSpeedMult = 1;
+    this.pendingFinaleScrapBursts = [];
+    this.pendingFinaleProjectileBursts = [];
+  }
+
+  private applyEndlessLevelFinaleToWavePlan(
+    waveIndex: number,
+    finale: NonNullable<ReturnType<typeof getCurrentEndlessLevelFinale>>
+  ): void {
+    this.activeLevelFinaleId = finale.id;
+    this.activeLevelFinaleKind = finale.kind;
+    this.activeLevelFinaleEnemyHpMult = positiveNum(finale.enemyHpMult, 1);
+    this.activeLevelFinaleEnemySpeedMult = positiveNum(finale.enemySpeedMult, 1);
+    this.activeLevelFinaleProjectileSpeedMult = positiveNum(finale.projectileSpeedMult, 1);
+    this.pendingFinaleScrapBursts = (finale.scrapBursts ?? []).map((burst) => ({
+      t: burst.t,
+      clusters: Math.max(1, Math.floor(burst.clusters)),
+      scrapType: burst.scrapType,
+    }));
+    this.pendingFinaleProjectileBursts = (finale.projectileBursts ?? []).map((burst) => ({
+      t: burst.t,
+      count: Math.max(1, Math.floor(burst.count)),
+      formation: burst.formation ?? "corners",
+      speedMult: positiveNum(burst.speedMult, 1),
+      damageMult: positiveNum(burst.damageMult, 1),
+      lifetimeSec: positiveNum(burst.lifetimeSec, this.state.config.enemies.shooter.projectile.lifetimeSec),
+      spreadDeg: positiveNum(burst.spreadDeg, 10),
+    }));
+
+    this.wavePlan = {
+      waveIndex,
+      durationSec: finale.durationSec,
+      budget: this.wavePlan.budget + finale.spawns.reduce((total, spawn) => total + Math.max(1, spawn.count), 0),
+      spawns: finale.spawns.map((spawn) => ({
+        t: spawn.t,
+        type: spawn.type,
+        count: spawn.count,
+        formation: spawn.formation,
+        arcDeg: spawn.arcDeg,
+      })),
+      patternId: finale.patternId,
+      caps: {
+        maxShooters: Math.max(this.wavePlan.caps.maxShooters, Math.floor(finale.capsOverride?.maxShooters ?? this.wavePlan.caps.maxShooters)),
+        maxCutters: Math.max(this.wavePlan.caps.maxCutters, Math.floor(finale.capsOverride?.maxCutters ?? this.wavePlan.caps.maxCutters)),
+        maxTotal: Math.max(this.wavePlan.caps.maxTotal, Math.floor(finale.capsOverride?.maxTotal ?? this.wavePlan.caps.maxTotal)),
+      },
+      pressureTargets: this.wavePlan.pressureTargets,
+      extraScrapClusters: Math.max(0, Math.floor(finale.extraScrapClusters ?? 0)),
+      special: { type: finale.kind === "sectorEvent" ? "sector_event" : "mini_boss", finaleId: finale.id },
+    };
+  }
+
+  private updateEndlessFinaleEvents(): void {
+    while (this.pendingFinaleScrapBursts.length > 0 && this.pendingFinaleScrapBursts[0]!.t <= this.waveTime) {
+      const burst = this.pendingFinaleScrapBursts.shift()!;
+      this.spawnScrapBurst(burst.clusters, burst.scrapType);
+    }
+
+    while (this.pendingFinaleProjectileBursts.length > 0 && this.pendingFinaleProjectileBursts[0]!.t <= this.waveTime) {
+      this.fireEndlessFinaleProjectileBurst(this.pendingFinaleProjectileBursts.shift()!);
+    }
+  }
+
+  private fireEndlessFinaleProjectileBurst(burst: FinaleProjectileBurstState): void {
+    const projectile = this.state.config.enemies.shooter.projectile;
+
+    for (let i = 0; i < burst.count; i++) {
+      const pos = this.pickSpawnPos(burst.formation, i, burst.count);
+      const leadX = this.player.x + this.player.body.velocity.x * 0.16 + this.rng.float(-34, 34);
+      const leadY = this.player.y + this.player.body.velocity.y * 0.16 + this.rng.float(-34, 34);
+      const angle = Math.atan2(leadY - pos.y, leadX - pos.x) + Phaser.Math.DegToRad(this.rng.float(-burst.spreadDeg, burst.spreadDeg));
+      this.spawnProjectile(
+        "enemy",
+        pos.x,
+        pos.y,
+        Math.cos(angle),
+        Math.sin(angle),
+        projectile.speed * burst.speedMult * this.getProjectileSpeedMult(),
+        Math.max(1, Math.floor(projectile.damage * burst.damageMult)),
+        Math.max(projectile.lifetimeSec, burst.lifetimeSec)
+      );
     }
   }
 
   private onWaveComplete(): void {
     if (this.state.mode === "tutorial") return;
+    if (isEndlessLevelFinalWave(this.state.waveIndex, this.state.endless.wavesPerLevel)) {
+      const nextProgress = queueNextEndlessLevel(this.state.endless, this.rng);
+      const reward = nextProgress.lastCleared;
+      this.state.endless = nextProgress;
+      if (reward) {
+        this.state.bolts += reward.rewardBolts;
+        this.state.cores += reward.rewardCores;
+      }
+    }
+
     this.awaitingUpgrade = true;
     this.waveTime = 0;
     this.spawnCursor = 0;
@@ -1311,11 +1596,16 @@ export class GameScene extends Phaser.Scene {
 
   private onScrapOverlap(s: Phaser.Physics.Arcade.Image): void {
     if (this.captureCooldown > 0) return;
-    const magnet = this.state.config.magnet;
     const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, s.x, s.y);
-    if (d > magnet.captureDistance) return;
+    if (d > this.getScrapCaptureDistance()) return;
+    this.collectScrap(s, this.state.config.magnet.captureCooldownSec, "player");
+  }
 
-    this.captureCooldown = magnet.captureCooldownSec;
+  private collectScrap(s: Phaser.Physics.Arcade.Image, cooldownSec: number, source: "player" | "dash_siphon"): void {
+    if (!s.active) return;
+    this.captureCooldown = Math.max(0, cooldownSec);
+    const x = s.x;
+    const y = s.y;
     const type = (s.getData("scrapType") as ScrapType | undefined) ?? "common";
 
     if (this.tail.length < this.state.config.tail.maxLenCap) {
@@ -1324,14 +1614,19 @@ export class GameScene extends Phaser.Scene {
       if (type === "heavy") this.state.bolts += this.getHeavyScrapBoltValue();
       else this.state.bolts += this.state.config.recycler.boltsPerScrapCommon;
     }
+    if (type === "heavy") this.addLevelObjectiveProgress("heavy_scrap", 1);
+    this.refreshCurrentLevelObjectiveProgress();
 
     if (type === "rareShard") {
       const bonus = this.state.mode === "daily" ? this.state.config.daily.dailyRewards.coreDropBonus : 0;
-      if (this.rng.next() < this.state.config.scrap.types.rareShard.coreDropChance + bonus) this.state.cores += 1;
+      if (this.rng.next() < this.state.config.scrap.types.rareShard.coreDropChance + bonus + this.getRareCoreChanceBonus()) this.state.cores += 1;
     }
 
     const tex = type === "heavy" ? "scrap_heavy" : type === "rareShard" ? "scrap_rare" : "scrap_common";
-    this.game.events.emit(GAME_EVENTS.SCRAP_COLLECTED, { x: s.x, y: s.y, type, tex });
+    this.game.events.emit(GAME_EVENTS.SCRAP_COLLECTED, { x, y, type, tex, source });
+    if (source === "dash_siphon") {
+      this.game.events.emit(GAME_EVENTS.DASH_SIPHON, { x, y, targetX: this.player.x, targetY: this.player.y, type });
+    }
     s.destroy();
 
     this.time.delayedCall(this.state.config.scrap.respawnTimeSec * 1000, () => {
@@ -1344,20 +1639,22 @@ export class GameScene extends Phaser.Scene {
   private bankTail(): void {
     const counts = this.tail.countByType();
     const mult = this.state.perks.recycler_bolts_mult?.params?.mult;
-    const m = typeof mult === "number" ? mult : 1;
+    const m = (typeof mult === "number" ? mult : 1) * this.getBankBoltsMult();
 
     const boltsBase =
       counts.common * this.state.config.recycler.boltsPerScrapCommon +
       counts.heavy * this.getHeavyScrapBoltValue();
     const bolts = Math.floor(boltsBase * m);
     this.state.bolts += bolts;
+    this.addLevelObjectiveProgress("bank_bolts", bolts);
 
-    const heal = this.state.config.recycler.healOnBank;
+    const heal = Math.max(1, Math.floor(this.state.config.recycler.healOnBank * this.getBankHealMult()));
     const hpBefore = this.state.hp;
     this.state.hp = Math.min(this.state.config.player.hpMax, this.state.hp + heal);
     const hpHealed = Math.max(0, this.state.hp - hpBefore);
 
     this.tail.clear();
+    this.refreshCurrentLevelObjectiveProgress();
     const pos = this.state.config.arena.recyclerPos;
     this.game.events.emit(GAME_EVENTS.BANK_COMPLETE, { x: pos.x, y: pos.y, bolts, hpHealed });
   }
@@ -1417,6 +1714,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.emit(GAME_EVENTS.TAIL_CUT, { x, y, segmentsLost: removed.length, segments: removed });
     this.spawnTailDebris(removed);
     this.spawnScrapMines(removed);
+    this.refreshCurrentLevelObjectiveProgress();
   }
 
   private tryPreventTailLoss(): boolean {
@@ -1572,6 +1870,7 @@ export class GameScene extends Phaser.Scene {
     this.vfx?.emit("enemy_killed", { x, y, enemyType: ent.type });
     ent.sprite.destroy();
     if (this.rng.next() < this.state.config.tuning.scrapSpawn.enemyKillDropChance) this.spawnScrapAt(x, y);
+    this.maybeSpawnDashSiphonDrop(x, y, ent.type);
   }
 
   private applyDamage(damage: number): void {
@@ -1591,6 +1890,7 @@ export class GameScene extends Phaser.Scene {
     if (dmg <= 0) return;
 
     this.state.hp -= dmg;
+    this.refreshCurrentLevelObjectiveProgress();
     this.playerInvuln = Math.max(this.playerInvuln, this.state.config.player.invulnOnHitSec);
     this.state.recentHits.push({ t: this.time.now / 1000 });
     this.game.events.emit(GAME_EVENTS.PLAYER_HIT, { x: this.player.x, y: this.player.y, damage: dmg });
@@ -1604,11 +1904,16 @@ export class GameScene extends Phaser.Scene {
     if (this.state.deathReason) return;
     this.state.deathReason = reason;
     void signalPlatformGameplayStop(this.platformAdapter);
-    this.game.events.emit(GAME_EVENTS.RUN_END, { waveIndex: this.state.waveIndex, bolts: this.state.bolts });
+    this.game.events.emit(GAME_EVENTS.RUN_END, {
+      levelIndex: this.state.endless.current.index,
+      waveIndex: this.state.waveIndex,
+      bolts: this.state.bolts,
+    });
     const durationMs = Math.max(0, Date.now() - this.state.startedAtMs);
     this.track(ANALYTICS_EVENTS.RUN_END, {
       mode: this.state.mode,
       durationMs,
+      level: this.state.endless.current.index,
       wave: this.state.waveIndex,
       bolts: this.state.bolts,
       cores: this.state.cores,
@@ -1669,6 +1974,7 @@ export class GameScene extends Phaser.Scene {
     const cfg = this.state.config.ads.rewarded.revive;
     const hp = Math.max(1, Math.floor(this.state.config.player.hpMax * cfg.hpRestoreFrac));
     this.state.hp = hp;
+    this.refreshCurrentLevelObjectiveProgress();
     this.playerInvuln = Math.max(this.playerInvuln, cfg.invulnSec);
     this.state.recentHits = [];
     this.banking.active = false;
@@ -1772,6 +2078,10 @@ export class GameScene extends Phaser.Scene {
   private updateHudStatus(): void {
     const waveStatus = this.awaitingUpgrade ? t(this.locale, "wave.upgradePick") : this.waveHudLabel;
     const buffs: string[] = [];
+    const finaleStatus = this.getActiveLevelFinaleStatus();
+    if (finaleStatus) buffs.push(finaleStatus);
+    const objectiveStatus = this.getLevelObjectiveStatus();
+    if (objectiveStatus) buffs.push(objectiveStatus);
 
     if (this.shieldHp > 0) buffs.push(t(this.locale, "status.shield", { value: Math.ceil(this.shieldHp) }));
     if (this.clampCharges > 0) buffs.push(t(this.locale, "status.clamp", { value: this.clampCharges }));
@@ -1785,12 +2095,59 @@ export class GameScene extends Phaser.Scene {
       buffs.push(this.vacuumBurstCooldown > 0 ? t(this.locale, "status.vacuum", { value: Math.ceil(this.vacuumBurstCooldown) }) : t(this.locale, "status.vacuumReady"));
     }
 
+    if (this.dashWakeTime > 0) buffs.push(t(this.locale, "status.dashWake", { value: this.dashWakeTime.toFixed(1) }));
     if (this.drone) buffs.push(t(this.locale, "status.drone"));
     if (this.scrapMines.length > 0) buffs.push(t(this.locale, "status.mines", { value: this.scrapMines.length }));
     if (this.state.cores > 0) buffs.push(t(this.locale, "status.corePull", { value: this.getCorePullMult().toFixed(2) }));
 
     this.registry.set("uiStatusPrimary", waveStatus);
     this.registry.set("uiStatusSecondary", buffs.join(" | "));
+  }
+
+  private getActiveLevelFinaleStatus(): string {
+    if (!this.activeLevelFinaleId || !this.activeLevelFinaleKind) return "";
+    const copy = getLevelFinaleCopy(this.locale, this.activeLevelFinaleId);
+    return t(this.locale, this.activeLevelFinaleKind === "sectorEvent" ? "status.event" : "status.finale", {
+      title: copy.title,
+    });
+  }
+
+  private addLevelObjectiveProgress(objectiveId: string, amount: number): void {
+    if (this.state.mode === "tutorial") return;
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const objective = getCurrentEndlessLevelObjective(this.state.endless);
+    if (objective.id !== objectiveId || objective.mode !== "cumulative") return;
+    objective.progress += amount;
+  }
+
+  private refreshCurrentLevelObjectiveProgress(): void {
+    if (this.state.mode === "tutorial") return;
+    const objective = getCurrentEndlessLevelObjective(this.state.endless);
+    if (objective.mode !== "current") return;
+
+    if (objective.id === "tail_segments") {
+      objective.progress = this.tail.length;
+      return;
+    }
+
+    if (objective.id === "hull_integrity") {
+      objective.progress = Math.max(0, this.state.hp);
+    }
+  }
+
+  private getLevelObjectiveStatus(): string {
+    if (this.state.mode === "tutorial") return "";
+    const objective = getCurrentEndlessLevelObjective(this.state.endless);
+    const copy = getLevelObjectiveCopy(this.locale, objective.id);
+    if (isEndlessLevelObjectiveComplete(objective)) {
+      return t(this.locale, "objective.complete", { title: copy.title });
+    }
+
+    return t(this.locale, "objective.progress", {
+      title: copy.title,
+      progress: formatNumber(this.locale, Math.floor(objective.progress)),
+      target: formatNumber(this.locale, objective.target),
+    });
   }
 
   private onSettingsChanged(payload: SettingsChangedPayload = {}): void {
@@ -1816,7 +2173,76 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.waveHudLabel = this.wavePlan ? describeWavePlan(this.wavePlan, this.locale) : "";
+    this.waveHudLabel = this.wavePlan ? this.buildWaveHudLabel() : "";
+  }
+
+  private buildWaveHudLabel(): string {
+    if (this.state.mode === "tutorial") return t(this.locale, "wave.trainingLoop");
+    const modifier = getCurrentEndlessLevelModifier(this.state.endless);
+    const modifierCopy = getLevelModifierCopy(this.locale, modifier.id);
+    const waveInLevel = getWaveInEndlessLevel(this.state.waveIndex, this.state.endless.wavesPerLevel);
+    const planLabel = describeWavePlan(this.wavePlan, this.locale);
+    const phaseLabel = `${t(this.locale, "hud.wave")} ${waveInLevel}/${this.state.endless.wavesPerLevel}`;
+    return planLabel ? `${modifierCopy.title} | ${phaseLabel} | ${planLabel}` : `${modifierCopy.title} | ${phaseLabel}`;
+  }
+
+  private applyLevelSpawnPromotion(type: EnemyType): EnemyType {
+    if (this.state.mode === "tutorial") return type;
+    if (type !== "chaser") return type;
+    const modifier = getCurrentEndlessLevelModifier(this.state.endless);
+    if (!modifier.promoteChaserTo) return type;
+    const chance = clamp(numOrDefault(modifier.promoteChance, 0), 0, 1);
+    return this.rng.next() < chance ? modifier.promoteChaserTo : type;
+  }
+
+  private getPlayerSpeedMult(): number {
+    if (this.state.mode === "tutorial") return 1;
+    return positiveNum(getCurrentEndlessLevelModifier(this.state.endless).playerSpeedMult, 1);
+  }
+
+  private getEnemyHpMult(): number {
+    if (this.state.mode === "tutorial") return 1;
+    return positiveNum(getCurrentEndlessLevelModifier(this.state.endless).enemyHpMult, 1) * this.activeLevelFinaleEnemyHpMult;
+  }
+
+  private getEnemySpeedMult(): number {
+    if (this.state.mode === "tutorial") return 1;
+    return positiveNum(getCurrentEndlessLevelModifier(this.state.endless).enemySpeedMult, 1) * this.activeLevelFinaleEnemySpeedMult;
+  }
+
+  private getProjectileSpeedMult(): number {
+    if (this.state.mode === "tutorial") return 1;
+    return positiveNum(getCurrentEndlessLevelModifier(this.state.endless).projectileSpeedMult, 1) * this.activeLevelFinaleProjectileSpeedMult;
+  }
+
+  private getBankTimeSec(): number {
+    if (this.state.mode === "tutorial") return this.state.config.recycler.bankTimeSec;
+    return Math.max(0.15, this.state.config.recycler.bankTimeSec * positiveNum(getCurrentEndlessLevelModifier(this.state.endless).bankTimeMult, 1));
+  }
+
+  private getBankBoltsMult(): number {
+    if (this.state.mode === "tutorial") return 1;
+    return positiveNum(getCurrentEndlessLevelModifier(this.state.endless).bankBoltsMult, 1);
+  }
+
+  private getBankHealMult(): number {
+    if (this.state.mode === "tutorial") return 1;
+    return positiveNum(getCurrentEndlessLevelModifier(this.state.endless).bankHealMult, 1);
+  }
+
+  private getFlipCooldownMult(): number {
+    if (this.state.mode === "tutorial") return 1;
+    return positiveNum(getCurrentEndlessLevelModifier(this.state.endless).flipCooldownMult, 1);
+  }
+
+  private getDashCooldownMult(): number {
+    if (this.state.mode === "tutorial") return 1;
+    return positiveNum(getCurrentEndlessLevelModifier(this.state.endless).dashCooldownMult, 1);
+  }
+
+  private getRareCoreChanceBonus(): number {
+    if (this.state.mode === "tutorial") return 0;
+    return Math.max(0, numOrDefault(getCurrentEndlessLevelModifier(this.state.endless).rareCoreChanceBonus, 0));
   }
 
   private finishTutorialMode(_reason: string): void {
@@ -1882,12 +2308,58 @@ export class GameScene extends Phaser.Scene {
 
   private getHeavyScrapBoltValue(): number {
     const bonus = this.state.perks.heavy_haul?.params?.heavyBonusBolts;
-    return this.state.config.recycler.boltsPerScrapHeavy + Math.max(0, Math.floor(numOrDefault(bonus, 0)));
+    return (
+      this.state.config.recycler.boltsPerScrapHeavy +
+      Math.max(0, Math.floor(numOrDefault(bonus, 0))) +
+      Math.max(0, Math.floor(getCurrentEndlessLevelModifier(this.state.endless).heavyBoltBonus ?? 0))
+    );
   }
 
   private getVacuumPullMult(): number {
     const perk = this.state.perks.vacuum_burst?.params?.pullMult;
     return positiveNum(perk, 1.3);
+  }
+
+  private activateDashWake(): void {
+    const perk = this.state.perks.dash_wake?.params;
+    if (!perk) return;
+    this.dashWakeTime = Math.max(this.dashWakeTime, positiveNum(perk.durationSec, 1));
+    this.captureCooldown = 0;
+  }
+
+  private getDashWakePullMult(): number {
+    const perk = this.state.perks.dash_wake?.params?.pullMult;
+    return positiveNum(perk, 1.7);
+  }
+
+  private getDashWakeRadiusMult(): number {
+    const perk = this.state.perks.dash_wake?.params?.radiusMult;
+    return positiveNum(perk, 1.45);
+  }
+
+  private maybeSpawnDashSiphonDrop(x: number, y: number, enemyType: EnemyType): void {
+    if (this.dashWakeTime <= 0) return;
+    const perk = this.state.perks.dash_siphon?.params;
+    if (!perk) return;
+
+    const rareChanceBase = Math.max(0, numOrDefault(perk.rareShardChance, 0.08));
+    const heavyChance = Math.max(0, numOrDefault(perk.heavyDropChance, 0.34));
+    const rareChance = enemyType === "shooter" ? rareChanceBase + 0.06 : rareChanceBase;
+    const roll = this.rng.next();
+    if (roll < rareChance) {
+      this.spawnScrapAt(x, y, "rareShard");
+      return;
+    }
+    if (roll < rareChance + heavyChance) {
+      this.spawnScrapAt(x, y, "heavy");
+    }
+  }
+
+  private getScrapCaptureDistance(): number {
+    const base = this.state.config.magnet.captureDistance;
+    if (this.dashWakeTime <= 0) return base;
+    const bonus = this.state.perks.dash_wake?.params?.captureBonus;
+    return base + Math.max(0, numOrDefault(bonus, 0));
   }
 
   private getCorePullMult(): number {
@@ -1923,6 +2395,8 @@ export class GameScene extends Phaser.Scene {
 
     this.game.events.on(GAME_EVENTS.SCRAP_COLLECTED, this.onVfxScrapCollected);
     this.game.events.on(GAME_EVENTS.FLIP_USED, this.onVfxFlipUsed);
+    this.game.events.on(GAME_EVENTS.DASH_ARC, this.onVfxDashArc);
+    this.game.events.on(GAME_EVENTS.DASH_SIPHON, this.onVfxDashSiphon);
     this.game.events.on(GAME_EVENTS.PROJECTILE_DEFLECTED, this.onVfxProjectileDeflected);
     this.game.events.on(GAME_EVENTS.PLAYER_HIT, this.onVfxPlayerHit);
     this.game.events.on(GAME_EVENTS.TAIL_CUT, this.onVfxTailCut);
@@ -1934,6 +2408,8 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.SCRAP_COLLECTED, this.onVfxScrapCollected);
       this.game.events.off(GAME_EVENTS.FLIP_USED, this.onVfxFlipUsed);
+      this.game.events.off(GAME_EVENTS.DASH_ARC, this.onVfxDashArc);
+      this.game.events.off(GAME_EVENTS.DASH_SIPHON, this.onVfxDashSiphon);
       this.game.events.off(GAME_EVENTS.PROJECTILE_DEFLECTED, this.onVfxProjectileDeflected);
       this.game.events.off(GAME_EVENTS.PLAYER_HIT, this.onVfxPlayerHit);
       this.game.events.off(GAME_EVENTS.TAIL_CUT, this.onVfxTailCut);
@@ -2330,5 +2806,11 @@ function describeWavePlan(plan: WavePlan, locale: Locale): string {
   ].filter(Boolean);
 
   const title = getPatternTitle(locale, plan.patternId ?? null);
+  if (plan.special?.type === "mini_boss") {
+    return details.length > 0 ? `${t(locale, "wave.finale")}: ${title} | ${details.join(", ")}` : `${t(locale, "wave.finale")}: ${title}`;
+  }
+  if (plan.special?.type === "sector_event") {
+    return details.length > 0 ? `${t(locale, "wave.event")}: ${title} | ${details.join(", ")}` : `${t(locale, "wave.event")}: ${title}`;
+  }
   return details.length > 0 ? `${title} | ${details.join(", ")}` : title;
 }

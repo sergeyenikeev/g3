@@ -2,6 +2,7 @@ import type { RuntimeConfig } from "../../data/runtimeConfig";
 import type { Rarity } from "../../data/types";
 import type { Rng } from "../../core/prng";
 import type { PerkState } from "../effects/applyEffects";
+import type { EndlessLevelProgress } from "./endlessLevels";
 
 export type RunMode = "run" | "daily" | "tutorial";
 
@@ -24,6 +25,7 @@ export type RunState = {
 
   pickedUpgrades: Record<string, { stacks: number; rarity: Rarity }>;
   pityNoRareOrEpicPicks: number;
+  endless: EndlessLevelProgress;
 
   daily?: { dateUtc: string; variantId: string; specialRule?: Record<string, unknown> };
 };

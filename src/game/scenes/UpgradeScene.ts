@@ -6,11 +6,22 @@ import type { AdsManager } from "../../platform/ads/adsManager";
 import type { RunState } from "../run/runState";
 import { applyEffects } from "../effects/applyEffects";
 import { GAME_EVENTS } from "../events";
+import { getUpgradeBadgeSpecs } from "../upgrades/upgradeBadges";
 import { makeUpgradeOffer } from "../upgrades/upgradeSelection";
 import { updatePityAfterPick } from "../upgrades/rarity";
 import { createRarityFrames, createVfxTextures } from "../../visual/TextureFactory";
 import type { SaveData } from "../../platform/save/saveManager";
-import { type Locale, getRarityLabel, getUpgradeCopy, resolveLocale, t } from "../../i18n/localization";
+import {
+  type Locale,
+  formatNumber,
+  getLevelFinaleCopy,
+  getLevelModifierCopy,
+  getLevelObjectiveCopy,
+  getRarityLabel,
+  getUpgradeCopy,
+  resolveLocale,
+  t,
+} from "../../i18n/localization";
 import type { PlatformAdapter } from "../../platform/platformAdapter";
 import { signalPlatformGameplayStop } from "../../platform/platformRuntime";
 
@@ -54,8 +65,89 @@ export class UpgradeScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(1001);
 
+    const lastCleared = this.state.endless.lastCleared;
+    const pendingLevel = this.state.endless.pending;
+    if (lastCleared) {
+      const reward = formatUpgradeReward(this.locale, lastCleared.rewardBolts, lastCleared.rewardCores);
+      const objectiveCopy = getLevelObjectiveCopy(this.locale, lastCleared.objectiveId);
+      const finaleCopy = lastCleared.finaleId ? getLevelFinaleCopy(this.locale, lastCleared.finaleId) : null;
+      this.add
+        .text(width / 2, height * 0.215, t(this.locale, "upgrade.levelClear", { level: lastCleared.levelIndex, reward }), {
+          fontSize: "15px",
+          color: "#7fdfff",
+          fontStyle: "700",
+          align: "center",
+        })
+        .setOrigin(0.5)
+        .setDepth(1001);
+      this.add
+        .text(width / 2, height * 0.245, t(this.locale, "upgrade.objective", { objective: objectiveCopy.title }), {
+          fontSize: "13px",
+          color: "#d9f2ff",
+          align: "center",
+        })
+        .setOrigin(0.5)
+        .setDepth(1001);
+      this.add
+        .text(
+          width / 2,
+          height * 0.268,
+          [
+            lastCleared.objectiveCompleted
+              ? t(this.locale, "upgrade.objectiveDone", {
+                  reward: formatUpgradeReward(this.locale, lastCleared.objectiveRewardBolts, lastCleared.objectiveRewardCores),
+                })
+              : t(this.locale, "upgrade.objectiveMissed"),
+            finaleCopy ? t(this.locale, "upgrade.finale", { finale: finaleCopy.title }) : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          {
+            fontSize: "12px",
+            color: lastCleared.objectiveCompleted ? "#98ffb9" : "#ffb084",
+            align: "center",
+          }
+        )
+        .setOrigin(0.5)
+        .setDepth(1001);
+    }
+
+    if (pendingLevel) {
+      const modifierCopy = getLevelModifierCopy(this.locale, pendingLevel.modifierId);
+      const objectiveCopy = getLevelObjectiveCopy(this.locale, pendingLevel.objective.id);
+      const finaleCopy = pendingLevel.finaleId ? getLevelFinaleCopy(this.locale, pendingLevel.finaleId) : null;
+      this.add
+        .text(width / 2, height * 0.305, t(this.locale, "upgrade.nextLevel", { level: pendingLevel.index, modifier: modifierCopy.title }), {
+          fontSize: "14px",
+          color: "#98b7c7",
+          align: "center",
+        })
+        .setOrigin(0.5)
+        .setDepth(1001);
+      this.add
+        .text(
+          width / 2,
+          height * 0.335,
+          [
+            modifierCopy.desc,
+            t(this.locale, "upgrade.objective", { objective: `${objectiveCopy.title} ${formatNumber(this.locale, pendingLevel.objective.target)}` }),
+            finaleCopy ? t(this.locale, "upgrade.finale", { finale: finaleCopy.title }) : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          {
+            fontSize: "13px",
+            color: "#7fdfff",
+            align: "center",
+            wordWrap: { width: Math.min(420, width * 0.82) },
+          }
+        )
+        .setOrigin(0.5)
+        .setDepth(1001);
+    }
+
     const reroll = this.add
-      .rectangle(width / 2, height * 0.26, 220, 44, 0x1b2635, 0.95)
+      .rectangle(width / 2, height * 0.38, 220, 44, 0x1b2635, 0.95)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true })
       .setDepth(1001);
@@ -116,10 +208,12 @@ export class UpgradeScene extends Phaser.Scene {
     });
 
     const w = Math.min(360, width * 0.86);
-    const h = 140;
+    const h = 154;
     const gap = 18;
     const totalH = offer.length * h + (offer.length - 1) * gap;
-    const y0 = height * 0.35;
+    const desiredY0 = height * 0.47;
+    const maxY0 = height - 24 - h / 2 - (offer.length - 1) * (h + gap) - totalH * 0.02;
+    const y0 = Math.min(desiredY0, maxY0);
 
     offer.forEach((o, idx) => {
       const x = width / 2;
@@ -152,12 +246,30 @@ export class UpgradeScene extends Phaser.Scene {
           fontSize: "18px",
           color: "#d9f2ff",
           fontStyle: "700",
-          wordWrap: { width: w - 36 },
+          wordWrap: { width: w - 132 },
         })
         .setOrigin(0, 0);
 
+      let badgeCursorX = -w / 2 + 18;
+      const badgeNodes = getUpgradeBadgeSpecs(this.locale, o.upgrade).map((badge) => {
+        const label = this.add
+          .text(0, 0, badge.label, {
+            fontSize: "10px",
+            color: badge.textColor,
+            fontStyle: "700",
+          })
+          .setOrigin(0.5);
+        const badgeWidth = label.width + 16;
+        const bgRect = this.add
+          .rectangle(0, 0, badgeWidth, 22, badge.fill, 0.96)
+          .setStrokeStyle(1, badge.stroke, 0.92);
+        const node = this.add.container(badgeCursorX + badgeWidth / 2, -h / 2 + 52, [bgRect, label]);
+        badgeCursorX += badgeWidth + 8;
+        return node;
+      });
+
       const desc = this.add
-        .text(-w / 2 + 18, -h / 2 + 44, copy.desc, {
+        .text(-w / 2 + 18, -h / 2 + 72, copy.desc, {
           fontSize: "14px",
           color: "#98b7c7",
           wordWrap: { width: w - 36 },
@@ -173,7 +285,7 @@ export class UpgradeScene extends Phaser.Scene {
         })
         .setOrigin(1, 0);
 
-      const card = this.add.container(x, y + 18, [glow, bg, frame, title, desc, chip]).setDepth(1002).setAlpha(0).setScale(0.98);
+      const card = this.add.container(x, y + 18, [glow, bg, frame, title, ...badgeNodes, desc, chip]).setDepth(1002).setAlpha(0).setScale(0.98);
       this.tweens.add({ targets: card, y, alpha: 1, scale: 1, duration: 240, delay: idx * 70, ease: "Cubic.Out" });
 
       bg.on("pointerover", () => {
@@ -234,4 +346,10 @@ export class UpgradeScene extends Phaser.Scene {
       // ignore
     }
   }
+}
+
+function formatUpgradeReward(locale: Locale, bolts: number, cores: number): string {
+  const parts = [`+${formatNumber(locale, bolts)} ${t(locale, "hud.bolts")}`];
+  if (cores > 0) parts.push(`+${formatNumber(locale, cores)} ${t(locale, "results.cores")}`);
+  return parts.join(" | ");
 }

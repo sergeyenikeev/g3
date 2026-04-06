@@ -1,6 +1,8 @@
 export const GAME_EVENTS = {
   SCRAP_COLLECTED: "scrap_collected",
   FLIP_USED: "flip_used",
+  DASH_ARC: "dash_arc",
+  DASH_SIPHON: "dash_siphon",
   PROJECTILE_DEFLECTED: "projectile_deflected",
   BANK_COMPLETE: "bank_complete",
   PLAYER_HIT: "player_hit",

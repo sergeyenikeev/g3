@@ -11,8 +11,10 @@ import { bindPageLifecycle } from "../../platform/pageLifecycle";
 import type { PlatformAdapter } from "../../platform/platformAdapter";
 import { addPlatformLifecycleListener, signalPlatformGameplayStop } from "../../platform/platformRuntime";
 import type { StaticGameData } from "../../data/staticGameData";
+import { getCurrentEndlessLevelFinale, getWaveInEndlessLevel } from "../run/endlessLevels";
 import { VISUAL_PALETTE, createLightGradient, createVfxTextures, createVignette } from "../../visual/TextureFactory";
 import { languageStroke, nextVolumeStep, qualityStroke, snapVolumeStep } from "./uiSettingsHelpers";
+import { getDashHudBadgeSpecs } from "../upgrades/upgradeBadges";
 import {
   type LanguageSetting,
   type Locale,
@@ -21,6 +23,9 @@ import {
   formatVolume,
   getDailyVariantCopy,
   getLanguageSettingLabel,
+  getLevelFinaleCopy,
+  getLevelModifierCopy,
+  getLevelObjectiveCopy,
   normalizeLanguageSetting,
   resolveLocale,
   t,
@@ -48,6 +53,17 @@ export class UIScene extends Phaser.Scene {
   private dailyText!: Phaser.GameObjects.Text;
   private waveText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
+  private levelProgressFrame!: Phaser.GameObjects.Rectangle;
+  private levelProgressFill!: Phaser.GameObjects.Rectangle;
+  private levelProgressMarkers: Phaser.GameObjects.Rectangle[] = [];
+  private levelBanner!: Phaser.GameObjects.Container;
+  private levelBannerTitle!: Phaser.GameObjects.Text;
+  private levelBannerDesc!: Phaser.GameObjects.Text;
+  private levelBannerTimer = 0;
+  private levelBannerBaseY = 96;
+  private lastLevelBannerKey = "";
+  private activeBannerLevel = 0;
+  private activeBannerModifierId = "";
 
   private joyBase!: Phaser.GameObjects.Arc;
   private joyKnob!: Phaser.GameObjects.Arc;
@@ -58,6 +74,8 @@ export class UIScene extends Phaser.Scene {
   private btnDash!: Phaser.GameObjects.Arc;
   private flipLabel!: Phaser.GameObjects.Text;
   private dashLabel!: Phaser.GameObjects.Text;
+  private dashBadgePrimary!: Phaser.GameObjects.Text;
+  private dashBadgeSecondary!: Phaser.GameObjects.Text;
   private flipGlow!: Phaser.GameObjects.Image;
   private dashGlow!: Phaser.GameObjects.Image;
   private pauseButton!: Phaser.GameObjects.Rectangle;
@@ -102,14 +120,29 @@ export class UIScene extends Phaser.Scene {
   private music: Phaser.Sound.BaseSound | null = null;
   private sfxVolume = 0.8;
   private musicVolume = 0.6;
+  private lastDashArcSfxAt = -1e9;
+  private lastDashSiphonSfxAt = -1e9;
   private suspendReasons = new Set<string>();
   private externalPauseOwnsGamePause = false;
 
-  private readonly onSfxPickup = () => this.playSfx("sfx_pickup");
+  private readonly onSfxPickup = (p?: any) => {
+    if (p?.source === "dash_siphon") return;
+    this.playSfx("sfx_pickup");
+  };
   private readonly onSfxFlip = () => this.playSfx("sfx_flip");
   private readonly onSfxBank = () => this.playSfx("sfx_bank");
   private readonly onSfxHit = () => this.playSfx("sfx_hit");
   private readonly onSfxUpgrade = () => this.playSfx("sfx_upgrade");
+  private readonly onSfxDashArc = () => {
+    if (this.time.now - this.lastDashArcSfxAt < 70) return;
+    this.lastDashArcSfxAt = this.time.now;
+    this.playSfx("sfx_dash_arc");
+  };
+  private readonly onSfxDashSiphon = () => {
+    if (this.time.now - this.lastDashSiphonSfxAt < 45) return;
+    this.lastDashSiphonSfxAt = this.time.now;
+    this.playSfx("sfx_dash_siphon");
+  };
 
   private readonly onAnalyticsFlip = () => this.track(ANALYTICS_EVENTS.FLIP_USED, {});
   private readonly onAnalyticsBank = (p: any) => this.track(ANALYTICS_EVENTS.RECYCLER_BANK_COMPLETE, { bolts: p?.bolts });
@@ -159,6 +192,8 @@ export class UIScene extends Phaser.Scene {
       .text(16, 56, "", { fontSize: "13px", color: "#7fdfff", fontStyle: "700", wordWrap: { width: 520 } })
       .setDepth(1000)
       .setScrollFactor(0);
+    this.createLevelProgressUi();
+    this.createLevelBannerUi();
 
     this.createControls();
     this.createTutorial();
@@ -187,6 +222,8 @@ export class UIScene extends Phaser.Scene {
 
       this.game.events.off(GAME_EVENTS.SCRAP_COLLECTED, this.onSfxPickup, this);
       this.game.events.off(GAME_EVENTS.FLIP_USED, this.onSfxFlip, this);
+      this.game.events.off(GAME_EVENTS.DASH_ARC, this.onSfxDashArc, this);
+      this.game.events.off(GAME_EVENTS.DASH_SIPHON, this.onSfxDashSiphon, this);
       this.game.events.off(GAME_EVENTS.BANK_COMPLETE, this.onSfxBank, this);
       this.game.events.off(GAME_EVENTS.PLAYER_HIT, this.onSfxHit, this);
       this.game.events.off(GAME_EVENTS.UPGRADE_PICKED, this.onSfxUpgrade, this);
@@ -215,6 +252,8 @@ export class UIScene extends Phaser.Scene {
     const hpMax = this.runState.config.player.hpMax;
     const hp = Math.max(0, this.runState.hp);
     const wave = this.runState.waveIndex;
+    const level = this.runState.endless.current.index;
+    const waveInLevel = getWaveInEndlessLevel(wave, this.runState.endless.wavesPerLevel);
     const bolts = this.runState.bolts;
     const daily =
       this.runState.mode === "daily"
@@ -223,7 +262,9 @@ export class UIScene extends Phaser.Scene {
           ? `| ${t(this.locale, "hud.training")}`
           : "";
 
-    this.hudText.setText(`${t(this.locale, "hud.hp")} ${formatNumber(this.locale, hp)}/${formatNumber(this.locale, hpMax)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, wave)}`);
+    this.hudText.setText(
+      `${t(this.locale, "hud.hp")} ${formatNumber(this.locale, hp)}/${formatNumber(this.locale, hpMax)} | ${t(this.locale, "hud.level")} ${formatNumber(this.locale, level)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, wave)} (${formatNumber(this.locale, waveInLevel)}/${formatNumber(this.locale, this.runState.endless.wavesPerLevel)})`
+    );
     this.boltsText.setText(`${t(this.locale, "hud.bolts")} ${formatNumber(this.locale, bolts)}`);
     this.dailyText.setText(daily);
     this.dailyText.setVisible(Boolean(daily));
@@ -234,11 +275,15 @@ export class UIScene extends Phaser.Scene {
     this.statusText.setText(statusLabel);
     this.statusText.setVisible(Boolean(statusLabel));
     this.layoutHud();
+    this.updateLevelProgressUi(waveInLevel, this.runState.endless.wavesPerLevel);
+    this.maybeShowLevelBanner();
+    this.updateLevelBanner(dt);
 
     const dashEnabled = Boolean(this.runState.config.dash.enabledByDefault) || Boolean((this.runState.perks as any).dash_module);
     this.btnDash.setVisible(dashEnabled);
     this.dashLabel.setVisible(dashEnabled);
     this.dashGlow.setVisible(dashEnabled);
+    this.refreshDashHudBadges(dashEnabled);
 
     let flipCd = (this.registry.get("flipCooldown") as number | undefined) ?? 0;
     let dashCd = (this.registry.get("dashCooldown") as number | undefined) ?? 0;
@@ -340,6 +385,20 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(1001)
       .setScrollFactor(0);
+    this.dashBadgePrimary = this.add
+      .text(0, 0, "", { fontSize: "10px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5)
+      .setDepth(1002)
+      .setScrollFactor(0)
+      .setPadding(6, 2, 6, 2)
+      .setVisible(false);
+    this.dashBadgeSecondary = this.add
+      .text(0, 0, "", { fontSize: "10px", color: "#d9f2ff", fontStyle: "700" })
+      .setOrigin(0.5)
+      .setDepth(1002)
+      .setScrollFactor(0)
+      .setPadding(6, 2, 6, 2)
+      .setVisible(false);
 
     this.pauseButton = this.add
       .rectangle(0, 0, 116, 34, 0x121a24, 0.92)
@@ -359,6 +418,135 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(1001)
       .setScrollFactor(0);
+  }
+
+  private createLevelProgressUi(): void {
+    this.levelProgressFrame = this.add
+      .rectangle(16, 76, 240, 14, 0x081019, 0.76)
+      .setOrigin(0, 0)
+      .setStrokeStyle(2, 0x2a556d, 0.9)
+      .setDepth(1000)
+      .setScrollFactor(0);
+    this.levelProgressFill = this.add
+      .rectangle(20, 83, 0, 6, VISUAL_PALETTE.neonCyan, 0.95)
+      .setOrigin(0, 0.5)
+      .setDepth(1001)
+      .setScrollFactor(0);
+
+    this.levelProgressMarkers = [];
+    const wavesPerLevel = Math.max(1, this.runState?.endless.wavesPerLevel ?? 4);
+    for (let i = 1; i < wavesPerLevel; i++) {
+      const marker = this.add
+        .rectangle(0, 0, 2, 10, 0xd9f2ff, 0.24)
+        .setDepth(1002)
+        .setScrollFactor(0);
+      this.levelProgressMarkers.push(marker);
+    }
+  }
+
+  private createLevelBannerUi(): void {
+    const bg = this.add.rectangle(0, 0, 560, 118, 0x0f1720, 0.94).setStrokeStyle(2, VISUAL_PALETTE.warningAmber, 0.82);
+    const accent = this.add.rectangle(0, -36, 500, 2, VISUAL_PALETTE.neonCyan, 0.85);
+    this.levelBannerTitle = this.add
+      .text(0, -22, "", { fontSize: "20px", color: "#d9f2ff", fontStyle: "700", align: "center" })
+      .setOrigin(0.5);
+    this.levelBannerDesc = this.add
+      .text(0, 16, "", {
+        fontSize: "13px",
+        color: "#98b7c7",
+        align: "center",
+        wordWrap: { width: 500 },
+      })
+      .setOrigin(0.5);
+
+    this.levelBanner = this.add.container(0, 0, [bg, accent, this.levelBannerTitle, this.levelBannerDesc]).setDepth(1250).setScrollFactor(0);
+    this.levelBanner.setVisible(false).setAlpha(0);
+  }
+
+  private updateLevelProgressUi(waveInLevel: number, wavesPerLevel: number): void {
+    const visible = !this.isTrainingMode();
+    this.levelProgressFrame.setVisible(visible);
+    this.levelProgressFill.setVisible(visible);
+    for (const marker of this.levelProgressMarkers) marker.setVisible(visible);
+    if (!visible) return;
+
+    const safeTotal = Math.max(1, wavesPerLevel);
+    const safeWave = clamp(waveInLevel, 1, safeTotal);
+    const progress = safeWave / safeTotal;
+    const fillWidth = Math.max(0, (this.levelProgressFrame.width - 8) * progress);
+    const isFinal = safeWave >= safeTotal;
+    const fillColor = isFinal ? VISUAL_PALETTE.warningAmber : VISUAL_PALETTE.neonCyan;
+
+    this.levelProgressFill.setSize(fillWidth, 6);
+    this.levelProgressFill.setFillStyle(fillColor, isFinal ? 0.98 : 0.92);
+    this.levelProgressFrame.setStrokeStyle(2, isFinal ? VISUAL_PALETTE.warningAmber : 0x2a556d, isFinal ? 0.95 : 0.9);
+
+    for (let i = 0; i < this.levelProgressMarkers.length; i++) {
+      const marker = this.levelProgressMarkers[i]!;
+      marker.setFillStyle(0xd9f2ff, i < safeWave - 1 ? 0.72 : 0.22);
+    }
+  }
+
+  private maybeShowLevelBanner(): void {
+    if (!this.runState || this.isTrainingMode()) {
+      this.levelBanner.setVisible(false).setAlpha(0);
+      this.levelBannerTimer = 0;
+      return;
+    }
+
+    const signature = `${this.runState.mode}:${this.runState.endless.current.index}:${this.runState.endless.current.modifierId}`;
+    if (signature === this.lastLevelBannerKey) return;
+    this.lastLevelBannerKey = signature;
+    this.showLevelBanner(this.runState.endless.current.index, this.runState.endless.current.modifierId);
+  }
+
+  private showLevelBanner(level: number, modifierId: string): void {
+    this.activeBannerLevel = level;
+    this.activeBannerModifierId = modifierId;
+    this.refreshLevelBannerCopy();
+    this.levelBannerTimer = 3.2;
+    this.levelBanner.setVisible(true).setAlpha(0);
+  }
+
+  private updateLevelBanner(dt: number): void {
+    if (this.levelBannerTimer <= 0) {
+      this.levelBanner.setVisible(false).setAlpha(0);
+      return;
+    }
+
+    this.levelBannerTimer = Math.max(0, this.levelBannerTimer - Math.max(0, dt));
+    const elapsed = 3.2 - this.levelBannerTimer;
+    const fadeIn = clamp(elapsed / 0.22, 0, 1);
+    const fadeOut = clamp(this.levelBannerTimer / 0.4, 0, 1);
+    const alpha = Math.min(fadeIn, fadeOut);
+    this.levelBanner.setVisible(true).setAlpha(alpha);
+    this.levelBanner.setY(this.levelBannerBaseY - (1 - alpha) * 10);
+  }
+
+  private refreshLevelBannerCopy(): void {
+    if (this.activeBannerLevel <= 0 || !this.activeBannerModifierId || !this.runState) return;
+    const copy = getLevelModifierCopy(this.locale, this.activeBannerModifierId);
+    const objective = this.runState.endless.current.objective;
+    const objectiveCopy = getLevelObjectiveCopy(this.locale, objective.id);
+    const finale = getCurrentEndlessLevelFinale(this.runState.endless);
+    const finaleCopy = finale ? getLevelFinaleCopy(this.locale, finale.id) : null;
+    const finaleLine = finaleCopy
+      ? `${t(this.locale, finale?.kind === "sectorEvent" ? "wave.event" : "wave.finale")}: ${finaleCopy.title}`
+      : "";
+    this.levelBannerTitle.setText(`${t(this.locale, "hud.level")} ${formatNumber(this.locale, this.activeBannerLevel)} | ${copy.title}`);
+    this.levelBannerDesc.setText(
+      [
+        copy.desc,
+        t(this.locale, "objective.progress", {
+          title: objectiveCopy.title,
+          progress: formatNumber(this.locale, Math.floor(objective.progress)),
+          target: formatNumber(this.locale, objective.target),
+        }),
+        finaleLine,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
   }
 
   private layout(): void {
@@ -384,11 +572,14 @@ export class UIScene extends Phaser.Scene {
     this.btnDash.setPosition(dashX, dashY);
     this.dashLabel.setPosition(dashX, dashY);
     this.dashGlow.setPosition(dashX, dashY);
+    this.layoutDashHudBadges();
 
     this.pauseButton.setPosition(width - margin - 58, margin + 18);
     this.pauseLabel.setPosition(this.pauseButton.x, this.pauseButton.y);
 
     this.tutorialBox.setPosition(width / 2, margin + 62);
+    this.levelBannerBaseY = this.tutorialBox.visible ? margin + 138 : margin + 84;
+    this.levelBanner.setPosition(width / 2, this.levelBannerBaseY);
     this.reviveBox.setPosition(width / 2, height / 2);
     this.reviveDim.setSize(width, height);
     this.settingsBox.setPosition(width / 2, height / 2);
@@ -410,6 +601,17 @@ export class UIScene extends Phaser.Scene {
     this.waveText.setPosition(x, y + 22);
     this.statusText.setPosition(x, y + 42);
     this.statusText.setWordWrapWidth(Math.max(260, this.scale.width - 32), true);
+
+    const progressY = this.statusText.visible ? this.statusText.y + Math.max(18, this.statusText.height) + 14 : this.waveText.y + 30;
+    this.levelProgressFrame.setPosition(x, progressY);
+    this.levelProgressFill.setPosition(x + 4, progressY + this.levelProgressFrame.height / 2);
+    const usableWidth = Math.max(32, this.levelProgressFrame.width - 8);
+    const segments = Math.max(1, this.levelProgressMarkers.length + 1);
+    for (let i = 0; i < this.levelProgressMarkers.length; i++) {
+      const marker = this.levelProgressMarkers[i]!;
+      const ratio = (i + 1) / segments;
+      marker.setPosition(x + 4 + usableWidth * ratio, progressY + this.levelProgressFrame.height / 2);
+    }
 
     const bounds = this.boltsText.getBounds();
     const bx = bounds.centerX;
@@ -508,6 +710,8 @@ export class UIScene extends Phaser.Scene {
   private bindAudioEvents(): void {
     this.game.events.on(GAME_EVENTS.SCRAP_COLLECTED, this.onSfxPickup, this);
     this.game.events.on(GAME_EVENTS.FLIP_USED, this.onSfxFlip, this);
+    this.game.events.on(GAME_EVENTS.DASH_ARC, this.onSfxDashArc, this);
+    this.game.events.on(GAME_EVENTS.DASH_SIPHON, this.onSfxDashSiphon, this);
     this.game.events.on(GAME_EVENTS.BANK_COMPLETE, this.onSfxBank, this);
     this.game.events.on(GAME_EVENTS.PLAYER_HIT, this.onSfxHit, this);
     this.game.events.on(GAME_EVENTS.UPGRADE_PICKED, this.onSfxUpgrade, this);
@@ -906,11 +1110,13 @@ export class UIScene extends Phaser.Scene {
 
     this.flipLabel.setText(t(this.locale, "hud.flip"));
     this.dashLabel.setText(t(this.locale, "hud.dash"));
+    this.refreshDashHudBadges(this.btnDash.visible);
     this.tutorialActionLabel.setText(this.isTrainingMode() ? t(this.locale, "tutorial.exit") : t(this.locale, "tutorial.skip"));
     this.reviveTitle.setText(t(this.locale, "revive.title"));
     this.reviveHint.setText(t(this.locale, "revive.hint"));
     this.reviveAcceptLabel.setText(t(this.locale, "revive.accept"));
     this.reviveDeclineLabel.setText(t(this.locale, "revive.decline"));
+    this.refreshLevelBannerCopy();
     this.refreshTutorialText();
   }
 
@@ -1006,6 +1212,38 @@ export class UIScene extends Phaser.Scene {
     return resolveLocale(setting, platformLanguageHint ? [platformLanguageHint] : null);
   }
 
+  private refreshDashHudBadges(dashEnabled: boolean): void {
+    const targets = [this.dashBadgePrimary, this.dashBadgeSecondary];
+    const badges = dashEnabled ? getDashHudBadgeSpecs(this.locale, this.runState?.perks as any) : [];
+    targets.forEach((target, idx) => {
+      const badge = badges[idx];
+      if (!badge) {
+        target.setText("");
+        target.setVisible(false);
+        return;
+      }
+      target.setText(badge.label);
+      target.setColor(badge.textColor);
+      target.setBackgroundColor(toCssHex(badge.fill));
+      target.setVisible(true);
+    });
+    this.layoutDashHudBadges();
+  }
+
+  private layoutDashHudBadges(): void {
+    const badges = [this.dashBadgePrimary, this.dashBadgeSecondary].filter((badge) => badge.visible);
+    if (badges.length === 0) return;
+
+    const gap = 6;
+    const totalWidth = badges.reduce((sum, badge) => sum + badge.width, 0) + gap * (badges.length - 1);
+    let cursor = this.btnDash.x - totalWidth / 2;
+    const y = this.btnDash.y - 44;
+    for (const badge of badges) {
+      badge.setPosition(cursor + badge.width / 2, y);
+      cursor += badge.width + gap;
+    }
+  }
+
   private releaseControls(): void {
     this.joyPointerId = null;
     inputState.moveX = 0;
@@ -1016,6 +1254,10 @@ export class UIScene extends Phaser.Scene {
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
+}
+
+function toCssHex(color: number): string {
+  return `#${Math.max(0, Math.min(0xffffff, color >>> 0)).toString(16).padStart(6, "0")}`;
 }
 
 function formatCooldown(locale: Locale, seconds: number): string {

@@ -77,6 +77,27 @@ await writeToneMp3(join(OUT_DIR, "upgrade_select.mp3"), {
   env: { attackSec: 0.003, decaySec: 0.03, sustain: 0.25, releaseSec: 0.08 },
 });
 
+await writeToneMp3(join(OUT_DIR, "dash_arc.mp3"), {
+  durationSec: 0.16,
+  ffmpegQ: 6,
+  osc: [
+    { type: "sweep", freqHz: [1180, 460], gain: 0.72 },
+    { type: "noise", freqHz: 0, gain: 0.12 },
+    { type: "sine", freqHz: 840, gain: 0.18 },
+  ],
+  env: { attackSec: 0.001, decaySec: 0.03, sustain: 0.18, releaseSec: 0.06 },
+});
+
+await writeToneMp3(join(OUT_DIR, "dash_siphon.mp3"), {
+  durationSec: 0.14,
+  ffmpegQ: 6,
+  osc: [
+    { type: "sweep", freqHz: [420, 980], gain: 0.66 },
+    { type: "sine", freqHz: 1320, gain: 0.16 },
+  ],
+  env: { attackSec: 0.002, decaySec: 0.02, sustain: 0.22, releaseSec: 0.05 },
+});
+
 await writeMusicLoopMp3(join(OUT_DIR, "music_battle_loop.mp3"), "battle");
 await writeMusicLoopMp3(join(OUT_DIR, "music_menu_loop.mp3"), "menu");
 await writeMusicLoopMp3(join(OUT_DIR, "music_loop.mp3"), "battle");

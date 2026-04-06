@@ -78,4 +78,39 @@ describe("makeUpgradeOffer", () => {
 
     expect(synergyHits).toBeGreaterThan(plainHits);
   });
+
+  it("leans toward upgrades that share build tags even without explicit synergy", () => {
+    const cfg: Pick<Balances, "upgradeRarityRoll"> = {
+      upgradeRarityRoll: {
+        pityNoRareOrEpicPicks: 6,
+        pityBoost: { rare: 0, epic: 0, takeFrom: "common" },
+        tables: [{ fromWave: 1, toWave: 999, common: 1, uncommon: 0, rare: 0, epic: 0 }],
+      },
+    };
+
+    const upgrades: RunUpgradeDef[] = [
+      { id: "dash_base", name: "Dash Base", rarity: "common", weight: 10, maxStacks: 1, tags: ["dash", "mobility"], effects: [] },
+      { id: "dash_pick", name: "Dash Pick", rarity: "common", weight: 10, maxStacks: 1, tags: ["dash"], effects: [] },
+      { id: "econ_pick", name: "Econ Pick", rarity: "common", weight: 10, maxStacks: 1, tags: ["economy"], effects: [] },
+    ];
+
+    let dashHits = 0;
+    let econHits = 0;
+
+    for (let i = 0; i < 200; i++) {
+      const rng = createRng(`shared-tag-${i}`);
+      const offer = makeUpgradeOffer(
+        cfg,
+        upgrades,
+        { waveIndex: 1, rarityState: { noRareOrEpicPicks: 0 }, pickedCounts: { dash_base: 1 }, offerSize: 1 },
+        rng
+      );
+
+      const picked = offer[0]?.upgrade.id;
+      if (picked === "dash_pick") dashHits += 1;
+      if (picked === "econ_pick") econHits += 1;
+    }
+
+    expect(dashHits).toBeGreaterThan(econHits);
+  });
 });

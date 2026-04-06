@@ -28,6 +28,10 @@ export class AutoPlatformAdapter implements PlatformAdapter {
   async load(): Promise<unknown | null> {
     return this.impl.load();
   }
+
+  async submitScore(score: number): Promise<void> {
+    await this.impl.submitScore?.(score);
+  }
 }
 
 function detect(): PlatformAdapter {

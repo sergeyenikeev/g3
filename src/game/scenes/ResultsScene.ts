@@ -1,11 +1,25 @@
 import Phaser from "phaser";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import type { AdsManager } from "../../platform/ads/adsManager";
-import type { SaveData, SaveManager } from "../../platform/save/saveManager";
+import type { LeaderboardDivisionId, SaveData, SaveManager } from "../../platform/save/saveManager";
 import type { RunState } from "../run/runState";
 import { normalizeDailySave } from "../daily/dailyAttempts";
 import { grantMetaWallet } from "../meta/metaProgression";
-import { type Locale, formatNumber, resolveLocale, t } from "../../i18n/localization";
+import {
+  buildLeaderboardEntry,
+  computeRunScore,
+  createLeaderboardEntryId,
+  filterLeaderboardEntries,
+  getLeaderboardBestScore,
+  getLeaderboardDivision,
+  getLeaderboardHigherDivision,
+  getLeaderboardNextDivision,
+  getLeaderboardPromotionRewards,
+  getLeaderboardRank,
+  type LeaderboardFilter,
+  upsertLeaderboardEntries,
+} from "../run/leaderboard";
+import { type Locale, formatNumber, formatResource, resolveLocale, t } from "../../i18n/localization";
 import type { PlatformAdapter } from "../../platform/platformAdapter";
 import { signalPlatformGameplayStop } from "../../platform/platformRuntime";
 
@@ -13,14 +27,21 @@ export class ResultsScene extends Phaser.Scene {
   private ads!: AdsManager;
   private saveManager!: SaveManager;
   private state!: RunState;
+  private platformAdapter: PlatformAdapter | null = null;
   private statsText!: Phaser.GameObjects.Text;
   private exitBusy = false;
   private x2Used = false;
   private x2Btn: Phaser.GameObjects.Rectangle | null = null;
   private x2Label: Phaser.GameObjects.Text | null = null;
-  private runRecorded = false;
+  private recordRunPromise: Promise<void> | null = null;
   private grantedRewards = { bolts: 0, cores: 0 };
   private locale: Locale = "en";
+  private latestLeaderboardRank: number | null = null;
+  private latestLeaderboardFilter: LeaderboardFilter = "run";
+  private latestLeaderboardIsRecord = false;
+  private latestLeaderboardPreviousBest: number | null = null;
+  private latestPromotionDivision: LeaderboardDivisionId | null = null;
+  private latestPromotionReward = { bolts: 0, cores: 0 };
 
   constructor() {
     super("results");
@@ -30,15 +51,22 @@ export class ResultsScene extends Phaser.Scene {
     this.ads = this.registry.get("adsManager") as AdsManager;
     this.saveManager = this.registry.get("saveManager") as SaveManager;
     this.state = this.registry.get("runState") as RunState;
-    void signalPlatformGameplayStop((this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null);
+    this.platformAdapter = (this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null;
+    void signalPlatformGameplayStop(this.platformAdapter);
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
     this.exitBusy = false;
     this.x2Used = false;
-    this.runRecorded = false;
+    this.recordRunPromise = null;
     this.grantedRewards = { bolts: 0, cores: 0 };
     this.x2Btn = null;
     this.x2Label = null;
+    this.latestLeaderboardRank = null;
+    this.latestLeaderboardFilter = this.state.mode === "daily" ? "daily" : "run";
+    this.latestLeaderboardIsRecord = false;
+    this.latestLeaderboardPreviousBest = null;
+    this.latestPromotionDivision = null;
+    this.latestPromotionReward = { bolts: 0, cores: 0 };
     this.input.enabled = true;
 
     const { width, height } = this.scale;
@@ -51,9 +79,10 @@ export class ResultsScene extends Phaser.Scene {
 
     this.statsText = this.add
       .text(width / 2, height * 0.36, "", {
-        fontSize: "20px",
+        fontSize: "18px",
         color: "#98b7c7",
         align: "center",
+        wordWrap: { width: Math.min(540, width * 0.84) },
       })
       .setOrigin(0.5)
       .setDepth(2001);
@@ -107,14 +136,57 @@ export class ResultsScene extends Phaser.Scene {
   }
 
   private refreshStatsText(): void {
-    const rewardPreview = this.computeCurrentRunRewards(this.saveManager?.get?.() ?? null);
-    this.statsText.setText(t(this.locale, "results.stats", {
-      wave: formatNumber(this.locale, this.state.waveIndex),
-      bolts: formatNumber(this.locale, this.state.bolts),
-      cores: formatNumber(this.locale, this.state.cores),
-      rewardBolts: formatNumber(this.locale, rewardPreview.bolts),
-      rewardCores: formatNumber(this.locale, rewardPreview.cores),
-    }));
+    const save = this.saveManager?.get?.() ?? null;
+    const rewardPreview = this.computeCurrentRunRewards(save);
+    const currentEntry = buildLeaderboardEntry(this.state, this.getLeaderboardEntryId(), save?.settings?.pilotName);
+    const score = computeRunScore(this.state);
+    const division = getLeaderboardDivision(score);
+    const nextDivision = getLeaderboardNextDivision(score);
+    const leaderboardEntries = filterLeaderboardEntries(save?.leaderboard?.entries ?? [], this.latestLeaderboardFilter);
+    const rank = this.latestLeaderboardRank ?? getLeaderboardRank(leaderboardEntries, this.getLeaderboardEntryId());
+    const topLines = leaderboardEntries.slice(0, 3).map((entry, index) =>
+      `${index + 1}. ${entry.pilot} [${entry.mode === "daily" ? t(this.locale, "leaderboard.mode.daily") : t(this.locale, "leaderboard.mode.run")} | ${t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`)}] | ${formatNumber(this.locale, entry.score)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`
+    );
+    const bestDelta =
+      this.latestLeaderboardPreviousBest === null ? null : score - this.latestLeaderboardPreviousBest;
+    this.statsText.setText(
+      [
+        `${t(this.locale, "results.pilot")}: ${currentEntry.pilot}`,
+        `${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
+        `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)}`,
+        `${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)}`,
+        `${t(this.locale, "hud.bolts")}: ${formatNumber(this.locale, this.state.bolts)}`,
+        `${t(this.locale, "results.cores")}: ${formatNumber(this.locale, this.state.cores)}`,
+        t(this.locale, "results.workshop", {
+          bolts: formatNumber(this.locale, rewardPreview.bolts),
+          cores: formatNumber(this.locale, rewardPreview.cores),
+        }),
+        `${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)}`,
+        this.latestPromotionDivision
+          ? t(this.locale, "results.promotion", {
+              division: t(this.locale, `leaderboard.division.${this.latestPromotionDivision}`),
+              reward: formatLeaderboardReward(this.locale, this.latestPromotionReward),
+            })
+          : "",
+        bestDelta === null
+          ? t(this.locale, "results.bestDeltaNone")
+          : t(this.locale, "results.bestDelta", {
+              value: `${bestDelta >= 0 ? "+" : ""}${formatNumber(this.locale, bestDelta)}`,
+            }),
+        nextDivision
+          ? t(this.locale, "results.nextDivision", {
+              division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
+              score: formatNumber(this.locale, nextDivision.minScore),
+            })
+          : t(this.locale, "results.topDivision"),
+        rank ? t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) }) : "",
+        this.latestLeaderboardIsRecord ? t(this.locale, "results.newRecord") : "",
+        `${t(this.locale, "results.leaderboardTitle")} (${t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`)})`,
+        ...(topLines.length > 0 ? topLines : [t(this.locale, "menu.leaderboardEmpty")]),
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
   }
 
   private async handleX2(): Promise<void> {
@@ -142,16 +214,38 @@ export class ResultsScene extends Phaser.Scene {
   }
 
   private async recordRunOnceAndPersistScores(): Promise<void> {
-    if (this.runRecorded) return;
-    this.runRecorded = true;
+    if (this.recordRunPromise) return this.recordRunPromise;
+    this.recordRunPromise = this.persistRunResults(true);
+    return this.recordRunPromise;
+  }
 
+  private async persistRunResults(incrementRunsCompleted: boolean): Promise<void> {
     const s0 = this.saveManager.get();
     const s1 = this.state.mode === "daily" && this.state.daily?.dateUtc ? normalizeDailySave(s0, this.state.daily.dateUtc) : s0;
-    const s = this.syncRunRewards(s1);
+    const saveWithRewards = this.syncRunRewards(s1);
+    const entry = buildLeaderboardEntry(this.state, this.getLeaderboardEntryId(), saveWithRewards.settings.pilotName);
+    const previousFiltered = filterLeaderboardEntries(saveWithRewards.leaderboard.entries, this.latestLeaderboardFilter);
+    const previousBestScore = getLeaderboardBestScore(previousFiltered, entry.id);
+    const promotion = getLeaderboardPromotionRewards(
+      saveWithRewards.leaderboard.highestDivision,
+      entry.score,
+      saveWithRewards.leaderboard.claimedRewardDivisions
+    );
+    const promotedDivision = promotion.divisions[promotion.divisions.length - 1] ?? null;
+    const promotionReward = promotion.reward;
+    const withPromotionRewards =
+      promotionReward.bolts > 0 || promotionReward.cores > 0 ? grantMetaWallet(saveWithRewards, promotionReward) : saveWithRewards;
+    const s = this.upsertRunLeaderboard(withPromotionRewards, entry, promotion.divisions);
+    const filteredEntries = filterLeaderboardEntries(s.leaderboard.entries, this.latestLeaderboardFilter);
+    this.latestLeaderboardRank = getLeaderboardRank(filteredEntries, entry.id);
+    this.latestLeaderboardPreviousBest = previousBestScore;
+    this.latestLeaderboardIsRecord = Boolean(this.latestLeaderboardRank === 1 && entry.score > (previousBestScore ?? -1));
+    this.latestPromotionDivision = promotedDivision;
+    this.latestPromotionReward = promotionReward;
 
     const bestWave = Math.max(s.stats.bestWave, this.state.waveIndex);
     const bestBolts = Math.max(s.stats.bestBolts, this.state.bolts);
-    const runsCompleted = Math.max(0, Math.floor(s.stats.runsCompleted)) + 1;
+    const runsCompleted = incrementRunsCompleted ? Math.max(0, Math.floor(s.stats.runsCompleted)) + 1 : s.stats.runsCompleted;
 
     let daily = s.daily;
     if (this.state.mode === "daily" && this.state.daily?.dateUtc && daily.lastDateUtc === this.state.daily.dateUtc) {
@@ -164,27 +258,20 @@ export class ResultsScene extends Phaser.Scene {
 
     await this.saveManager.save({ ...s, stats: { ...s.stats, bestWave, bestBolts, runsCompleted }, daily });
     this.registry.set("saveData", this.saveManager.get());
+    this.registry.set("lastLeaderboardEntryId", entry.id);
+    this.registry.set("lastLeaderboardFilter", this.latestLeaderboardFilter);
+    this.registry.set("lastLeaderboardRank", this.latestLeaderboardRank);
+    this.registry.set("lastLeaderboardIsRecord", this.latestLeaderboardIsRecord);
+    this.registry.set("lastLeaderboardPromotionDivision", this.latestPromotionDivision);
+    this.registry.set("lastLeaderboardPromotionBolts", promotionReward.bolts);
+    this.registry.set("lastLeaderboardPromotionCores", promotionReward.cores);
+    this.refreshStatsText();
+    const submit = this.platformAdapter?.submitScore?.(computeRunScore(this.state));
+    if (submit) void submit.catch(() => {});
   }
 
   private async persistScoresOnly(): Promise<void> {
-    const s0 = this.saveManager.get();
-    const s1 = this.state.mode === "daily" && this.state.daily?.dateUtc ? normalizeDailySave(s0, this.state.daily.dateUtc) : s0;
-    const s = this.syncRunRewards(s1);
-
-    const bestWave = Math.max(s.stats.bestWave, this.state.waveIndex);
-    const bestBolts = Math.max(s.stats.bestBolts, this.state.bolts);
-
-    let daily = s.daily;
-    if (this.state.mode === "daily" && this.state.daily?.dateUtc && daily.lastDateUtc === this.state.daily.dateUtc) {
-      daily = {
-        ...daily,
-        bestWave: Math.max(daily.bestWave, this.state.waveIndex),
-        bestBolts: Math.max(daily.bestBolts, this.state.bolts),
-      };
-    }
-
-    await this.saveManager.save({ ...s, stats: { ...s.stats, bestWave, bestBolts }, daily });
-    this.registry.set("saveData", this.saveManager.get());
+    await this.persistRunResults(false);
   }
 
   private syncRunRewards(save: SaveData): SaveData {
@@ -211,6 +298,31 @@ export class ResultsScene extends Phaser.Scene {
     if (save.daily.lastDateUtc !== this.state.daily.dateUtc) return 1;
     if (save.daily.attemptsUsed !== 1) return 1;
     return positiveNum(this.state.config.daily.dailyRewards.firstRunBonusBoltsMult, 1);
+  }
+
+  private upsertRunLeaderboard(
+    save: SaveData,
+    entry: ReturnType<typeof buildLeaderboardEntry>,
+    promotedDivisions: readonly LeaderboardDivisionId[] = []
+  ): SaveData {
+    const claimed = new Set<LeaderboardDivisionId>(save.leaderboard.claimedRewardDivisions);
+    for (const division of promotedDivisions) claimed.add(division);
+    const previousBestScore = save.leaderboard.entries.reduce((best, candidate) => Math.max(best, candidate.score), 0);
+    const highestDivision = getLeaderboardHigherDivision(save.leaderboard.highestDivision, getLeaderboardDivision(Math.max(previousBestScore, entry.score)).id);
+
+    return {
+      ...save,
+      leaderboard: {
+        ...save.leaderboard,
+        entries: upsertLeaderboardEntries(save.leaderboard.entries, entry),
+        highestDivision,
+        claimedRewardDivisions: ["raider", "ace", "elite", "legend"].filter((division) => claimed.has(division as LeaderboardDivisionId)) as LeaderboardDivisionId[],
+      },
+    };
+  }
+
+  private getLeaderboardEntryId(): string {
+    return createLeaderboardEntryId(this.state);
   }
 
   private async exitTo(target: "restart" | "menu"): Promise<void> {
@@ -241,4 +353,11 @@ function positiveNum(v: unknown, fallback: number): number {
 
 function formatMult(v: number): string {
   return Number.isInteger(v) ? `${v}` : v.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores: number }): string {
+  const parts = [];
+  if (reward.bolts > 0) parts.push(formatResource(locale, "bolts", reward.bolts));
+  if (reward.cores > 0) parts.push(formatResource(locale, "cores", reward.cores));
+  return parts.join(" | ");
 }

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   formatResource,
   getDailyVariantCopy,
+  getLevelFinaleCopy,
+  getLevelModifierCopy,
+  getLevelObjectiveCopy,
   getMetaNodeName,
   getRarityLabel,
   normalizeLanguageSetting,
@@ -29,6 +32,16 @@ describe("localization", () => {
     expect(t("ru", "menu.play")).toBe("ИГРАТЬ");
     expect(getDailyVariantCopy("ru", "daily_fast_flip").title).toBe("Быстрый флип");
     expect(getMetaNodeName("ru", "meta_dash_unlock", "Dash")).toBe("Тюнинг рывка");
+    expect(getLevelModifierCopy("en", "salvage_surge").title).toBe("Salvage Surge");
+    expect(getLevelObjectiveCopy("en", "deflect_projectiles").title).toBe("Return Fire");
+    expect(getLevelFinaleCopy("en", "ion_tempest").title).toBe("Ion Tempest");
+    expect(t("en", "menu.pilotButton", { name: "ORBIT-7" })).toBe("Pilot: ORBIT-7");
+    expect(t("en", "leaderboard.division.elite")).toBe("Elite");
+    expect(t("en", "leaderboard.filter.daily")).toBe("DAILY");
+    expect(t("en", "results.newRecord")).toBe("New record");
+    expect(t("en", "results.bestDelta", { value: "+1200" })).toBe("Best delta: +1200");
+    expect(t("en", "results.nextDivision", { division: "Elite", score: "60000" })).toBe("Next division: Elite at 60000");
+    expect(t("en", "results.pilot")).toBe("Pilot");
     expect(getRarityLabel("en", "epic")).toBe("EPIC");
     expect(formatResource("ru", "cores", 3)).toBe("3 ядра");
   });

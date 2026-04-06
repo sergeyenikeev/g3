@@ -29,6 +29,22 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "menu.heroLead": "Escort the magnet rig through scrap storms and feed the recycler before the swarm closes in.",
     "menu.controls": "WASD/Arrows: move | Space: flip | Shift: dash",
     "menu.best": (p) => `Best wave: ${p?.bestWave ?? 0} | Best bolts: ${p?.bestBolts ?? 0}`,
+    "menu.pilotButton": (p) => `Pilot: ${p?.name ?? "AUTO"}`,
+    "menu.pilotAuto": "AUTO",
+    "menu.pilotPrompt": "Set your pilot callsign. Leave it blank to use an auto callsign.",
+    "menu.pilotUnsupported": "Pilot rename is unavailable on this platform.",
+    "menu.leaderboard": "TOP PILOTS",
+    "menu.leaderboardTitle": "Top pilots",
+    "menu.leaderboardEmpty": "No runs on the board yet.",
+    "menu.leaderboardHint": (p) =>
+      `Showing ${p?.mode ?? "ALL"} standings. Current pilot: ${p?.pilot ?? "AUTO"}. Score rewards survival first, then bolts, cores and caravan length.`,
+    "menu.leaderboardScoring": "Score rewards deep runs first, then bolts, cores and tail length.",
+    "menu.leaderboardLatest": (p) => `Latest run landed at #${p?.rank ?? 0} on the ${p?.mode ?? "ALL"} board.`,
+    "menu.leaderboardRecord": (p) => `New record: #${p?.rank ?? 0} on the ${p?.mode ?? "ALL"} board.`,
+    "menu.leaderboardPromotion": (p) => `League promotion: ${p?.division ?? "Scrapper"} | ${p?.reward ?? ""}`,
+    "menu.leaderboardCareerNext": (p) =>
+      `Career league: ${p?.division ?? "Scrapper"} | Next ${p?.nextDivision ?? "Raider"} at ${p?.score ?? "0"}`,
+    "menu.leaderboardCareerTop": (p) => `Career league: ${p?.division ?? "Legend"} | Top division secured`,
     "menu.wallet": (p) => `Wallet: ${p?.bolts ?? "0 bolts"} | ${p?.cores ?? "0 cores"}`,
     "menu.stockpile": (p) => `Stockpile: ${p?.bolts ?? "0 bolts"} | ${p?.cores ?? "0 cores"}`,
     "menu.workshopHint": "Permanent upgrades apply to all future runs.",
@@ -72,6 +88,7 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "toast.sfx": (p) => `SFX: ${p?.value ?? "OFF"}`,
     "toast.music": (p) => `Music: ${p?.value ?? "OFF"}`,
     "toast.language": (p) => `Language: ${p?.value ?? "English"}`,
+    "toast.pilot": (p) => `Pilot: ${p?.value ?? "AUTO"}`,
     "language.auto": "Auto",
     "language.ru": "Russian",
     "language.en": "English",
@@ -89,8 +106,31 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "upgrade.title": (p) => `UPGRADE PICK - WAVE ${p?.wave ?? 1}`,
     "upgrade.reroll": "REROLL (Rewarded)",
     "hud.hp": "HP",
+    "hud.level": "Level",
     "hud.wave": "Wave",
     "hud.bolts": "Bolts",
+    "hud.goal": "Goal",
+    "results.cores": "Cores",
+    "results.workshop": (p) => `Workshop: +${p?.bolts ?? 0} bolts | +${p?.cores ?? 0} cores`,
+    "results.pilot": "Pilot",
+    "results.division": "Division",
+    "results.score": "Score",
+    "results.promotion": (p) => `Promotion: ${p?.division ?? "Scrapper"} (${p?.reward ?? ""})`,
+    "results.bestDelta": (p) => `Best delta: ${p?.value ?? "+0"}`,
+    "results.bestDeltaNone": "First ranked result",
+    "results.nextDivision": (p) => `Next division: ${p?.division ?? "Raider"} at ${p?.score ?? "0"}`,
+    "results.topDivision": "Top division reached",
+    "results.rank": (p) => `Rank: #${p?.rank ?? 0}`,
+    "results.newRecord": "New record",
+    "results.leaderboardTitle": "Leaderboard",
+    "upgrade.levelClear": (p) => `Level ${p?.level ?? 1} clear: ${p?.reward ?? ""}`,
+    "upgrade.nextLevel": (p) => `Next level ${p?.level ?? 1}: ${p?.modifier ?? "Unknown"}`,
+    "upgrade.objective": (p) => `Bonus objective: ${p?.objective ?? ""}`,
+    "upgrade.objectiveDone": (p) => `Completed: ${p?.reward ?? ""}`,
+    "upgrade.objectiveMissed": "Missed this time",
+    "upgrade.finale": (p) => `Finale: ${p?.finale ?? ""}`,
+    "objective.progress": (p) => `Goal: ${p?.title ?? "Goal"} ${p?.progress ?? 0}/${p?.target ?? 0}`,
+    "objective.complete": (p) => `Goal complete: ${p?.title ?? "Goal"}`,
     "hud.daily": "Daily",
     "hud.training": "Training",
     "hud.flip": "FLIP",
@@ -110,6 +150,8 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "wave.trainingLoop": "Training: learn the salvage loop",
     "wave.quickTest": "Quick test wave",
     "wave.breather": "Breather wave: harvest and reset",
+    "wave.finale": "Finale",
+    "wave.event": "Sector Event",
     "wave.pressure": "Pressure wave",
     "status.shield": (p) => `Shield ${p?.value ?? 0}`,
     "status.clamp": (p) => `Clamp x${p?.value ?? 0}`,
@@ -117,9 +159,39 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "status.anchorReady": "Anchor ready",
     "status.vacuum": (p) => `Vacuum ${p?.value ?? 0}s`,
     "status.vacuumReady": "Vacuum ready",
+    "status.dashWake": (p) => `Wake ${p?.value ?? 0}s`,
     "status.drone": "Drone online",
     "status.mines": (p) => `Mines ${p?.value ?? 0}`,
     "status.corePull": (p) => `Core pull x${p?.value ?? "1.00"}`,
+    "tag.core": "CORE",
+    "tag.collection": "HAUL",
+    "tag.utility": "UTIL",
+    "tag.economy": "ECON",
+    "tag.flip": "FLIP",
+    "tag.combat": "COMBAT",
+    "tag.tail": "TAIL",
+    "tag.survival": "SURV",
+    "tag.mobility": "MOVE",
+    "tag.risk_reward": "RISK",
+    "tag.dash": "DASH",
+    "tag.ram": "RAM",
+    "tag.wake": "WAKE",
+    "tag.ion": "ION",
+    "tag.siphon": "SIPHON",
+    "status.finale": (p) => `Finale ${p?.title ?? ""}`,
+    "status.event": (p) => `Event ${p?.title ?? ""}`,
+    "leaderboard.filter.all": "ALL",
+    "leaderboard.filter.run": "RUN",
+    "leaderboard.filter.daily": "DAILY",
+    "leaderboard.mode.run": "Run",
+    "leaderboard.mode.daily": "Daily",
+    "leaderboard.division.scrapper": "Scrapper",
+    "leaderboard.division.raider": "Raider",
+    "leaderboard.division.ace": "Ace",
+    "leaderboard.division.elite": "Elite",
+    "leaderboard.division.legend": "Legend",
+    "leaderboard.lastRun": "LAST RUN",
+    "leaderboard.recordBadge": "NEW RECORD",
     "enemy.chaser": "Chaser",
     "enemy.shooter": "Shooter",
     "enemy.cutter": "Cutter",
@@ -205,8 +277,19 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "upgrade.title": (p) => `ВЫБОР УЛУЧШЕНИЯ - ВОЛНА ${p?.wave ?? 1}`,
     "upgrade.reroll": "ПЕРЕБРОС (за рекламу)",
     "hud.hp": "HP",
+    "hud.level": "\u0423\u0440\u043e\u0432\u0435\u043d\u044c",
     "hud.wave": "Волна",
     "hud.bolts": "Болты",
+    "hud.goal": "\u0426\u0435\u043b\u044c",
+    "results.cores": "\u042f\u0434\u0440\u0430",
+    "results.workshop": (p) => `\u041c\u0430\u0441\u0442\u0435\u0440\u0441\u043a\u0430\u044f: +${p?.bolts ?? 0} \u0431\u043e\u043b\u0442\u043e\u0432 | +${p?.cores ?? 0} \u044f\u0434\u0435\u0440`,
+    "upgrade.levelClear": (p) => `\u0423\u0440\u043e\u0432\u0435\u043d\u044c ${p?.level ?? 1} \u0437\u0430\u0447\u0438\u0449\u0435\u043d: ${p?.reward ?? ""}`,
+    "upgrade.nextLevel": (p) => `\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439 \u0443\u0440\u043e\u0432\u0435\u043d\u044c ${p?.level ?? 1}: ${p?.modifier ?? "?"}`,
+    "upgrade.objective": (p) => `\u0411\u043e\u043d\u0443\u0441-\u0446\u0435\u043b\u044c: ${p?.objective ?? ""}`,
+    "upgrade.objectiveDone": (p) => `\u0412\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u043e: ${p?.reward ?? ""}`,
+    "upgrade.objectiveMissed": "\u0412 \u044d\u0442\u043e\u0442 \u0440\u0430\u0437 \u043d\u0435 \u0437\u0430\u0448\u043b\u043e",
+    "objective.progress": (p) => `\u0426\u0435\u043b\u044c: ${p?.title ?? "\u0426\u0435\u043b\u044c"} ${p?.progress ?? 0}/${p?.target ?? 0}`,
+    "objective.complete": (p) => `\u0426\u0435\u043b\u044c \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0430: ${p?.title ?? "\u0426\u0435\u043b\u044c"}`,
     "hud.daily": "Ежедневка",
     "hud.training": "Обучение",
     "hud.flip": "ФЛИП",
@@ -233,9 +316,25 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "status.anchorReady": "Якорь готов",
     "status.vacuum": (p) => `Вакуум ${p?.value ?? 0}с`,
     "status.vacuumReady": "Вакуум готов",
+    "status.dashWake": (p) => `Шлейф ${p?.value ?? 0}с`,
     "status.drone": "Дрон в строю",
     "status.mines": (p) => `Мины ${p?.value ?? 0}`,
     "status.corePull": (p) => `Тяга ядра x${p?.value ?? "1.00"}`,
+    "tag.core": "ЯДРО",
+    "tag.collection": "СБОР",
+    "tag.utility": "УТИЛ",
+    "tag.economy": "ЭКО",
+    "tag.flip": "ФЛИП",
+    "tag.combat": "БОЙ",
+    "tag.tail": "ХВОСТ",
+    "tag.survival": "ЩИТ",
+    "tag.mobility": "ДВИЖ",
+    "tag.risk_reward": "РИСК",
+    "tag.dash": "РЫВОК",
+    "tag.ram": "ТАРАН",
+    "tag.wake": "ШЛЕЙФ",
+    "tag.ion": "ИОН",
+    "tag.siphon": "СИФОН",
     "enemy.chaser": "Таран",
     "enemy.shooter": "Стрелок",
     "enemy.cutter": "Резчик",
@@ -245,6 +344,61 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "rarity.epic": "ЭПИЧЕСКОЕ",
   },
 };
+
+Object.assign(MESSAGES.ru, {
+  "menu.pilotButton": (p?: Record<string, unknown>) => `\u041f\u0438\u043b\u043e\u0442: ${p?.name ?? "\u0410\u0412\u0422\u041e"}`,
+  "menu.pilotAuto": "\u0410\u0412\u0422\u041e",
+  "menu.pilotPrompt":
+    "\u0417\u0430\u0434\u0430\u0439 \u043f\u043e\u0437\u044b\u0432\u043d\u043e\u0439 \u043f\u0438\u043b\u043e\u0442\u0430. \u041e\u0441\u0442\u0430\u0432\u044c \u043f\u0443\u0441\u0442\u043e, \u0447\u0442\u043e\u0431\u044b \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u0430\u0432\u0442\u043e-\u043f\u043e\u0437\u044b\u0432\u043d\u043e\u0439.",
+  "menu.pilotUnsupported": "\u0412 \u044d\u0442\u043e\u0439 \u0432\u0435\u0440\u0441\u0438\u0438 \u043d\u0435\u043b\u044c\u0437\u044f \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c \u043f\u0438\u043b\u043e\u0442\u0430.",
+  "menu.leaderboard": "\u0420\u0415\u0419\u0422\u0418\u041d\u0413",
+  "menu.leaderboardTitle": "\u0422\u043e\u043f \u043f\u0438\u043b\u043e\u0442\u043e\u0432",
+  "menu.leaderboardEmpty": "\u0412 \u0437\u0430\u043b\u0435 \u0441\u043b\u0430\u0432\u044b \u043f\u043e\u043a\u0430 \u043f\u0443\u0441\u0442\u043e.",
+  "menu.leaderboardHint": (p?: Record<string, unknown>) =>
+    `\u041f\u043e\u043a\u0430\u0437\u0430\u043d\u044b \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u044b: ${p?.mode ?? "\u0412\u0421\u0415"}. \u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0438\u043b\u043e\u0442: ${p?.pilot ?? "\u0410\u0412\u0422\u041e"}. \u041e\u0447\u043a\u0438 \u0446\u0435\u043d\u044f\u0442 \u0433\u043b\u0443\u0431\u0438\u043d\u0443 \u0437\u0430\u0435\u0437\u0434\u0430, \u0431\u043e\u043b\u0442\u044b, \u044f\u0434\u0440\u0430 \u0438 \u0434\u043b\u0438\u043d\u0443 \u043a\u0430\u0440\u0430\u0432\u0430\u043d\u0430.`,
+  "menu.leaderboardScoring":
+    "\u0421\u0447\u0451\u0442 \u0432 \u043f\u0435\u0440\u0432\u0443\u044e \u043e\u0447\u0435\u0440\u0435\u0434\u044c \u043d\u0430\u0433\u0440\u0430\u0436\u0434\u0430\u0435\u0442 \u0434\u0430\u043b\u044c\u043d\u0438\u0439 \u0437\u0430\u0435\u0437\u0434, \u0437\u0430\u0442\u0435\u043c \u0431\u043e\u043b\u0442\u044b, \u044f\u0434\u0440\u0430 \u0438 \u0434\u043b\u0438\u043d\u0443 \u0445\u0432\u043e\u0441\u0442\u0430.",
+  "menu.leaderboardLatest": (p?: Record<string, unknown>) =>
+    `\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442: #${p?.rank ?? 0} \u0432 \u0442\u0430\u0431\u043b\u0438\u0446\u0435 ${p?.mode ?? "\u0412\u0421\u0415"}.`,
+  "menu.leaderboardRecord": (p?: Record<string, unknown>) =>
+    `\u041d\u043e\u0432\u044b\u0439 \u0440\u0435\u043a\u043e\u0440\u0434: #${p?.rank ?? 0} \u0432 \u0442\u0430\u0431\u043b\u0438\u0446\u0435 ${p?.mode ?? "\u0412\u0421\u0415"}.`,
+  "menu.leaderboardPromotion": (p?: Record<string, unknown>) =>
+    `\u041f\u043e\u0432\u044b\u0448\u0435\u043d\u0438\u0435 \u043b\u0438\u0433\u0438: ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"} | ${p?.reward ?? ""}`,
+  "menu.leaderboardCareerNext": (p?: Record<string, unknown>) =>
+    `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u0430\u044f \u043b\u0438\u0433\u0430: ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"} | \u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f ${p?.nextDivision ?? "\u0420\u0435\u0439\u0434\u0435\u0440"} \u043d\u0430 ${p?.score ?? "0"}`,
+  "menu.leaderboardCareerTop": (p?: Record<string, unknown>) =>
+    `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u0430\u044f \u043b\u0438\u0433\u0430: ${p?.division ?? "\u041b\u0435\u0433\u0435\u043d\u0434\u0430"} | \u0412\u0435\u0440\u0445\u043d\u044f\u044f \u043b\u0438\u0433\u0430 \u0432\u0437\u044f\u0442\u0430`,
+  "toast.pilot": (p?: Record<string, unknown>) => `\u041f\u0438\u043b\u043e\u0442: ${p?.value ?? "\u0410\u0412\u0422\u041e"}`,
+  "results.pilot": "\u041f\u0438\u043b\u043e\u0442",
+  "results.division": "\u041b\u0438\u0433\u0430",
+  "results.score": "\u041e\u0447\u043a\u0438",
+  "results.promotion": (p?: Record<string, unknown>) => `\u041f\u043e\u0432\u044b\u0448\u0435\u043d\u0438\u0435: ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"} (${p?.reward ?? ""})`,
+  "results.bestDelta": (p?: Record<string, unknown>) => `\u0414\u0435\u043b\u044c\u0442\u0430 \u043a \u043b\u0443\u0447\u0448\u0435\u043c\u0443: ${p?.value ?? "+0"}`,
+  "results.bestDeltaNone": "\u041f\u0435\u0440\u0432\u044b\u0439 \u0440\u0435\u0439\u0442\u0438\u043d\u0433\u043e\u0432\u044b\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442",
+  "results.nextDivision": (p?: Record<string, unknown>) =>
+    `\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f \u043b\u0438\u0433\u0430: ${p?.division ?? "\u0420\u0435\u0439\u0434\u0435\u0440"} \u043d\u0430 ${p?.score ?? "0"}`,
+  "results.topDivision": "\u0414\u043e\u0441\u0442\u0438\u0433\u043d\u0443\u0442\u0430 \u0432\u0435\u0440\u0445\u043d\u044f\u044f \u043b\u0438\u0433\u0430",
+  "results.rank": (p?: Record<string, unknown>) => `\u041c\u0435\u0441\u0442\u043e: #${p?.rank ?? 0}`,
+  "results.newRecord": "\u041d\u043e\u0432\u044b\u0439 \u0440\u0435\u043a\u043e\u0440\u0434",
+  "results.leaderboardTitle": "\u0420\u0435\u0439\u0442\u0438\u043d\u0433",
+  "upgrade.finale": (p?: Record<string, unknown>) => `\u0424\u0438\u043d\u0430\u043b: ${p?.finale ?? ""}`,
+  "wave.finale": "\u0424\u0438\u043d\u0430\u043b",
+  "wave.event": "\u0421\u043e\u0431\u044b\u0442\u0438\u0435 \u0441\u0435\u043a\u0442\u043e\u0440\u0430",
+  "status.finale": (p?: Record<string, unknown>) => `\u0424\u0438\u043d\u0430\u043b ${p?.title ?? ""}`,
+  "status.event": (p?: Record<string, unknown>) => `\u0421\u043e\u0431\u044b\u0442\u0438\u0435 ${p?.title ?? ""}`,
+  "leaderboard.filter.all": "\u0412\u0421\u0415",
+  "leaderboard.filter.run": "\u0417\u0410\u0415\u0417\u0414",
+  "leaderboard.filter.daily": "\u0414\u0415\u0419\u041b\u0418",
+  "leaderboard.mode.run": "\u0417\u0430\u0435\u0437\u0434",
+  "leaderboard.mode.daily": "\u0414\u0435\u0439\u043b\u0438",
+  "leaderboard.division.scrapper": "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c",
+  "leaderboard.division.raider": "\u0420\u0435\u0439\u0434\u0435\u0440",
+  "leaderboard.division.ace": "\u0410\u0441",
+  "leaderboard.division.elite": "\u042d\u043b\u0438\u0442\u0430",
+  "leaderboard.division.legend": "\u041b\u0435\u0433\u0435\u043d\u0434\u0430",
+  "leaderboard.lastRun": "\u041f\u041e\u0421\u041b\u0415\u0414\u041d\u0418\u0419 \u0417\u0410\u0415\u0417\u0414",
+  "leaderboard.recordBadge": "\u041d\u041e\u0412\u042b\u0419 \u0420\u0415\u041a\u041e\u0420\u0414",
+});
 
 const UPGRADE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   en: {
@@ -266,6 +420,10 @@ const UPGRADE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     recycler_bonus: { title: "Recycler Bonus", desc: "Banking heals more and grants +10% bolts." },
     overclock: { title: "Overclock", desc: "+12% speed, but incoming damage is +10%." },
     dash_module: { title: "Dash Module", desc: "Boost Dash for this run: -15% cooldown, longer burst, and more i-frames." },
+    ram_plating: { title: "Ram Plating", desc: "Dash becomes a battering ram: more impact force and damage, plus shield for enemies clipped." },
+    magnet_wake: { title: "Magnet Wake", desc: "After Dash, a short magnetic wake widens pull and scoops scrap from farther away." },
+    ion_ram: { title: "Ion Ram", desc: "Dash impacts arc ion shocks into nearby enemies for follow-up hits." },
+    salvage_siphon: { title: "Salvage Siphon", desc: "Wake auto-captures valuable scrap, and dash kills spill heavier salvage." },
     drone_buddy: { title: "Drone Buddy", desc: "A support drone fires every 1.4s for 6 damage." },
     scrap_mine: { title: "Scrap Mine", desc: "Lost tail segments become mines for 3s." },
     x2_results_hook: { title: "Double Results Hook", desc: "Improves the value of the rewarded results screen." },
@@ -289,6 +447,10 @@ const UPGRADE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     recycler_bonus: { title: "Бонус переработчика", desc: "Сдача сильнее лечит и даёт +10% болтов." },
     overclock: { title: "Разгон", desc: "+12% скорости, но входящий урон +10%." },
     dash_module: { title: "Модуль рывка", desc: "Усиливает рывок в этом заезде: -15% кд, длиннее окно рывка и больше i-frame." },
+    ram_plating: { title: "Таранная броня", desc: "Рывок превращается в таран: сильнее удар, дольше сбивает врагов и даёт щит за каждое попадание." },
+    magnet_wake: { title: "Магнитный шлейф", desc: "После рывка остаётся короткий магнитный шлейф: шире тяга и легче подбирать лом на ходу." },
+    ion_ram: { title: "Ионный таран", desc: "Попадания рывком пускают ионные дуги в соседних врагов и добивают строй." },
+    salvage_siphon: { title: "Сифон добычи", desc: "Шлейф сам втягивает ценный лом, а убийства в рывке чаще роняют heavy и rare-добычу." },
     drone_buddy: { title: "Дрон-напарник", desc: "Дрон стреляет раз в 1.4с и наносит 6 урона." },
     scrap_mine: { title: "Мины из лома", desc: "Потерянные сегменты хвоста превращаются в мины на 3с." },
     x2_results_hook: { title: "Крюк двойной выгоды", desc: "Усиливает ценность рекламного экрана наград." },
@@ -381,6 +543,147 @@ const DAILY_VARIANT_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   },
 };
 
+const LEVEL_MODIFIER_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
+  en: {
+    salvage_surge: {
+      title: "Salvage Surge",
+      desc: "Extra scrap fields and stronger recycler payouts, but the swarm moves faster.",
+    },
+    crossfire_protocol: {
+      title: "Crossfire Protocol",
+      desc: "Chasers start converting into shooters. Enemy shots fly faster, but FLIP cools down quicker too.",
+    },
+    razor_parade: {
+      title: "Razor Parade",
+      desc: "Cutters join the wave more often. Banking is faster, and the caravan gets a little more speed.",
+    },
+    iron_convoy: {
+      title: "Iron Convoy",
+      desc: "Enemies gain more hull, but heavy scrap pays better and recycler heals harder.",
+    },
+    ion_storm: {
+      title: "Ion Storm",
+      desc: "The whole arena overclocks: enemies, shots and pressure spike, while dash and core gains improve.",
+    },
+  },
+  ru: {
+    salvage_surge: {
+      title: "\u0428\u043a\u0432\u0430\u043b \u0434\u043e\u0431\u044b\u0447\u0438",
+      desc: "\u041d\u0430 \u043f\u043e\u043b\u0435 \u0431\u043e\u043b\u044c\u0448\u0435 \u043b\u043e\u043c\u0430 \u0438 \u0432\u044b\u0433\u043e\u0434\u043d\u0435\u0435 \u0441\u0434\u0430\u0447\u0430, \u043d\u043e \u0440\u043e\u0439 \u0434\u0432\u0438\u0433\u0430\u0435\u0442\u0441\u044f \u0431\u044b\u0441\u0442\u0440\u0435\u0435.",
+    },
+    crossfire_protocol: {
+      title: "\u041f\u0440\u043e\u0442\u043e\u043a\u043e\u043b \u043f\u0435\u0440\u0435\u043a\u0440\u0435\u0441\u0442\u043d\u043e\u0433\u043e \u043e\u0433\u043d\u044f",
+      desc: "\u0422\u0430\u0440\u0430\u043d\u044b \u0447\u0430\u0449\u0435 \u043c\u0435\u043d\u044f\u044e\u0442\u0441\u044f \u043d\u0430 \u0441\u0442\u0440\u0435\u043b\u043a\u043e\u0432. \u0412\u044b\u0441\u0442\u0440\u0435\u043b\u044b \u043b\u0435\u0442\u044f\u0442 \u0431\u044b\u0441\u0442\u0440\u0435\u0435, \u0437\u0430\u0442\u043e \u0424\u041b\u0418\u041f \u043e\u0442\u043a\u0430\u0442\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u0440\u0430\u043d\u044c\u0448\u0435.",
+    },
+    razor_parade: {
+      title: "\u041f\u0430\u0440\u0430\u0434 \u0440\u0435\u0437\u0447\u0438\u043a\u043e\u0432",
+      desc: "\u0420\u0435\u0437\u0447\u0438\u043a\u0438 \u0432\u044b\u0445\u043e\u0434\u044f\u0442 \u0447\u0430\u0449\u0435. \u0421\u0434\u0430\u0432\u0430\u0442\u044c \u0445\u0432\u043e\u0441\u0442 \u043b\u0435\u0433\u0447\u0435, \u0430 \u043a\u0430\u0440\u0430\u0432\u0430\u043d \u0435\u0434\u0435\u0442 \u0447\u0443\u0442\u044c \u0440\u0435\u0437\u0432\u0435\u0435.",
+    },
+    iron_convoy: {
+      title: "\u0416\u0435\u043b\u0435\u0437\u043d\u044b\u0439 \u043a\u043e\u043d\u0432\u043e\u0439",
+      desc: "\u0412\u0440\u0430\u0433\u0438 \u0441\u0442\u0430\u043d\u043e\u0432\u044f\u0442\u0441\u044f \u043f\u0440\u043e\u0447\u043d\u0435\u0435, \u043d\u043e heavy-\u043b\u043e\u043c \u0434\u043e\u0440\u043e\u0436\u0435, \u0430 \u043f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a \u043b\u0435\u0447\u0438\u0442 \u0441\u0438\u043b\u044c\u043d\u0435\u0435.",
+    },
+    ion_storm: {
+      title: "\u0418\u043e\u043d\u043d\u0430\u044f \u0431\u0443\u0440\u044f",
+      desc: "\u0410\u0440\u0435\u043d\u0430 \u0432\u0445\u043e\u0434\u0438\u0442 \u0432 \u0440\u0430\u0437\u043d\u043e\u0441: \u0432\u0440\u0430\u0433\u0438 \u0438 \u0438\u0445 \u0441\u043d\u0430\u0440\u044f\u0434\u044b \u0443\u0441\u043a\u043e\u0440\u044f\u044e\u0442\u0441\u044f, \u0437\u0430\u0442\u043e \u0440\u044b\u0432\u043e\u043a \u0438 \u044f\u0434\u0440\u0430 \u0441\u0442\u0430\u043d\u043e\u0432\u044f\u0442\u0441\u044f \u0446\u0435\u043d\u043d\u0435\u0435.",
+    },
+  },
+};
+
+const LEVEL_OBJECTIVE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
+  en: {
+    bank_bolts: {
+      title: "Cash In",
+      desc: "Bank enough bolts during this level.",
+    },
+    deflect_projectiles: {
+      title: "Return Fire",
+      desc: "Deflect enemy shots back into the swarm.",
+    },
+    tail_segments: {
+      title: "Full Caravan",
+      desc: "Finish the level with a long scrap chain intact.",
+    },
+    heavy_scrap: {
+      title: "Heavy Freight",
+      desc: "Secure extra heavy scrap before the level ends.",
+    },
+    hull_integrity: {
+      title: "Hold The Line",
+      desc: "Finish the level with strong hull integrity.",
+    },
+  },
+  ru: {
+    bank_bolts: {
+      title: "\u0421\u0434\u0430\u0439 \u0434\u043e\u0431\u044b\u0447\u0443",
+      desc: "\u0421\u0434\u0430\u0439 \u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u0431\u043e\u043b\u0442\u043e\u0432 \u0432 \u044d\u0442\u043e\u043c \u0443\u0440\u043e\u0432\u043d\u0435.",
+    },
+    deflect_projectiles: {
+      title: "\u0412\u0435\u0440\u043d\u0438 \u043e\u0433\u043e\u043d\u044c",
+      desc: "\u041e\u0442\u0431\u0438\u0432\u0430\u0439 \u0432\u0440\u0430\u0436\u0435\u0441\u043a\u0438\u0435 \u0432\u044b\u0441\u0442\u0440\u0435\u043b\u044b \u043e\u0431\u0440\u0430\u0442\u043d\u043e \u0432 \u0440\u043e\u0439.",
+    },
+    tail_segments: {
+      title: "\u041f\u043e\u043b\u043d\u044b\u0439 \u043a\u0430\u0440\u0430\u0432\u0430\u043d",
+      desc: "\u0417\u0430\u043a\u043e\u043d\u0447\u0438 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441 \u0434\u043b\u0438\u043d\u043d\u043e\u0439 \u0446\u0435\u043f\u044c\u044e \u043b\u043e\u043c\u0430.",
+    },
+    heavy_scrap: {
+      title: "\u0422\u044f\u0436\u0451\u043b\u044b\u0439 \u0433\u0440\u0443\u0437",
+      desc: "\u0423\u0441\u043f\u0435\u0439 \u0441\u043e\u0431\u0440\u0430\u0442\u044c \u043f\u043e\u0431\u043e\u043b\u044c\u0448\u0435 heavy-\u043b\u043e\u043c\u0430 \u0434\u043e \u043a\u043e\u043d\u0446\u0430 \u0443\u0440\u043e\u0432\u043d\u044f.",
+    },
+    hull_integrity: {
+      title: "\u0414\u0435\u0440\u0436\u0438 \u043a\u043e\u0440\u043f\u0443\u0441",
+      desc: "\u0414\u043e\u0439\u0434\u0438 \u0434\u043e \u043a\u043e\u043d\u0446\u0430 \u0443\u0440\u043e\u0432\u043d\u044f \u0441 \u0437\u0430\u043f\u0430\u0441\u043e\u043c HP.",
+    },
+  },
+};
+
+const LEVEL_FINALE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
+  en: {
+    crossfire_overseer: {
+      title: "Crossfire Overseer",
+      desc: "A commander-pattern finale with layered shooter angles and flank pressure.",
+    },
+    blade_dancer: {
+      title: "Blade Dancer",
+      desc: "A cutter-led finale that keeps collapsing onto the tail line.",
+    },
+    scrap_juggernaut: {
+      title: "Scrap Juggernaut",
+      desc: "A hulking convoy finale with tanky pressure and heavy salvage drops.",
+    },
+    salvage_storm: {
+      title: "Salvage Storm",
+      desc: "A rare sector event that floods the arena with salvage bursts and ambushes.",
+    },
+    ion_tempest: {
+      title: "Ion Tempest",
+      desc: "A rare sector event with storm barrages, rare shards and edge-fire volleys.",
+    },
+  },
+  ru: {
+    crossfire_overseer: {
+      title: "\u0421\u043c\u043e\u0442\u0440\u044f\u0449\u0438\u0439 \u043f\u0435\u0440\u0435\u043a\u0440\u0451\u0441\u0442\u043d\u043e\u0433\u043e \u043e\u0433\u043d\u044f",
+      desc: "\u0424\u0438\u043d\u0430\u043b \u0441 \u043a\u043e\u043c\u0430\u043d\u0434\u0438\u0440\u0441\u043a\u0438\u043c \u043f\u0430\u0442\u0442\u0435\u0440\u043d\u043e\u043c: \u0443\u0433\u043b\u044b, \u0444\u043b\u0430\u043d\u0433\u0438 \u0438 \u043f\u0435\u0440\u0435\u043a\u0440\u0451\u0441\u0442\u043d\u044b\u0439 \u043e\u0433\u043e\u043d\u044c.",
+    },
+    blade_dancer: {
+      title: "\u0422\u0430\u043d\u0446\u043e\u0440 \u043b\u0435\u0437\u0432\u0438\u0439",
+      desc: "\u0424\u0438\u043d\u0430\u043b \u043f\u043e\u0434 \u0434\u0438\u043a\u0442\u043e\u0432\u043a\u0443 \u0440\u0435\u0437\u0447\u0438\u043a\u043e\u0432, \u0433\u0434\u0435 \u0434\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0432\u0441\u0451 \u0432\u0440\u0435\u043c\u044f \u0441\u0432\u0430\u043b\u0438\u0432\u0430\u0435\u0442\u0441\u044f \u043d\u0430 \u0445\u0432\u043e\u0441\u0442.",
+    },
+    scrap_juggernaut: {
+      title: "\u041b\u043e\u043c\u043e\u0432\u043e\u0439 \u0434\u0436\u0430\u0433\u0433\u0435\u0440\u043d\u0430\u0443\u0442",
+      desc: "\u0422\u044f\u0436\u0451\u043b\u044b\u0439 \u0444\u0438\u043d\u0430\u043b-\u043a\u043e\u043d\u0432\u043e\u0439: \u0442\u0430\u043d\u043a\u043e\u0432\u043e\u0435 \u0434\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0438 heavy-\u0432\u044b\u0431\u0440\u043e\u0441\u044b \u043b\u043e\u043c\u0430.",
+    },
+    salvage_storm: {
+      title: "\u0428\u043a\u0432\u0430\u043b \u0434\u043e\u0431\u044b\u0447\u0438",
+      desc: "\u0420\u0435\u0434\u043a\u043e\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u0435 \u0441\u0435\u043a\u0442\u043e\u0440\u0430: \u0430\u0440\u0435\u043d\u0443 \u0437\u0430\u0432\u0430\u043b\u0438\u0432\u0430\u044e\u0442 \u0432\u044b\u0431\u0440\u043e\u0441\u044b \u043b\u043e\u043c\u0430 \u0438 \u0437\u0430\u0441\u0430\u0434\u044b.",
+    },
+    ion_tempest: {
+      title: "\u0418\u043e\u043d\u043d\u044b\u0439 \u0442\u0435\u043c\u043f\u0435\u0441\u0442",
+      desc: "\u0420\u0435\u0434\u043a\u043e\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u0435 \u0441\u0435\u043a\u0442\u043e\u0440\u0430: \u0433\u0440\u0430\u043d\u0438\u0447\u043d\u044b\u0435 \u0437\u0430\u043b\u043f\u044b, \u0440\u0435\u0434\u043a\u0438\u0435 \u043e\u0441\u043a\u043e\u043b\u043a\u0438 \u0438 \u0448\u0442\u043e\u0440\u043c\u043e\u0432\u044b\u0435 \u0432\u043e\u043b\u043d\u044b.",
+    },
+  },
+};
+
 const PATTERN_TITLES: Record<Locale, Record<string, string>> = {
   en: {
     pincer_chasers: "Pincer Chasers",
@@ -390,6 +693,11 @@ const PATTERN_TITLES: Record<Locale, Record<string, string>> = {
     crossfire_lane: "Crossfire Lane",
     hook_and_cut: "Hook and Cut",
     siege_circle: "Siege Circle",
+    crossfire_overseer: "Crossfire Overseer",
+    blade_dancer: "Blade Dancer",
+    scrap_juggernaut: "Scrap Juggernaut",
+    salvage_storm: "Salvage Storm",
+    ion_tempest: "Ion Tempest",
   },
   ru: {
     pincer_chasers: "Клещи",
@@ -399,6 +707,11 @@ const PATTERN_TITLES: Record<Locale, Record<string, string>> = {
     crossfire_lane: "Линия перекрёстного огня",
     hook_and_cut: "Зацеп и рез",
     siege_circle: "Кольцо осады",
+    crossfire_overseer: "\u0421\u043c\u043e\u0442\u0440\u044f\u0449\u0438\u0439 \u043f\u0435\u0440\u0435\u043a\u0440\u0451\u0441\u0442\u043d\u043e\u0433\u043e \u043e\u0433\u043d\u044f",
+    blade_dancer: "\u0422\u0430\u043d\u0446\u043e\u0440 \u043b\u0435\u0437\u0432\u0438\u0439",
+    scrap_juggernaut: "\u041b\u043e\u043c\u043e\u0432\u043e\u0439 \u0434\u0436\u0430\u0433\u0433\u0435\u0440\u043d\u0430\u0443\u0442",
+    salvage_storm: "\u0428\u043a\u0432\u0430\u043b \u0434\u043e\u0431\u044b\u0447\u0438",
+    ion_tempest: "\u0418\u043e\u043d\u043d\u044b\u0439 \u0442\u0435\u043c\u043f\u0435\u0441\u0442",
   },
 };
 
@@ -488,6 +801,30 @@ export function getDailyVariantCopy(locale: Locale, variantId: string, fallbackT
   };
 }
 
+export function getLevelModifierCopy(locale: Locale, modifierId: string, fallbackTitle = "", fallbackDesc = ""): UpgradeCopy {
+  const copy = LEVEL_MODIFIER_COPY[locale][modifierId] ?? LEVEL_MODIFIER_COPY.en[modifierId];
+  return {
+    title: copy?.title ?? fallbackTitle ?? modifierId,
+    desc: copy?.desc ?? fallbackDesc ?? "",
+  };
+}
+
+export function getLevelObjectiveCopy(locale: Locale, objectiveId: string, fallbackTitle = "", fallbackDesc = ""): UpgradeCopy {
+  const copy = LEVEL_OBJECTIVE_COPY[locale][objectiveId] ?? LEVEL_OBJECTIVE_COPY.en[objectiveId];
+  return {
+    title: copy?.title ?? fallbackTitle ?? objectiveId,
+    desc: copy?.desc ?? fallbackDesc ?? "",
+  };
+}
+
+export function getLevelFinaleCopy(locale: Locale, finaleId: string, fallbackTitle = "", fallbackDesc = ""): UpgradeCopy {
+  const copy = LEVEL_FINALE_COPY[locale][finaleId] ?? LEVEL_FINALE_COPY.en[finaleId];
+  return {
+    title: copy?.title ?? fallbackTitle ?? finaleId,
+    desc: copy?.desc ?? fallbackDesc ?? "",
+  };
+}
+
 export function getPatternTitle(locale: Locale, patternId?: string | null): string {
   if (!patternId) return t(locale, "wave.pressure");
   return PATTERN_TITLES[locale][patternId] ?? PATTERN_TITLES.en[patternId] ?? humanizePatternId(patternId);
@@ -499,6 +836,12 @@ export function getEnemyLabel(locale: Locale, type: EnemyType): string {
 
 export function getRarityLabel(locale: Locale, rarity: Rarity): string {
   return t(locale, `rarity.${rarity}`);
+}
+
+export function getUpgradeTagLabel(locale: Locale, tag: string): string {
+  const key = `tag.${tag}`;
+  const label = t(locale, key);
+  return label === key ? humanizePatternId(tag).toUpperCase() : label;
 }
 
 function getNavigatorLanguages(): string[] {

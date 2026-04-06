@@ -324,7 +324,7 @@
     "rarity": "rare",
     "weight": 35,
     "maxStacks": 1,
-    "tags": ["mobility"],
+    "tags": ["mobility", "dash"],
     "ui": {
       "title": "Модуль рывка",
       "desc": "Открывает Dash в ранe и −15% кд Dash."
@@ -334,9 +334,112 @@
       { "op": "mul", "path": "dash.durationSec", "value": 1.15 },
       { "op": "add", "path": "dash.iframesSec", "value": 0.05 }
     ],
-    "synergy": { "worksWith": ["emergency_patch", "overclock"] }
+    "synergy": { "worksWith": ["emergency_patch", "overclock", "ram_plating", "magnet_wake"] }
   },
-
+  {
+    "id": "ram_plating",
+    "name": "Ram Plating",
+    "rarity": "uncommon",
+    "weight": 70,
+    "maxStacks": 2,
+    "tags": ["dash", "combat", "survival"],
+    "ui": {
+      "title": "Ram Plating",
+      "desc": "Dash hits harder, staggers longer, and grants shield per enemy clipped."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "dash_ram",
+        "params": {
+          "damageBonusPerStack": 5,
+          "pushMultPerStack": 0.16,
+          "forwardPushPerStack": 60,
+          "lockBonusPerStack": 0.05,
+          "shieldPerHit": 2,
+          "shieldCap": 18,
+          "shieldDurationSec": 2.4
+        }
+      }
+    ],
+    "synergy": { "worksWith": ["dash_module", "overclock", "emergency_patch", "ion_ram"] }
+  },
+  {
+    "id": "magnet_wake",
+    "name": "Magnet Wake",
+    "rarity": "uncommon",
+    "weight": 68,
+    "maxStacks": 1,
+    "tags": ["dash", "mobility", "collection"],
+    "ui": {
+      "title": "Magnet Wake",
+      "desc": "After Dash, a short wake pulls scrap harder and scoops it from farther away."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "dash_wake",
+        "params": {
+          "durationSec": 1.05,
+          "radiusMult": 1.45,
+          "pullMult": 1.7,
+          "captureBonus": 12
+        }
+      }
+    ],
+    "synergy": { "worksWith": ["dash_module", "wide_field", "strong_pull", "recycler_bonus", "salvage_siphon"] }
+  },
+  {
+    "id": "ion_ram",
+    "name": "Ion Ram",
+    "rarity": "rare",
+    "weight": 32,
+    "maxStacks": 1,
+    "tags": ["dash", "combat", "flip"],
+    "ui": {
+      "title": "Ion Ram",
+      "desc": "Dash impacts chain ion shocks into nearby enemies."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "dash_arc",
+        "params": {
+          "chainRadius": 128,
+          "maxChainsPerImpact": 2,
+          "damage": 6,
+          "pushForce": 320,
+          "controlLockSec": 0.12
+        }
+      }
+    ],
+    "synergy": { "worksWith": ["ram_plating", "dash_module", "hard_push", "polarity_echo"] }
+  },
+  {
+    "id": "salvage_siphon",
+    "name": "Salvage Siphon",
+    "rarity": "rare",
+    "weight": 30,
+    "maxStacks": 1,
+    "tags": ["dash", "collection", "economy"],
+    "ui": {
+      "title": "Salvage Siphon",
+      "desc": "Wake auto-captures valuable scrap and dash kills shed richer salvage."
+    },
+    "effects": [
+      {
+        "op": "grant_perk",
+        "perkId": "dash_siphon",
+        "params": {
+          "autoCaptureRadius": 96,
+          "captureCooldownSec": 0.015,
+          "heavyDropChance": 0.34,
+          "rareShardChance": 0.08
+        }
+      }
+    ],
+    "synergy": { "worksWith": ["magnet_wake", "dash_module", "heavy_haul", "x2_results_hook"] }
+  },
   {
     "id": "drone_buddy",
     "name": "Drone Buddy",

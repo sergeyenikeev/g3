@@ -11,7 +11,7 @@ export type WavePlan = {
   caps: { maxShooters: number; maxCutters: number; maxTotal: number };
   pressureTargets: { min: number; max: number };
   extraScrapClusters: number;
-  special?: { type: "breather" };
+  special?: { type: "breather" | "mini_boss" | "sector_event"; finaleId?: string };
 };
 
 export type WaveSpawnEvent = {
