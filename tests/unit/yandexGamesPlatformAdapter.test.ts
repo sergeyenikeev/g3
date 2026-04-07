@@ -117,4 +117,47 @@ describe("YandexGamesPlatformAdapter", () => {
     expect(stop).toHaveBeenCalledTimes(2);
     expect(start).toHaveBeenCalledTimes(3);
   });
+
+  it("submits board-aware scores and reads leaderboard snapshots", async () => {
+    const setLeaderboardScore = vi.fn(async () => undefined);
+    const getLeaderboardEntries = vi.fn(async () => ({
+      entries: [
+        { rank: 1, score: 50000, player: { publicName: "ACE-1" } },
+        { rank: 2, score: 42000, player: { publicName: "YOU" } },
+      ],
+      userRank: 2,
+      userScore: 42000,
+    }));
+
+    (globalThis as any).window = {
+      YaGames: {
+        init: vi.fn(async () => ({
+          getPlayer: vi.fn(async () => ({})),
+          getLeaderboards: vi.fn(async () => ({
+            setLeaderboardScore,
+            getLeaderboardEntries,
+          })),
+        })),
+      },
+    };
+
+    const adapter = new YandexGamesPlatformAdapter();
+    await adapter.init();
+    await adapter.submitScore("magnet_caravan_weekly", 42000);
+    const snapshot = await adapter.getLeaderboard("magnet_caravan_weekly", "weekly");
+
+    expect(setLeaderboardScore).toHaveBeenCalledWith("magnet_caravan_weekly", 42000);
+    expect(getLeaderboardEntries).toHaveBeenCalledWith("magnet_caravan_weekly", {
+      includeUser: true,
+      quantityAround: 1,
+      quantityTop: 5,
+    });
+    expect(snapshot).toMatchObject({
+      boardId: "magnet_caravan_weekly",
+      scope: "weekly",
+      source: "platform",
+      currentPlayerRank: 2,
+      currentPlayerScore: 42000,
+    });
+  });
 });

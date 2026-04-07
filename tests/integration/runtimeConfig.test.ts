@@ -16,6 +16,11 @@ describe("RuntimeConfig (integration)", () => {
     expect(built.config.enemies.chaser.hp).toBeGreaterThan(0);
     expect(built.config.recycler.healOnBank).toBeGreaterThan(10);
     expect(built.config.tail.maxLenBase).toBeGreaterThan(14);
+    expect(built.config.liveops.streak.maxDay).toBe(7);
+    expect(built.config.leaderboards.boards.some((board) => board.key === "weekly")).toBe(true);
+    expect((built.config.daily.rotations?.length ?? 0)).toBeGreaterThan(0);
+    expect(built.config.ads.interstitialDailyCap).toBe(2);
+    expect(built.config.ads.noInterstitialAfterRewardedChain).toBe(2);
   });
 
   it("applies daily modifiers to runtime config", async () => {

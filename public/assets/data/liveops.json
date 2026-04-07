@@ -1,0 +1,125 @@
+{
+  "onboarding": {
+    "freeBoostedRunUses": 2,
+    "freeBoostTailSegments": 3,
+    "freeBoostBolts": 12,
+    "freeBoostCores": 0
+  },
+  "streak": {
+    "maxDay": 7,
+    "graceDays": 1,
+    "rewards": [
+      { "day": 1, "bolts": 40, "cores": 0 },
+      { "day": 2, "bolts": 65, "cores": 0 },
+      { "day": 3, "bolts": 90, "cores": 0 },
+      { "day": 4, "bolts": 120, "cores": 1 },
+      { "day": 5, "bolts": 160, "cores": 1 },
+      { "day": 6, "bolts": 210, "cores": 1 },
+      { "day": 7, "bolts": 280, "cores": 2 }
+    ]
+  },
+  "comeback": {
+    "idleDays": 3,
+    "reward": {
+      "bolts": 220,
+      "cores": 1
+    },
+    "ui": {
+      "title": "Welcome Back Salvage",
+      "desc": "Return after a break to claim a comeback cache and jump back into the yard."
+    }
+  },
+  "missions": {
+    "daily": {
+      "slots": 2,
+      "pool": [
+        {
+          "id": "daily_wave_6",
+          "weight": 1,
+          "objective": { "type": "reach_wave", "target": 6 },
+          "reward": { "bolts": 90, "cores": 0 },
+          "ui": { "title": "Reach Wave 6", "desc": "Punch through the opening pressure and clear Wave 6." }
+        },
+        {
+          "id": "daily_bank_140",
+          "weight": 1,
+          "objective": { "type": "bank_bolts", "target": 140 },
+          "reward": { "bolts": 100, "cores": 0 },
+          "ui": { "title": "Bank 140 Bolts", "desc": "Cash out enough scrap in the Recycler Zone." }
+        },
+        {
+          "id": "daily_heavy_6",
+          "weight": 0.9,
+          "objective": { "type": "collect_heavy_scrap", "target": 6 },
+          "reward": { "bolts": 110, "cores": 0 },
+          "ui": { "title": "Heavy Haul", "desc": "Capture 6 heavy scrap chunks in one day." }
+        },
+        {
+          "id": "daily_deflect_10",
+          "weight": 0.9,
+          "objective": { "type": "deflect_projectiles", "target": 10 },
+          "reward": { "bolts": 100, "cores": 0 },
+          "ui": { "title": "Return Fire", "desc": "Deflect 10 enemy shots with Flip or Dash." }
+        },
+        {
+          "id": "daily_flip_18",
+          "weight": 0.8,
+          "objective": { "type": "use_flip", "target": 18 },
+          "reward": { "bolts": 85, "cores": 0 },
+          "ui": { "title": "Pulse Loop", "desc": "Use Flip 18 times today." }
+        }
+      ]
+    },
+    "weekly": {
+      "slots": 3,
+      "startsOnUtc": "monday",
+      "pool": [
+        {
+          "id": "weekly_runs_8",
+          "weight": 1,
+          "objective": { "type": "complete_runs", "target": 8 },
+          "reward": { "bolts": 240, "cores": 1 },
+          "ui": { "title": "Stay In The Yard", "desc": "Complete 8 runs this week." }
+        },
+        {
+          "id": "weekly_wave_14",
+          "weight": 1,
+          "objective": { "type": "reach_wave", "target": 14 },
+          "reward": { "bolts": 260, "cores": 1 },
+          "ui": { "title": "Wave 14 Push", "desc": "Reach Wave 14 in any run this week." }
+        },
+        {
+          "id": "weekly_score_35000",
+          "weight": 0.95,
+          "objective": { "type": "score_points", "target": 35000 },
+          "reward": { "bolts": 280, "cores": 1 },
+          "ui": { "title": "Rank Climb", "desc": "Post a 35,000+ score on the weekly board." }
+        },
+        {
+          "id": "weekly_gain_750",
+          "weight": 0.9,
+          "objective": { "type": "gain_bolts", "target": 750 },
+          "reward": { "bolts": 240, "cores": 1 },
+          "ui": { "title": "Bolt Reserve", "desc": "Earn 750 bolts across the week." }
+        },
+        {
+          "id": "weekly_deflect_36",
+          "weight": 0.75,
+          "objective": { "type": "deflect_projectiles", "target": 36 },
+          "reward": { "bolts": 220, "cores": 1 },
+          "ui": { "title": "Grid Defender", "desc": "Deflect 36 projectiles this week." }
+        }
+      ]
+    }
+  },
+  "tomorrowOffer": {
+    "reward": {
+      "bolts": 120,
+      "cores": 1
+    },
+    "ui": {
+      "title": "Tomorrow's Yard Bonus",
+      "desc": "Come back tomorrow for a fresh daily seed, streak reward, and extra mission cache."
+    }
+  }
+}

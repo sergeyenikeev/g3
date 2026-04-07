@@ -1,0 +1,44 @@
+{
+  "localEntryLimit": 10,
+  "boards": [
+    {
+      "id": "magnet_caravan_daily",
+      "key": "daily",
+      "scope": "daily",
+      "ui": {
+        "title": "Daily Board",
+        "desc": "Shared daily seed race that resets every UTC day."
+      },
+      "rewardByDivision": {
+        "raider": { "bolts": 110, "cores": 0 },
+        "ace": { "bolts": 180, "cores": 1 },
+        "elite": { "bolts": 260, "cores": 2 },
+        "legend": { "bolts": 360, "cores": 3 }
+      }
+    },
+    {
+      "id": "magnet_caravan_weekly",
+      "key": "weekly",
+      "scope": "weekly",
+      "ui": {
+        "title": "Weekly Board",
+        "desc": "Weekly all-run climb with reset rewards every Monday UTC."
+      },
+      "rewardByDivision": {
+        "raider": { "bolts": 140, "cores": 0 },
+        "ace": { "bolts": 220, "cores": 1 },
+        "elite": { "bolts": 320, "cores": 2 },
+        "legend": { "bolts": 460, "cores": 4 }
+      }
+    },
+    {
+      "id": "magnet_caravan_all_time",
+      "key": "all_time",
+      "scope": "all_time",
+      "ui": {
+        "title": "All-Time Endless",
+        "desc": "Permanent endless ladder for the strongest caravan pilots."
+      }
+    }
+  ]
+}

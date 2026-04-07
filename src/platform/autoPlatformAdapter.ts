@@ -1,4 +1,4 @@
-import type { PlatformAdapter, RewardedResult } from "./platformAdapter";
+import type { PlatformAdapter, PlatformLeaderboardSnapshot, RewardedResult } from "./platformAdapter";
 import { LocalPlatformAdapter } from "./localPlatformAdapter";
 import { VkPlatformAdapter } from "./adapters/vkPlatformAdapter";
 import { YandexGamesPlatformAdapter } from "./adapters/yandexGamesPlatformAdapter";
@@ -29,8 +29,12 @@ export class AutoPlatformAdapter implements PlatformAdapter {
     return this.impl.load();
   }
 
-  async submitScore(score: number): Promise<void> {
-    await this.impl.submitScore?.(score);
+  async submitScore(boardId: string, score: number): Promise<void> {
+    await this.impl.submitScore?.(boardId, score);
+  }
+
+  async getLeaderboard(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): Promise<PlatformLeaderboardSnapshot | null> {
+    return (await this.impl.getLeaderboard?.(boardId, scope)) ?? null;
   }
 }
 

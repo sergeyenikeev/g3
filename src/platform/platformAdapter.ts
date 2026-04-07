@@ -8,6 +8,22 @@ export type PlatformLifecycleListener = {
   resume?: () => void;
 };
 
+export type PlatformLeaderboardEntry = {
+  rank: number;
+  score: number;
+  playerName: string;
+  isCurrentPlayer?: boolean;
+};
+
+export type PlatformLeaderboardSnapshot = {
+  boardId: string;
+  scope: "daily" | "weekly" | "all_time";
+  source: "platform" | "local";
+  entries: PlatformLeaderboardEntry[];
+  currentPlayerRank: number | null;
+  currentPlayerScore: number | null;
+};
+
 export interface PlatformAdapter {
   readonly name: string;
   init(): Promise<void>;
@@ -21,5 +37,6 @@ export interface PlatformAdapter {
   showRewarded(placement: string): Promise<RewardedResult>;
   save(data: unknown): Promise<void>;
   load(): Promise<unknown | null>;
-  submitScore?(score: number): Promise<void>;
+  submitScore?(boardId: string, score: number): Promise<void>;
+  getLeaderboard?(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): Promise<PlatformLeaderboardSnapshot | null>;
 }

@@ -9,7 +9,9 @@ export type EndlessLevelModifierId =
   | "crossfire_protocol"
   | "razor_parade"
   | "iron_convoy"
-  | "ion_storm";
+  | "ion_storm"
+  | "breaker_surge"
+  | "reclaimer_uplink";
 
 export type EndlessLevelObjectiveId =
   | "bank_bolts"
@@ -23,7 +25,9 @@ export type EndlessLevelFinaleId =
   | "blade_dancer"
   | "scrap_juggernaut"
   | "salvage_storm"
-  | "ion_tempest";
+  | "ion_tempest"
+  | "breaker_ring"
+  | "core_monsoon";
 
 type EndlessLevelScrapType = "common" | "heavy" | "rareShard";
 
@@ -200,6 +204,40 @@ export const ENDLESS_LEVEL_MODIFIERS: readonly EndlessLevelModifier[] = [
     dashCooldownMult: 0.9,
     rareCoreChanceBonus: 0.1,
   },
+  {
+    id: "breaker_surge",
+    titleKey: "level.breaker_surge.title",
+    descKey: "level.breaker_surge.desc",
+    objectiveId: "tail_segments",
+    minLevel: 5,
+    weight: 1.7,
+    rewardBoltsBonus: 7,
+    extraScrapClusters: 1,
+    enemySpeedMult: 1.18,
+    bankTimeMult: 0.82,
+    playerSpeedMult: 1.06,
+    cutterCapBonus: 2,
+    promoteChaserTo: "cutter",
+    promoteChance: 0.24,
+    heavyBoltBonus: 1,
+  },
+  {
+    id: "reclaimer_uplink",
+    titleKey: "level.reclaimer_uplink.title",
+    descKey: "level.reclaimer_uplink.desc",
+    objectiveId: "hull_integrity",
+    minLevel: 6,
+    weight: 1.6,
+    rewardBoltsBonus: 7,
+    extraScrapClusters: 2,
+    enemyHpMult: 1.1,
+    projectileSpeedMult: 1.08,
+    bankBoltsMult: 1.12,
+    bankHealMult: 1.2,
+    dashCooldownMult: 0.84,
+    rareCoreChanceBonus: 0.12,
+    shooterCapBonus: 1,
+  },
 ] as const;
 
 export const ENDLESS_LEVEL_FINALES: readonly EndlessLevelFinale[] = [
@@ -317,6 +355,62 @@ export const ENDLESS_LEVEL_FINALES: readonly EndlessLevelFinale[] = [
       { t: 6.3, count: 4, formation: "opposite", speedMult: 1.1, damageMult: 1, spreadDeg: 14 },
       { t: 9.8, count: 5, formation: "corners", speedMult: 1.12, damageMult: 1, spreadDeg: 16 },
       { t: 13.2, count: 5, formation: "opposite", speedMult: 1.15, damageMult: 1.1, spreadDeg: 18 },
+    ],
+  },
+  {
+    id: "breaker_ring",
+    kind: "miniBoss",
+    minLevel: 5,
+    rewardBoltsBonus: 18,
+    rewardCoresBonus: 1,
+    durationSec: 17,
+    patternId: "breaker_ring",
+    spawns: [
+      { t: 0.4, type: "cutter", count: 1, formation: "behind_tail_bias" },
+      { t: 1.8, type: "chaser", count: 4, formation: "arc", arcDeg: 150 },
+      { t: 4.2, type: "cutter", count: 1, formation: "behind_tail_bias" },
+      { t: 6.8, type: "chaser", count: 4, formation: "opposite" },
+      { t: 9.8, type: "shooter", count: 1, formation: "corners" },
+      { t: 11.2, type: "cutter", count: 2, formation: "behind_tail_bias" },
+      { t: 14.0, type: "chaser", count: 5, formation: "random_ring" },
+    ],
+    capsOverride: { maxShooters: 2, maxCutters: 4, maxTotal: 12 },
+    extraScrapClusters: 1,
+    enemySpeedMult: 1.22,
+    scrapBursts: [
+      { t: 5.4, clusters: 1, scrapType: "heavy" },
+      { t: 10.6, clusters: 1, scrapType: "heavy" },
+    ],
+  },
+  {
+    id: "core_monsoon",
+    kind: "sectorEvent",
+    minLevel: 6,
+    rewardBoltsBonus: 14,
+    rewardCoresBonus: 2,
+    durationSec: 17,
+    patternId: "core_monsoon",
+    spawns: [
+      { t: 0.7, type: "shooter", count: 2, formation: "corners" },
+      { t: 3.5, type: "chaser", count: 4, formation: "arc", arcDeg: 140 },
+      { t: 6.3, type: "cutter", count: 1, formation: "behind_tail_bias" },
+      { t: 8.9, type: "shooter", count: 2, formation: "opposite" },
+      { t: 12.1, type: "chaser", count: 4, formation: "random_ring" },
+      { t: 14.4, type: "shooter", count: 1, formation: "corners" },
+    ],
+    capsOverride: { maxShooters: 4, maxCutters: 2, maxTotal: 11 },
+    extraScrapClusters: 2,
+    projectileSpeedMult: 1.08,
+    scrapBursts: [
+      { t: 2.2, clusters: 1, scrapType: "heavy" },
+      { t: 5.8, clusters: 1, scrapType: "rareShard" },
+      { t: 9.7, clusters: 1, scrapType: "heavy" },
+      { t: 13.1, clusters: 1, scrapType: "rareShard" },
+    ],
+    projectileBursts: [
+      { t: 4.1, count: 4, formation: "corners", speedMult: 1.05, damageMult: 1, spreadDeg: 14 },
+      { t: 10.2, count: 5, formation: "opposite", speedMult: 1.08, damageMult: 1, spreadDeg: 16 },
+      { t: 13.8, count: 5, formation: "corners", speedMult: 1.12, damageMult: 1.1, spreadDeg: 18 },
     ],
   },
 ] as const;
@@ -535,5 +629,9 @@ function pickLevelFinale(levelIndex: number, modifierId: EndlessLevelModifierId)
       return level >= 3 && level % 3 === 0 ? "salvage_storm" : null;
     case "ion_storm":
       return level >= 5 && level % 4 === 1 ? "ion_tempest" : null;
+    case "breaker_surge":
+      return level >= 5 && level % 3 === 2 ? "breaker_ring" : null;
+    case "reclaimer_uplink":
+      return level >= 6 && level % 4 === 2 ? "core_monsoon" : null;
   }
 }

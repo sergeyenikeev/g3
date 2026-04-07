@@ -47,8 +47,11 @@ describe("endlessLevels", () => {
     expect(getEndlessLevelFinaleForLevel(2, "crossfire_protocol")?.id).toBe("crossfire_overseer");
     expect(getEndlessLevelFinaleForLevel(6, "iron_convoy")?.id).toBe("scrap_juggernaut");
     expect(getEndlessLevelFinaleForLevel(3, "salvage_surge")?.id).toBe("salvage_storm");
+    expect(getEndlessLevelFinaleForLevel(5, "breaker_surge")?.id).toBe("breaker_ring");
+    expect(getEndlessLevelFinaleForLevel(6, "reclaimer_uplink")?.id).toBe("core_monsoon");
     expect(getEndlessLevelFinaleForLevel(2, "salvage_surge")).toBeNull();
     expect(getEndlessLevelFinaleForLevel(4, "razor_parade")).toBeNull();
+    expect(getEndlessLevelFinaleForLevel(7, "reclaimer_uplink")).toBeNull();
   });
 
   it("exposes the current finale when the level rolled one", () => {

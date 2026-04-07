@@ -42,11 +42,19 @@ const BRANCH_BADGES_BY_UPGRADE_ID: Record<string, string[]> = {
 
 const META_BADGES_BY_NODE_ID: Record<string, string[]> = {
   meta_core_1: ["core", "collection"],
+  meta_core_2: ["core", "collection"],
   meta_coil_1: ["flip", "combat"],
+  meta_coil_2: ["flip", "combat"],
   meta_frame_1: ["frame", "survival"],
+  meta_frame_2: ["frame", "survival"],
   meta_tail_1: ["tail", "mobility"],
+  meta_tail_2: ["tail", "mobility"],
   meta_dash_unlock: ["dash", "mobility"],
+  meta_dash_caps: ["dash", "mobility"],
+  meta_salvage_routes: ["economy", "collection"],
+  meta_flux_rig: ["flip", "combat"],
   meta_recycler_overdrive: ["recycler", "economy"],
+  meta_recycler_lattice: ["recycler", "economy"],
 };
 
 type DashPerks = Partial<Record<"dash_module" | "dash_ram" | "dash_wake" | "dash_arc" | "dash_siphon", unknown>>;

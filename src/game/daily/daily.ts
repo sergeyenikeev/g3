@@ -17,7 +17,11 @@ export function getUtcYyyymmdd(d: Date = new Date()): string {
 
 export function pickDailyVariant(cfg: DailyConfig, dateUtc: string): DailySelection {
   const rng = createRng(`daily:${dateUtc}`);
-  const entries = cfg.dailyVariants.map((v) => ({ item: v, weight: v.weight }));
+  const activeRotation =
+    cfg.rotations?.find((rotation) => rotation.fromDateUtc <= dateUtc && dateUtc <= rotation.toDateUtc) ?? null;
+  const allowedIds = activeRotation?.variantIds?.length ? new Set(activeRotation.variantIds) : null;
+  const pool = allowedIds ? cfg.dailyVariants.filter((variant) => allowedIds.has(variant.id)) : cfg.dailyVariants;
+  const entries = (pool.length > 0 ? pool : cfg.dailyVariants).map((v) => ({ item: v, weight: v.weight }));
   const variant = rng.weightedPick(entries);
   return { dateUtc, variantId: variant.id, specialRule: variant.specialRule as any };
 }
@@ -28,4 +32,3 @@ export function applyDailyToConfig(cfg: unknown, perks: PerkState, dailyCfg: Dai
   const effects = variant.modifiers as unknown as Effect[];
   applyEffects({ config: cfg, perks }, effects);
 }
-

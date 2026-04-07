@@ -27,7 +27,14 @@ export class AdsManager {
 
     if (res.ok && res.rewarded) {
       const s = this.saveManager.get();
-      await this.saveManager.save({ ...s, ads: { ...s.ads, lastRewardedAtMs: now } });
+      await this.saveManager.save({
+        ...s,
+        ads: {
+          ...s.ads,
+          lastRewardedAtMs: now,
+          rewardedChainCount: Math.max(0, Math.floor(s.ads.rewardedChainCount ?? 0)) + 1,
+        },
+      });
       this.track(ANALYTICS_EVENTS.AD_REWARDED_COMPLETE, { placement, rewarded: true });
       return res;
     }
@@ -44,7 +51,15 @@ export class AdsManager {
     const now = Date.now();
     const save = this.saveManager.get();
     const allowed = canShowInterstitial(cfg, save, now);
-    if (!allowed.ok) return false;
+    if (!allowed.ok) {
+      this.track(ANALYTICS_EVENTS.AD_INTERSTITIAL_FAIL, {
+        placement,
+        reason: allowed.reason,
+        rewardedChainCount: save.ads.rewardedChainCount,
+        lastRunDurationSec: save.ads.lastRunDurationSec,
+      });
+      return false;
+    }
 
     this.track(ANALYTICS_EVENTS.AD_INTERSTITIAL_OFFER, { placement });
     this.track(ANALYTICS_EVENTS.AD_INTERSTITIAL_START, { placement });
@@ -58,7 +73,18 @@ export class AdsManager {
 
     if (shown) {
       const s = this.saveManager.get();
-      await this.saveManager.save({ ...s, ads: { ...s.ads, lastInterstitialAtMs: now } });
+      const dateUtc = new Date(now).toISOString().slice(0, 10).replaceAll("-", "");
+      const shownToday = s.ads.interstitialDateUtc === dateUtc ? Math.max(0, Math.floor(s.ads.interstitialsShownToday ?? 0)) : 0;
+      await this.saveManager.save({
+        ...s,
+        ads: {
+          ...s.ads,
+          lastInterstitialAtMs: now,
+          rewardedChainCount: 0,
+          interstitialDateUtc: dateUtc,
+          interstitialsShownToday: shownToday + 1,
+        },
+      });
       this.track(ANALYTICS_EVENTS.AD_INTERSTITIAL_COMPLETE, { placement, shown: true });
       return true;
     }
@@ -75,4 +101,3 @@ export class AdsManager {
     }
   }
 }
-

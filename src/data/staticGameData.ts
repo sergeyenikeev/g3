@@ -3,6 +3,8 @@ import type {
   BalancePresetsConfig,
   DailyConfig,
   EnemiesConfig,
+  LeaderboardsConfig,
+  LiveopsConfig,
   MetaTreeConfig,
   PatternsConfig,
   RunUpgradeDef,
@@ -15,8 +17,9 @@ export type StaticGameData = {
   waveSets: WaveSetsConfig;
   patterns: PatternsConfig;
   daily: DailyConfig;
+  liveops: LiveopsConfig;
+  leaderboards: LeaderboardsConfig;
   runUpgrades: RunUpgradeDef[];
   balancePresets: BalancePresetsConfig;
   metaTree: MetaTreeConfig;
 };
-

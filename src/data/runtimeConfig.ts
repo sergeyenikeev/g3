@@ -1,6 +1,6 @@
 import { deepMerge } from "../core/deepMerge";
 import { applyEffects, type PerkState } from "../game/effects/applyEffects";
-import type { BalancePresetsConfig, Balances, MetaTreeConfig } from "./types";
+import type { BalancePresetsConfig, Balances, LeaderboardsConfig, LiveopsConfig, MetaTreeConfig } from "./types";
 import type { StaticGameData } from "./staticGameData";
 import type { EnemiesConfig, EnemyType, RunUpgradeDef, WaveSetsConfig, PatternsConfig, DailyConfig } from "./types";
 
@@ -9,6 +9,8 @@ export type RuntimeConfig = Balances & {
   waveSets: WaveSetsConfig;
   patterns: PatternsConfig;
   daily: DailyConfig;
+  liveops: LiveopsConfig;
+  leaderboards: LeaderboardsConfig;
   runUpgrades: RunUpgradeDef[];
   balancePresets: BalancePresetsConfig;
   metaTree: MetaTreeConfig;
@@ -32,6 +34,8 @@ export function buildRuntimeConfig(data: StaticGameData, opts: BuildConfigOption
     waveSets: structuredClone(data.waveSets),
     patterns: structuredClone(data.patterns),
     daily: structuredClone(data.daily),
+    liveops: structuredClone(data.liveops),
+    leaderboards: structuredClone(data.leaderboards),
     runUpgrades: structuredClone(data.runUpgrades),
     balancePresets: structuredClone(data.balancePresets),
     metaTree: structuredClone(data.metaTree),

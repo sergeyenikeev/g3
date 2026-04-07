@@ -12,7 +12,7 @@ import { addEnemyDisruption, createEnemyDisruptionState, resolveEnemyVelocity, t
 import { Tail, type ScrapType } from "../entities/tail";
 import { GAME_EVENTS } from "../events";
 import { consumeActions, inputState } from "../input/inputState";
-import type { RunMode, RunState } from "../run/runState";
+import type { PendingStartBoosterPayload, RunMode, RunState } from "../run/runState";
 import {
   createEndlessLevelProgress,
   getCurrentEndlessLevelFinale,
@@ -205,7 +205,7 @@ export class GameScene extends Phaser.Scene {
   private banking = { active: false, t: 0 };
   private revivePending = false;
   private reviveOffered = false;
-  private pendingStartBooster = false;
+  private pendingStartBooster: PendingStartBoosterPayload | null = null;
   private tutorialEnemySpawned = false;
 
   constructor() {
@@ -229,8 +229,10 @@ export class GameScene extends Phaser.Scene {
     });
     if (mode === "tutorial") applyTrainingModeConfig(built.config);
 
-    this.pendingStartBooster = Boolean(this.registry.get("pendingStartBooster"));
-    this.registry.set("pendingStartBooster", false);
+    const pendingStartBooster = this.registry.get("pendingStartBooster");
+    this.pendingStartBooster =
+      pendingStartBooster && typeof pendingStartBooster === "object" ? (pendingStartBooster as PendingStartBoosterPayload) : null;
+    this.registry.set("pendingStartBooster", null);
 
     this.rng = createRng(
       mode === "daily" ? `daily-run:${currentDateUtc}` : mode === "tutorial" ? `tutorial:${Date.now()}` : `run:${Date.now()}`
@@ -251,6 +253,18 @@ export class GameScene extends Phaser.Scene {
       pickedUpgrades: {},
       pityNoRareOrEpicPicks: 0,
       endless: createEndlessLevelProgress(this.rng),
+      metrics: {
+        scrapCollected: 0,
+        heavyScrapCollected: 0,
+        banksCompleted: 0,
+        boltsBanked: 0,
+        projectilesDeflected: 0,
+        flipsUsed: 0,
+        upgradesPicked: 0,
+        reviveOffers: 0,
+        revivesAccepted: 0,
+        startBoosterSource: null,
+      },
     };
 
     if (mode === "daily") {
@@ -634,7 +648,7 @@ export class GameScene extends Phaser.Scene {
           const ent = this.projectiles.find((pp) => pp.sprite === p);
           if (ent && ent.owner === "enemy") {
             ent.owner = "player";
-            this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: p.x, y: p.y });
+            this.noteProjectileDeflect(p.x, p.y);
             this.addLevelObjectiveProgress("deflect_projectiles", 1);
           } else if (ent) {
             ent.owner = "player";
@@ -1214,6 +1228,7 @@ export class GameScene extends Phaser.Scene {
     this.queueFlipPulse(1, 1, true, true);
     this.playerInvuln = Math.max(this.playerInvuln, cfg.postFlipInvulnSec);
     this.flipCount += 1;
+    this.state.metrics.flipsUsed += 1;
     this.applyFlipShield();
 
     const echo = this.state.perks.polarity_echo?.params;
@@ -1341,7 +1356,7 @@ export class GameScene extends Phaser.Scene {
       spr.body.velocity.y = dirY * speed + ny * 60;
       spr.setRotation(Math.atan2(spr.body.velocity.y, spr.body.velocity.x));
       projectile.owner = "player";
-      this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x: spr.x, y: spr.y });
+      this.noteProjectileDeflect(spr.x, spr.y);
       this.addLevelObjectiveProgress("deflect_projectiles", 1);
       projectileHits += 1;
     }
@@ -1607,6 +1622,8 @@ export class GameScene extends Phaser.Scene {
     const x = s.x;
     const y = s.y;
     const type = (s.getData("scrapType") as ScrapType | undefined) ?? "common";
+    this.state.metrics.scrapCollected += 1;
+    if (type === "heavy") this.state.metrics.heavyScrapCollected += 1;
 
     if (this.tail.length < this.state.config.tail.maxLenCap) {
       this.tail.addSegment(type, this.player.x, this.player.y);
@@ -1646,6 +1663,8 @@ export class GameScene extends Phaser.Scene {
       counts.heavy * this.getHeavyScrapBoltValue();
     const bolts = Math.floor(boltsBase * m);
     this.state.bolts += bolts;
+    this.state.metrics.banksCompleted += 1;
+    this.state.metrics.boltsBanked += bolts;
     this.addLevelObjectiveProgress("bank_bolts", bolts);
 
     const heal = Math.max(1, Math.floor(this.state.config.recycler.healOnBank * this.getBankHealMult()));
@@ -1942,6 +1961,7 @@ export class GameScene extends Phaser.Scene {
   private offerRevive(): void {
     this.revivePending = true;
     this.reviveOffered = true;
+    this.state.metrics.reviveOffers += 1;
     void signalPlatformGameplayStop(this.platformAdapter);
     this.physics.world.pause();
     try {
@@ -1963,6 +1983,7 @@ export class GameScene extends Phaser.Scene {
   private onReviveAccepted(): void {
     if (!this.revivePending) return;
     this.revivePending = false;
+    this.state.metrics.revivesAccepted += 1;
     void signalPlatformGameplayStart(this.platformAdapter);
     this.physics.world.resume();
     try {
@@ -2367,19 +2388,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   private applyStartBooster(): void {
+    const payload = this.pendingStartBooster;
     const cfg = this.state.config.ads?.rewarded?.startBooster;
-    if (!cfg?.enabled) return;
+    if (!payload && !cfg?.enabled) return;
 
-    const addBolts = Math.max(0, Math.floor(cfg.addBolts));
-    const addCores = Math.max(0, Math.floor(cfg.addCores));
-    const addTailSegments = Math.max(0, Math.floor(cfg.addTailSegments));
+    const addBolts = Math.max(0, Math.floor(payload?.addBolts ?? cfg?.addBolts ?? 0));
+    const addCores = Math.max(0, Math.floor(payload?.addCores ?? cfg?.addCores ?? 0));
+    const addTailSegments = Math.max(0, Math.floor(payload?.addTailSegments ?? cfg?.addTailSegments ?? 0));
 
     this.state.bolts += addBolts;
     this.state.cores += addCores;
+    this.state.metrics.startBoosterSource = payload?.source ?? "rewarded";
 
     for (let i = 0; i < addTailSegments; i++) {
       this.tail.addSegment("common", this.player.x, this.player.y);
     }
+  }
+
+  private noteProjectileDeflect(x: number, y: number): void {
+    this.state.metrics.projectilesDeflected += 1;
+    this.game.events.emit(GAME_EVENTS.PROJECTILE_DEFLECTED, { x, y });
   }
 
   private createVfxSystem(): void {

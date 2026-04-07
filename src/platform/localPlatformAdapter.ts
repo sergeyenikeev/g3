@@ -1,5 +1,6 @@
 import type { PlatformAdapter, RewardedResult } from "./platformAdapter";
-import { PLATFORM_SAVE_KEY } from "./storageKeys";
+import type { PlatformLeaderboardSnapshot } from "./platformAdapter";
+import { PLATFORM_LEADERBOARD_KEY, PLATFORM_SAVE_KEY } from "./storageKeys";
 import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "./utils/localStorage";
 
 export class LocalPlatformAdapter implements PlatformAdapter {
@@ -26,5 +27,48 @@ export class LocalPlatformAdapter implements PlatformAdapter {
   async load(): Promise<unknown | null> {
     return safeJsonParse(safeLocalStorageGet(PLATFORM_SAVE_KEY));
   }
+
+  async submitScore(boardId: string, score: number): Promise<void> {
+    const store = readLeaderboards();
+    const entries = Array.isArray(store[boardId]) ? store[boardId] : [];
+    entries.push({
+      score: Math.max(0, Math.floor(score)),
+      playerName: "LOCAL",
+      createdAtMs: Date.now(),
+    });
+    entries.sort((a, b) => b.score - a.score || b.createdAtMs - a.createdAtMs);
+    store[boardId] = entries.slice(0, 20);
+    writeLeaderboards(store);
+  }
+
+  async getLeaderboard(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): Promise<PlatformLeaderboardSnapshot | null> {
+    const store = readLeaderboards();
+    const entries = (Array.isArray(store[boardId]) ? store[boardId] : []).map((entry, index) => ({
+      rank: index + 1,
+      score: Math.max(0, Math.floor(entry.score)),
+      playerName: typeof entry.playerName === "string" ? entry.playerName : `LOCAL-${index + 1}`,
+    }));
+    return {
+      boardId,
+      scope,
+      source: "local",
+      entries,
+      currentPlayerRank: entries[0]?.rank ?? null,
+      currentPlayerScore: entries[0]?.score ?? null,
+    };
+  }
 }
 
+type LocalLeaderboardStore = Record<string, Array<{ score: number; playerName: string; createdAtMs: number }>>;
+
+function readLeaderboards(): LocalLeaderboardStore {
+  const raw = safeJsonParse(safeLocalStorageGet(PLATFORM_LEADERBOARD_KEY));
+  if (!raw || typeof raw !== "object") return {};
+  return raw as LocalLeaderboardStore;
+}
+
+function writeLeaderboards(value: LocalLeaderboardStore): void {
+  const raw = safeJsonStringify(value);
+  if (!raw) return;
+  safeLocalStorageSet(PLATFORM_LEADERBOARD_KEY, raw);
+}

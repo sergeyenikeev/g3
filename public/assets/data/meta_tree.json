@@ -66,6 +66,88 @@
         { "op": "add", "path": "recycler.boltsPerScrapHeavy", "value": 1 },
         { "op": "add", "path": "recycler.healOnBank", "value": 6 }
       ]
+    },
+    {
+      "id": "meta_core_2",
+      "name": "Magnet Core II",
+      "maxLevel": 6,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "add", "path": "magnet.radiusBase", "value": 5 },
+        { "op": "mul", "path": "magnet.pullAccelBase", "value": 1.02 }
+      ]
+    },
+    {
+      "id": "meta_coil_2",
+      "name": "Polarity Coil II",
+      "maxLevel": 5,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "mul", "path": "flip.cooldownBaseSec", "value": 0.95 },
+        { "op": "add", "path": "flip.radius", "value": 6 }
+      ]
+    },
+    {
+      "id": "meta_frame_2",
+      "name": "Reinforced Frame II",
+      "maxLevel": 4,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "add", "path": "player.hpMax", "value": 10 },
+        { "op": "add", "path": "recycler.healOnBank", "value": 2 }
+      ]
+    },
+    {
+      "id": "meta_tail_2",
+      "name": "Caravan Linkage II",
+      "maxLevel": 4,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "add", "path": "tail.maxLenBase", "value": 2 },
+        { "op": "mul", "path": "player.tailSpeedPenaltyPerSegment", "value": 0.95 }
+      ]
+    },
+    {
+      "id": "meta_salvage_routes",
+      "name": "Salvage Routes",
+      "maxLevel": 4,
+      "costCurrency": "bolts",
+      "effectsPerLevel": [
+        { "op": "add", "path": "recycler.boltsPerScrapCommon", "value": 1 },
+        { "op": "add", "path": "recycler.boltsPerScrapHeavy", "value": 1 }
+      ]
+    },
+    {
+      "id": "meta_flux_rig",
+      "name": "Flux Rig",
+      "maxLevel": 1,
+      "cost": { "currency": "cores", "amount": 4 },
+      "effects": [
+        { "op": "set", "path": "flip.shrapnel.enabled", "value": true },
+        { "op": "add", "path": "flip.pushForce", "value": 140 }
+      ]
+    },
+    {
+      "id": "meta_recycler_lattice",
+      "name": "Recycler Lattice",
+      "maxLevel": 1,
+      "cost": { "currency": "cores", "amount": 5 },
+      "effects": [
+        { "op": "mul", "path": "recycler.bankTimeSec", "value": 0.88 },
+        { "op": "add", "path": "recycler.healOnBank", "value": 5 },
+        { "op": "add", "path": "scrap.types.rareShard.coreDropChance", "value": 0.08 }
+      ]
+    },
+    {
+      "id": "meta_dash_caps",
+      "name": "Dash Capacitors",
+      "maxLevel": 1,
+      "cost": { "currency": "cores", "amount": 4 },
+      "effects": [
+        { "op": "mul", "path": "dash.cooldownSec", "value": 0.85 },
+        { "op": "add", "path": "dash.iframesSec", "value": 0.06 },
+        { "op": "mul", "path": "dash.durationSec", "value": 1.1 }
+      ]
     }
   ]
 }

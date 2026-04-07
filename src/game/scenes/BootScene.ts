@@ -8,6 +8,8 @@ import { createPlatformAdapter } from "../../platform/platformFactory";
 import { getPlatformLanguageHint, resolvePlatformTimeOffsetMs } from "../../platform/platformRuntime";
 import { SaveManager } from "../../platform/save/saveManager";
 import { resolveLocale } from "../../i18n/localization";
+import { getUtcYyyymmdd } from "../daily/daily";
+import { normalizeLiveopsSave } from "../liveops/liveops";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -21,6 +23,8 @@ export class BootScene extends Phaser.Scene {
     this.load.json("wave_sets", "data/wave_sets.json");
     this.load.json("patterns", "data/patterns.json");
     this.load.json("daily", "data/daily.json");
+    this.load.json("liveops", "data/liveops.json");
+    this.load.json("leaderboards", "data/leaderboards.json");
     this.load.json("run_upgrades", "data/run_upgrades.json");
     this.load.json("balance_presets", "data/balance_presets.json");
     this.load.json("meta_tree", "data/meta_tree.json");
@@ -77,6 +81,8 @@ export class BootScene extends Phaser.Scene {
       waveSets: this.cache.json.get("wave_sets"),
       patterns: this.cache.json.get("patterns"),
       daily: this.cache.json.get("daily"),
+      liveops: this.cache.json.get("liveops"),
+      leaderboards: this.cache.json.get("leaderboards"),
       runUpgrades: this.cache.json.get("run_upgrades"),
       balancePresets: this.cache.json.get("balance_presets"),
       metaTree: this.cache.json.get("meta_tree"),
@@ -92,7 +98,28 @@ export class BootScene extends Phaser.Scene {
     const platformLanguageHint = getPlatformLanguageHint(adapter);
     const platformTimeOffsetMs = await resolvePlatformTimeOffsetMs(adapter);
     const saveManager = new SaveManager(adapter);
-    const save = await saveManager.load();
+    let save = await saveManager.load();
+    const dateUtc = getUtcYyyymmdd(new Date(Date.now() + platformTimeOffsetMs));
+    const liveopsInit = normalizeLiveopsSave(
+      save,
+      (this.registry.get("staticGameData") as StaticGameData).liveops,
+      (this.registry.get("staticGameData") as StaticGameData).leaderboards,
+      dateUtc
+    );
+    let nextSave = liveopsInit.save;
+    if ((nextSave.ads.rewardedChainCount ?? 0) !== 0) {
+      nextSave = {
+        ...nextSave,
+        ads: {
+          ...nextSave.ads,
+          rewardedChainCount: 0,
+        },
+      };
+    }
+    if (nextSave !== save) {
+      save = nextSave;
+      await saveManager.save(save);
+    }
 
     const analytics = createAnalyticsAdapter();
     await analytics.init();
@@ -108,8 +135,21 @@ export class BootScene extends Phaser.Scene {
     this.registry.set("locale", locale);
     this.registry.set("analytics", analytics);
     this.registry.set("adsManager", adsManager);
+    this.registry.set("liveopsSessionSummary", liveopsInit.summary);
+    this.registry.set("currentDateUtc", dateUtc);
 
-    trackSessionStart(analytics, adapter.name);
+    trackSessionStart(analytics, adapter.name, {
+      dateUtc,
+      returnGapDays: liveopsInit.summary.returnedAfterDays,
+      streakDay: liveopsInit.summary.streakDay,
+      sessionsStarted: save.liveops.sessionsStarted,
+    });
+    if (liveopsInit.summary.returnedAfterDays >= 1) {
+      analytics.track(ANALYTICS_EVENTS.RETURN_AFTER_DAY, {
+        dateUtc,
+        daysAway: liveopsInit.summary.returnedAfterDays,
+      });
+    }
     try {
       window.addEventListener("beforeunload", () => trackSessionEnd(analytics, adapter.name));
     } catch {
@@ -120,8 +160,8 @@ export class BootScene extends Phaser.Scene {
   }
 }
 
-function trackSessionStart(analytics: AnalyticsAdapter, platform: string): void {
-  analytics.track(ANALYTICS_EVENTS.SESSION_START, { platform, t: Date.now() });
+function trackSessionStart(analytics: AnalyticsAdapter, platform: string, payload: Record<string, unknown>): void {
+  analytics.track(ANALYTICS_EVENTS.SESSION_START, { platform, t: Date.now(), ...payload });
 }
 
 function trackSessionEnd(analytics: AnalyticsAdapter, platform: string): void {

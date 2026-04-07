@@ -145,6 +145,10 @@ export type Balances = {
     disableInterstitialUntilTutorialDone: boolean;
     interstitialMinRunsCompleted: number;
     noInterstitialAfterRewardedSec: number;
+    interstitialDailyCap: number;
+    interstitialMinRunDurationSec: number;
+    noInterstitialAfterFrustrationSec: number;
+    noInterstitialAfterRewardedChain: number;
     rewarded: {
       revive: {
         enabled: boolean;
@@ -291,12 +295,112 @@ export type DailyConfig = {
     extraAttemptRewardedMax: number;
     coreDropBonus: number;
   };
+  rotations?: Array<{
+    id: string;
+    fromDateUtc: string;
+    toDateUtc: string;
+    variantIds?: string[];
+    ui?: { badge?: string; title?: string; desc?: string };
+  }>;
   dailyVariants: Array<{
     id: string;
     weight: number;
     modifiers: Array<{ op: "mul" | "add" | "set"; path: string; value: unknown }>;
     ui?: { title?: string; desc?: string };
     specialRule?: Record<string, unknown>;
+  }>;
+};
+
+export type MissionObjectiveType =
+  | "reach_wave"
+  | "bank_bolts"
+  | "collect_heavy_scrap"
+  | "deflect_projectiles"
+  | "complete_runs"
+  | "use_flip"
+  | "score_points"
+  | "gain_bolts";
+
+export type LiveopsMissionDef = {
+  id: string;
+  weight: number;
+  objective: {
+    type: MissionObjectiveType;
+    target: number;
+  };
+  reward: {
+    bolts: number;
+    cores: number;
+  };
+  ui?: {
+    title?: string;
+    desc?: string;
+  };
+};
+
+export type LiveopsConfig = {
+  onboarding: {
+    freeBoostedRunUses: number;
+    freeBoostTailSegments: number;
+    freeBoostBolts: number;
+    freeBoostCores: number;
+  };
+  streak: {
+    maxDay: number;
+    graceDays: number;
+    rewards: Array<{
+      day: number;
+      bolts: number;
+      cores: number;
+    }>;
+  };
+  comeback: {
+    idleDays: number;
+    reward: {
+      bolts: number;
+      cores: number;
+    };
+    ui?: {
+      title?: string;
+      desc?: string;
+    };
+  };
+  missions: {
+    daily: {
+      slots: number;
+      pool: LiveopsMissionDef[];
+    };
+    weekly: {
+      slots: number;
+      startsOnUtc: "monday";
+      pool: LiveopsMissionDef[];
+    };
+  };
+  tomorrowOffer: {
+    reward: {
+      bolts: number;
+      cores: number;
+    };
+    ui?: {
+      title?: string;
+      desc?: string;
+    };
+  };
+};
+
+export type LeaderboardBoardScope = "daily" | "weekly" | "all_time";
+
+export type LeaderboardsConfig = {
+  localEntryLimit: number;
+  boards: Array<{
+    id: string;
+    key: "daily" | "weekly" | "all_time";
+    scope: LeaderboardBoardScope;
+    ui?: {
+      title?: string;
+      desc?: string;
+    };
+    rewardByDivision?: Partial<Record<"scrapper" | "raider" | "ace" | "elite" | "legend", { bolts: number; cores: number }>>;
   }>;
 };
 

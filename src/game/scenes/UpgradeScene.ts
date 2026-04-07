@@ -318,6 +318,7 @@ export class UpgradeScene extends Phaser.Scene {
     const prev = this.state.pickedUpgrades[def.id];
     const nextStacks = (prev?.stacks ?? 0) + 1;
     if (nextStacks > def.maxStacks) return;
+    this.state.metrics.upgradesPicked += 1;
 
     this.state.pickedUpgrades[def.id] = { stacks: nextStacks, rarity: def.rarity };
 

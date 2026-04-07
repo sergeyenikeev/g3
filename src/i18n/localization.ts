@@ -25,6 +25,17 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "menu.dailyBoost": "DAILY + BOOST",
     "menu.dailyBoostExtra": "DAILY + BOOST (Extra Attempt)",
     "menu.dailyBoostLocked": "DAILY + BOOST (Locked)",
+    "menu.playFreeBoost": (p) => `PLAY + FREE BOOST (${p?.usesLeft ?? 0} left)`,
+    "menu.rotationLine": (p) => `Rotation: ${p?.badge ?? "Event"} | ${p?.title ?? "Daily Rotation"}`,
+    "menu.streakLine": (p) => `Streak Day ${p?.day ?? 1}: ${p?.reward ?? ""} | ${p?.status ?? ""}`,
+    "menu.claimReady": "claim ready",
+    "menu.claimedToday": "claimed today",
+    "menu.missionsLine": (p) =>
+      `Missions: daily ${p?.dailyDone ?? 0}/${p?.dailyTotal ?? 0} | weekly ${p?.weeklyDone ?? 0}/${p?.weeklyTotal ?? 0} | ready ${p?.ready ?? 0}`,
+    "menu.comebackLine": (p) => `Comeback: ${p?.days ?? 0} days away | ${p?.reward ?? ""}`,
+    "menu.tomorrowOfferLine": (p) => `Tomorrow: ${p?.title ?? "Fresh yard bonus"} | ${p?.reward ?? ""}`,
+    "menu.claimOpsReady": (p) => `CLAIM READY (${p?.count ?? 0})`,
+    "menu.claimOpsIdle": "NO CLAIMS READY",
     "menu.tagline": "Flip the field. Bank the haul. Outlast the swarm.",
     "menu.heroLead": "Escort the magnet rig through scrap storms and feed the recycler before the swarm closes in.",
     "menu.controls": "WASD/Arrows: move | Space: flip | Shift: dash",
@@ -76,6 +87,8 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "menu.boostDailyUnavailable": "Boosted daily: unavailable today.",
     "menu.seedLine": (p) => `Seed: ${p?.seed ?? "-"}`,
     "menu.attemptsLine": (p) => `Attempts: ${p?.used ?? 0}/${p?.max ?? 0} | ${p?.best ?? "-"}`,
+    "menu.loginRewardLine": (p) =>
+      `Login reward: Day ${p?.day ?? 1}/${p?.maxDay ?? 5} ${p?.reward ?? ""} | Next Day ${p?.nextDay ?? 1}: ${p?.nextReward ?? ""}`,
     "settings.gfx": "GFX",
     "settings.sfx": "SFX",
     "settings.music": "MUSIC",
@@ -89,6 +102,12 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "toast.sfx": (p) => `SFX: ${p?.value ?? "OFF"}`,
     "toast.music": (p) => `Music: ${p?.value ?? "OFF"}`,
     "toast.language": (p) => `Language: ${p?.value ?? "English"}`,
+    "toast.loginReward": (p) => `Login reward claimed: Day ${p?.day ?? 1} | ${p?.reward ?? ""}`,
+    "toast.noOpsReady": "No liveops rewards ready yet.",
+    "toast.opsClaimed": (p) => `Claimed liveops rewards: ${p?.reward ?? ""}`,
+    "toast.freeBoostApplied": (p) => `Free boost loaded: ${p?.reward ?? ""}`,
+    "toast.weeklyBoardReward": (p) => `Weekly board reward: ${p?.division ?? "Scrapper"} | ${p?.reward ?? ""}`,
+    "toast.comebackReady": (p) => `Comeback cache ready after ${p?.days ?? 0} days away.`,
     "toast.pilot": (p) => `Pilot: ${p?.value ?? "AUTO"}`,
     "language.auto": "Auto",
     "language.ru": "Russian",
@@ -121,6 +140,7 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "results.bestDeltaNone": "First ranked result",
     "results.nextDivision": (p) => `Next division: ${p?.division ?? "Raider"} at ${p?.score ?? "0"}`,
     "results.topDivision": "Top division reached",
+    "results.weeklyBoard": (p) => `Weekly board: #${p?.rank ?? 0} | ${p?.division ?? "Scrapper"}`,
     "results.rank": (p) => `Rank: #${p?.rank ?? 0}`,
     "results.newRecord": "New record",
     "results.leaderboardTitle": "Leaderboard",
@@ -216,6 +236,17 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "menu.dailyBoost": "ЕЖЕДНЕВКА + БУСТ",
     "menu.dailyBoostExtra": "ЕЖЕДНЕВКА + БУСТ (доп. попытка)",
     "menu.dailyBoostLocked": "ЕЖЕДНЕВКА + БУСТ (закрыта)",
+    "menu.playFreeBoost": (p) => `ИГРАТЬ + БЕСПЛАТНЫЙ БУСТ (${p?.usesLeft ?? 0} ост.)`,
+    "menu.rotationLine": (p) => `Ротация: ${p?.badge ?? "Событие"} | ${p?.title ?? "Дневная ротация"}`,
+    "menu.streakLine": (p) => `Стрик, день ${p?.day ?? 1}: ${p?.reward ?? ""} | ${p?.status ?? ""}`,
+    "menu.claimReady": "можно забрать",
+    "menu.claimedToday": "уже забрано",
+    "menu.missionsLine": (p) =>
+      `Миссии: дневные ${p?.dailyDone ?? 0}/${p?.dailyTotal ?? 0} | недельные ${p?.weeklyDone ?? 0}/${p?.weeklyTotal ?? 0} | готово ${p?.ready ?? 0}`,
+    "menu.comebackLine": (p) => `Камбэк: пауза ${p?.days ?? 0} дн. | ${p?.reward ?? ""}`,
+    "menu.tomorrowOfferLine": (p) => `Завтра: ${p?.title ?? "Бонус двора"} | ${p?.reward ?? ""}`,
+    "menu.claimOpsReady": (p) => `ЗАБРАТЬ НАГРАДЫ (${p?.count ?? 0})`,
+    "menu.claimOpsIdle": "НЕТ ГОТОВЫХ НАГРАД",
     "menu.tagline": "Переверни поле. Сдай лом. Переживи натиск.",
     "menu.heroLead": "Веди магнитный тягач сквозь штормы лома и корми переработчик, пока рой не сомкнулся.",
     "menu.controls": "WASD/Стрелки: движение | Пробел: флип | Shift: рывок",
@@ -251,6 +282,8 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "menu.boostDailyUnavailable": "Буст-дейлик: сегодня недоступен.",
     "menu.seedLine": (p) => `Сид: ${p?.seed ?? "-"}`,
     "menu.attemptsLine": (p) => `Попытки: ${p?.used ?? 0}/${p?.max ?? 0} | ${p?.best ?? "-"}`,
+    "menu.loginRewardLine": (p) =>
+      `Награда за вход: день ${p?.day ?? 1}/${p?.maxDay ?? 5} ${p?.reward ?? ""} | Следующий день ${p?.nextDay ?? 1}: ${p?.nextReward ?? ""}`,
     "settings.gfx": "ГРАФИКА",
     "settings.sfx": "ЭФФЕКТЫ",
     "settings.music": "МУЗЫКА",
@@ -264,6 +297,12 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "toast.sfx": (p) => `Эффекты: ${p?.value ?? "ВЫКЛ"}`,
     "toast.music": (p) => `Музыка: ${p?.value ?? "ВЫКЛ"}`,
     "toast.language": (p) => `Язык: ${p?.value ?? "Русский"}`,
+    "toast.loginReward": (p) => `Награда за вход: день ${p?.day ?? 1} | ${p?.reward ?? ""}`,
+    "toast.noOpsReady": "Пока нечего забирать из liveops.",
+    "toast.opsClaimed": (p) => `Забраны liveops-награды: ${p?.reward ?? ""}`,
+    "toast.freeBoostApplied": (p) => `Бесплатный буст загружен: ${p?.reward ?? ""}`,
+    "toast.weeklyBoardReward": (p) => `Награда weekly board: ${p?.division ?? "Старатель"} | ${p?.reward ?? ""}`,
+    "toast.comebackReady": (p) => `Камбэк-кеш готов: пауза ${p?.days ?? 0} дн.`,
     "language.auto": "Авто",
     "language.ru": "Русский",
     "language.en": "Английский",
@@ -352,6 +391,21 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
 };
 
 Object.assign(MESSAGES.en, {
+  "menu.liveopsTitle": "MISSION BOARD",
+  "menu.dailyMissionsTitle": "TODAY",
+  "menu.weeklyMissionsTitle": "THIS WEEK",
+  "menu.readyBadge": (p?: Record<string, unknown>) => `READY ${p?.count ?? 0}`,
+  "menu.missionReady": "READY",
+  "menu.missionClaimed": "CLAIMED",
+  "menu.missionProgress": "IN PROGRESS",
+  "menu.mission.reach_wave": (p?: Record<string, unknown>) => `Wave ${p?.target ?? 0}`,
+  "menu.mission.bank_bolts": (p?: Record<string, unknown>) => `Bank ${p?.target ?? 0} bolts`,
+  "menu.mission.collect_heavy_scrap": (p?: Record<string, unknown>) => `Heavy scrap ${p?.target ?? 0}`,
+  "menu.mission.deflect_projectiles": (p?: Record<string, unknown>) => `Deflect ${p?.target ?? 0} shots`,
+  "menu.mission.use_flip": (p?: Record<string, unknown>) => `Use FLIP ${p?.target ?? 0}x`,
+  "menu.mission.complete_runs": (p?: Record<string, unknown>) => `Runs ${p?.target ?? 0}`,
+  "menu.mission.score_points": (p?: Record<string, unknown>) => `Score ${p?.target ?? 0}`,
+  "menu.mission.gain_bolts": (p?: Record<string, unknown>) => `Gain ${p?.target ?? 0} bolts`,
   "menu.careerMilestonesTitle": "Career badges",
   "menu.careerUnlocked": "Unlocked",
   "menu.careerNewBadge": "NEW",
@@ -365,6 +419,9 @@ Object.assign(MESSAGES.en, {
     `Career badge unlocked: ${p?.titles ?? ""} (${p?.reward ?? ""})`,
   "results.nextMilestone": (p?: Record<string, unknown>) => `Next badge: ${p?.title ?? "Unknown"}`,
   "results.allMilestones": "All career badges unlocked",
+  "results.weeklyDeltaUp": (p?: Record<string, unknown>) => `Weekly climb: +${p?.value ?? 0}`,
+  "results.weeklyDeltaDown": (p?: Record<string, unknown>) => `Weekly slide: ${p?.value ?? 0}`,
+  "results.weeklyDeltaNew": "Weekly board debut",
   "leaderboard.milestone.score_25000": "Quartermaster 25K",
   "leaderboard.milestone.wave_20": "Frontline 20",
   "leaderboard.milestone.salvage_400": "Scrap Baron",
@@ -372,6 +429,21 @@ Object.assign(MESSAGES.en, {
 });
 
 Object.assign(MESSAGES.ru, {
+  "menu.liveopsTitle": "\u0414\u041e\u0421\u041a\u0410 \u0417\u0410\u0414\u0410\u041d\u0418\u0419",
+  "menu.dailyMissionsTitle": "\u0421\u0415\u0413\u041e\u0414\u041d\u042f",
+  "menu.weeklyMissionsTitle": "\u041d\u0410 \u042d\u0422\u0423 \u041d\u0415\u0414\u0415\u041b\u042e",
+  "menu.readyBadge": (p?: Record<string, unknown>) => `\u0413\u041e\u0422\u041e\u0412\u041e ${p?.count ?? 0}`,
+  "menu.missionReady": "\u0413\u041e\u0422\u041e\u0412\u041e",
+  "menu.missionClaimed": "\u0417\u0410\u0411\u0420\u0410\u041d\u041e",
+  "menu.missionProgress": "\u0412 \u041f\u0420\u041e\u0426\u0415\u0421\u0421\u0415",
+  "menu.mission.reach_wave": (p?: Record<string, unknown>) => `\u0412\u043e\u043b\u043d\u0430 ${p?.target ?? 0}`,
+  "menu.mission.bank_bolts": (p?: Record<string, unknown>) => `\u0421\u0434\u0430\u0439 ${p?.target ?? 0} \u0431\u043e\u043b\u0442.`,
+  "menu.mission.collect_heavy_scrap": (p?: Record<string, unknown>) => `\u0422\u044f\u0436. \u043b\u043e\u043c ${p?.target ?? 0}`,
+  "menu.mission.deflect_projectiles": (p?: Record<string, unknown>) => `\u041e\u0442\u0431\u0435\u0439 ${p?.target ?? 0} \u0432\u044b\u0441\u0442\u0440.`,
+  "menu.mission.use_flip": (p?: Record<string, unknown>) => `\u0424\u041b\u0418\u041f x${p?.target ?? 0}`,
+  "menu.mission.complete_runs": (p?: Record<string, unknown>) => `\u0417\u0430\u0435\u0437\u0434\u043e\u0432 ${p?.target ?? 0}`,
+  "menu.mission.score_points": (p?: Record<string, unknown>) => `\u041e\u0447\u043a\u0438 ${p?.target ?? 0}`,
+  "menu.mission.gain_bolts": (p?: Record<string, unknown>) => `\u0411\u043e\u043b\u0442\u044b ${p?.target ?? 0}`,
   "menu.pilotButton": (p?: Record<string, unknown>) => `\u041f\u0438\u043b\u043e\u0442: ${p?.name ?? "\u0410\u0412\u0422\u041e"}`,
   "menu.pilotAuto": "\u0410\u0412\u0422\u041e",
   "menu.pilotPrompt":
@@ -415,6 +487,13 @@ Object.assign(MESSAGES.ru, {
   "results.nextDivision": (p?: Record<string, unknown>) =>
     `\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f \u043b\u0438\u0433\u0430: ${p?.division ?? "\u0420\u0435\u0439\u0434\u0435\u0440"} \u043d\u0430 ${p?.score ?? "0"}`,
   "results.topDivision": "\u0414\u043e\u0441\u0442\u0438\u0433\u043d\u0443\u0442\u0430 \u0432\u0435\u0440\u0445\u043d\u044f\u044f \u043b\u0438\u0433\u0430",
+  "results.weeklyBoard": (p?: Record<string, unknown>) =>
+    `\u041d\u0435\u0434\u0435\u043b\u044c\u043d\u044b\u0439 \u0440\u0435\u0439\u0442\u0438\u043d\u0433: #${p?.rank ?? 0} | ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"}`,
+  "results.weeklyDeltaUp": (p?: Record<string, unknown>) =>
+    `\u041f\u043e\u0434\u044a\u0451\u043c \u0432 weekly: +${p?.value ?? 0}`,
+  "results.weeklyDeltaDown": (p?: Record<string, unknown>) =>
+    `\u041f\u0440\u043e\u0441\u0430\u0434\u043a\u0430 \u0432 weekly: ${p?.value ?? 0}`,
+  "results.weeklyDeltaNew": "\u0414\u0435\u0431\u044e\u0442 \u0432 weekly-\u0440\u0435\u0439\u0442\u0438\u043d\u0433\u0435",
   "results.nextMilestone": (p?: Record<string, unknown>) =>
     `\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439 \u0431\u0435\u0439\u0434\u0436: ${p?.title ?? "?"}`,
   "results.allMilestones": "\u0412\u0441\u0435 \u043a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0435 \u0431\u0435\u0439\u0434\u0436\u0438 \u0441\u043e\u0431\u0440\u0430\u043d\u044b",
@@ -527,6 +606,38 @@ const META_NODE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
       title: "Recycler Overdrive",
       desc: "Permanent recycler speed, heavy-scrap payout and heal upgrades.",
     },
+    meta_core_2: {
+      title: "Magnet Core II",
+      desc: "Pushes radius and pull strength farther so high-density salvage routes feel smoother.",
+    },
+    meta_coil_2: {
+      title: "Polarity Coil II",
+      desc: "Cuts more FLIP downtime and stretches the pulse radius for cleaner crowd control.",
+    },
+    meta_frame_2: {
+      title: "Reinforced Frame II",
+      desc: "Adds more permanent hull and recycler sustain for longer comeback windows.",
+    },
+    meta_tail_2: {
+      title: "Caravan Linkage II",
+      desc: "Supports longer chains while easing the movement tax from hauling big tails.",
+    },
+    meta_salvage_routes: {
+      title: "Salvage Routes",
+      desc: "Every future bank cashes out harder, especially once the chain gets heavy.",
+    },
+    meta_flux_rig: {
+      title: "Flux Rig",
+      desc: "Starts all future runs with a more violent FLIP pattern and heavier opening tempo.",
+    },
+    meta_recycler_lattice: {
+      title: "Recycler Lattice",
+      desc: "Sharpens bank speed, healing, and shard conversion for long-term economy runs.",
+    },
+    meta_dash_caps: {
+      title: "Dash Capacitors",
+      desc: "Turns dash into a safer, faster breakaway tool with better uptime.",
+    },
   },
   ru: {
     meta_core_1: {
@@ -587,6 +698,124 @@ const DAILY_VARIANT_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   },
 };
 
+const EXTRA_META_NODE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
+  en: {
+    meta_core_2: {
+      title: "Magnet Core II",
+      desc: "Pushes radius and pull strength farther so high-density salvage routes feel smoother.",
+    },
+    meta_coil_2: {
+      title: "Polarity Coil II",
+      desc: "Cuts more FLIP downtime and stretches the pulse radius for cleaner crowd control.",
+    },
+    meta_frame_2: {
+      title: "Reinforced Frame II",
+      desc: "Adds more permanent hull and recycler sustain for longer comeback windows.",
+    },
+    meta_tail_2: {
+      title: "Caravan Linkage II",
+      desc: "Supports longer chains while easing the movement tax from hauling big tails.",
+    },
+    meta_salvage_routes: {
+      title: "Salvage Routes",
+      desc: "Every future bank cashes out harder, especially once the chain gets heavy.",
+    },
+    meta_flux_rig: {
+      title: "Flux Rig",
+      desc: "Starts all future runs with a more violent FLIP pattern and heavier opening tempo.",
+    },
+    meta_recycler_lattice: {
+      title: "Recycler Lattice",
+      desc: "Sharpens bank speed, healing, and shard conversion for long-term economy runs.",
+    },
+    meta_dash_caps: {
+      title: "Dash Capacitors",
+      desc: "Turns dash into a safer, faster breakaway tool with better uptime.",
+    },
+  },
+  ru: {
+    meta_core_2: {
+      title: "Сердечник магнита II",
+      desc: "Ещё сильнее расширяет радиус и тягу, чтобы плотные сборочные маршруты игрались мягче.",
+    },
+    meta_coil_2: {
+      title: "Катушка полярности II",
+      desc: "Ещё ниже кд ФЛИПа и шире импульс для уверенного контроля плотных волн.",
+    },
+    meta_frame_2: {
+      title: "Усиленная рама II",
+      desc: "Добавляет постоянный запас корпуса и устойчивости через лечение переработчика.",
+    },
+    meta_tail_2: {
+      title: "Сцепка каравана II",
+      desc: "Позволяет тащить ещё более длинные цепи и слабее режет скорость за хвост.",
+    },
+    meta_salvage_routes: {
+      title: "Маршруты добычи",
+      desc: "Каждая будущая сдача приносит больше, особенно когда хвост успел разрастись.",
+    },
+    meta_flux_rig: {
+      title: "Флюкс-риг",
+      desc: "Делает все будущие ФЛИПы злее и задаёт более взрывной стартовый темп.",
+    },
+    meta_recycler_lattice: {
+      title: "Решётка переработчика",
+      desc: "Ускоряет сдачу, усиливает лечение и повышает ценность редких осколков.",
+    },
+    meta_dash_caps: {
+      title: "Конденсаторы рывка",
+      desc: "Делают рывок быстрее, безопаснее и заметно доступнее в каждом заезде.",
+    },
+  },
+};
+
+const EXTRA_DAILY_VARIANT_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
+  en: {
+    daily_cash_surge: {
+      title: "Cash Surge",
+      desc: "Every bank pays better, but pressure ramps faster.",
+    },
+    daily_long_tail: {
+      title: "Long Tail",
+      desc: "Longer chains stay controllable and pay off hauling-focused routes.",
+    },
+    daily_hot_dash: {
+      title: "Hot Dash",
+      desc: "Dash comes back sooner, but FLIP asks for cleaner timing.",
+    },
+    daily_shrapnel_field: {
+      title: "Shrapnel Field",
+      desc: "Runs start with shrapnel pulses and a livelier FLIP loop.",
+    },
+    daily_salvage_rain: {
+      title: "Salvage Rain",
+      desc: "The yard is richer and denser, but banking takes a little longer.",
+    },
+  },
+  ru: {
+    daily_cash_surge: {
+      title: "Кассовый всплеск",
+      desc: "Любая сдача приносит больше, но давление раскручивается быстрее.",
+    },
+    daily_long_tail: {
+      title: "Длинный хвост",
+      desc: "Длинные цепи легче удерживать, и они лучше окупают маршрут на сбор.",
+    },
+    daily_hot_dash: {
+      title: "Горячий рывок",
+      desc: "Рывок возвращается быстрее, но ФЛИП требует аккуратного тайминга.",
+    },
+    daily_shrapnel_field: {
+      title: "Осколочное поле",
+      desc: "Заезд стартует с осколочным ФЛИПом и более агрессивным темпом.",
+    },
+    daily_salvage_rain: {
+      title: "Ливень добычи",
+      desc: "На карте больше лома и он появляется чаще, но сдача идёт чуть дольше.",
+    },
+  },
+};
+
 const LEVEL_MODIFIER_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   en: {
     salvage_surge: {
@@ -609,6 +838,14 @@ const LEVEL_MODIFIER_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
       title: "Ion Storm",
       desc: "The whole arena overclocks: enemies, shots and pressure spike, while dash and core gains improve.",
     },
+    breaker_surge: {
+      title: "Breaker Surge",
+      desc: "Cutters and hunter packs crash the lane harder. Banking is faster, but keeping the caravan intact matters more.",
+    },
+    reclaimer_uplink: {
+      title: "Reclaimer Uplink",
+      desc: "Recovery beacons spike salvage and dash tempo, while recycler lanes attract denser crossfire.",
+    },
   },
   ru: {
     salvage_surge: {
@@ -630,6 +867,14 @@ const LEVEL_MODIFIER_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     ion_storm: {
       title: "\u0418\u043e\u043d\u043d\u0430\u044f \u0431\u0443\u0440\u044f",
       desc: "\u0410\u0440\u0435\u043d\u0430 \u0432\u0445\u043e\u0434\u0438\u0442 \u0432 \u0440\u0430\u0437\u043d\u043e\u0441: \u0432\u0440\u0430\u0433\u0438 \u0438 \u0438\u0445 \u0441\u043d\u0430\u0440\u044f\u0434\u044b \u0443\u0441\u043a\u043e\u0440\u044f\u044e\u0442\u0441\u044f, \u0437\u0430\u0442\u043e \u0440\u044b\u0432\u043e\u043a \u0438 \u044f\u0434\u0440\u0430 \u0441\u0442\u0430\u043d\u043e\u0432\u044f\u0442\u0441\u044f \u0446\u0435\u043d\u043d\u0435\u0435.",
+    },
+    breaker_surge: {
+      title: "\u041d\u0430\u0442\u0438\u0441\u043a \u0440\u0435\u0437\u0447\u0438\u043a\u043e\u0432",
+      desc: "\u0420\u0435\u0437\u0447\u0438\u043a\u0438 \u0438 \u043e\u0445\u043e\u0442\u043d\u0438\u0447\u044c\u0438 \u0441\u0442\u0430\u0438 \u0434\u0430\u0432\u044f\u0442 \u0441\u0438\u043b\u044c\u043d\u0435\u0435. \u0421\u0434\u0430\u0447\u0430 \u0438\u0434\u0451\u0442 \u0431\u044b\u0441\u0442\u0440\u0435\u0435, \u043d\u043e \u0445\u0432\u043e\u0441\u0442 \u043d\u0443\u0436\u043d\u043e \u0443\u0434\u0435\u0440\u0436\u0430\u0442\u044c \u0446\u0435\u043b\u044b\u043c.",
+    },
+    reclaimer_uplink: {
+      title: "\u041a\u0430\u043d\u0430\u043b \u0441\u0431\u043e\u0440\u0449\u0438\u043a\u043e\u0432",
+      desc: "\u041c\u0430\u044f\u043a\u0438 \u0434\u043e\u0431\u044b\u0447\u0438 \u0443\u0441\u0438\u043b\u0438\u0432\u0430\u044e\u0442 \u0441\u0431\u043e\u0440 \u0438 \u0440\u044b\u0432\u043e\u043a, \u043d\u043e \u0443 \u043f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a\u0430 \u0441\u0433\u0443\u0449\u0430\u0435\u0442\u0441\u044f \u043f\u0435\u0440\u0435\u043a\u0440\u0451\u0441\u0442\u043d\u044b\u0439 \u043e\u0433\u043e\u043d\u044c.",
     },
   },
 };
@@ -703,6 +948,14 @@ const LEVEL_FINALE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
       title: "Ion Tempest",
       desc: "A rare sector event with storm barrages, rare shards and edge-fire volleys.",
     },
+    breaker_ring: {
+      title: "Breaker Ring",
+      desc: "A cutter-heavy boss ring that keeps collapsing toward the caravan spine.",
+    },
+    core_monsoon: {
+      title: "Core Monsoon",
+      desc: "A salvage squall event with shard bursts, heavy drops and recycler-lane crossfire.",
+    },
   },
   ru: {
     crossfire_overseer: {
@@ -725,6 +978,14 @@ const LEVEL_FINALE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
       title: "\u0418\u043e\u043d\u043d\u044b\u0439 \u0442\u0435\u043c\u043f\u0435\u0441\u0442",
       desc: "\u0420\u0435\u0434\u043a\u043e\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u0435 \u0441\u0435\u043a\u0442\u043e\u0440\u0430: \u0433\u0440\u0430\u043d\u0438\u0447\u043d\u044b\u0435 \u0437\u0430\u043b\u043f\u044b, \u0440\u0435\u0434\u043a\u0438\u0435 \u043e\u0441\u043a\u043e\u043b\u043a\u0438 \u0438 \u0448\u0442\u043e\u0440\u043c\u043e\u0432\u044b\u0435 \u0432\u043e\u043b\u043d\u044b.",
     },
+    breaker_ring: {
+      title: "\u041a\u043e\u043b\u044c\u0446\u043e \u0440\u0435\u0437\u0447\u0438\u043a\u043e\u0432",
+      desc: "\u0424\u0438\u043d\u0430\u043b, \u0433\u0434\u0435 \u0440\u0435\u0437\u0447\u0438\u043a\u0438 \u0441\u0445\u043b\u043e\u043f\u044b\u0432\u0430\u044e\u0442 \u043a\u043e\u043b\u044c\u0446\u043e \u0432\u043e\u043a\u0440\u0443\u0433 \u043a\u0430\u0440\u0430\u0432\u0430\u043d\u0430.",
+    },
+    core_monsoon: {
+      title: "\u041c\u0443\u0441\u0441\u043e\u043d \u044f\u0434\u0435\u0440",
+      desc: "\u0428\u043a\u0432\u0430\u043b \u0434\u043e\u0431\u044b\u0447\u0438: \u043e\u0441\u043a\u043e\u043b\u043a\u0438, heavy-\u0432\u044b\u0431\u0440\u043e\u0441\u044b \u0438 \u043f\u0435\u0440\u0435\u043a\u0440\u0451\u0441\u0442\u043d\u044b\u0439 \u043e\u0433\u043e\u043d\u044c \u0443 \u043b\u0438\u043d\u0438\u0438 \u043f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a\u0430.",
+    },
   },
 };
 
@@ -742,6 +1003,8 @@ const PATTERN_TITLES: Record<Locale, Record<string, string>> = {
     scrap_juggernaut: "Scrap Juggernaut",
     salvage_storm: "Salvage Storm",
     ion_tempest: "Ion Tempest",
+    breaker_ring: "Breaker Ring",
+    core_monsoon: "Core Monsoon",
   },
   ru: {
     pincer_chasers: "Клещи",
@@ -756,6 +1019,8 @@ const PATTERN_TITLES: Record<Locale, Record<string, string>> = {
     scrap_juggernaut: "\u041b\u043e\u043c\u043e\u0432\u043e\u0439 \u0434\u0436\u0430\u0433\u0433\u0435\u0440\u043d\u0430\u0443\u0442",
     salvage_storm: "\u0428\u043a\u0432\u0430\u043b \u0434\u043e\u0431\u044b\u0447\u0438",
     ion_tempest: "\u0418\u043e\u043d\u043d\u044b\u0439 \u0442\u0435\u043c\u043f\u0435\u0441\u0442",
+    breaker_ring: "\u041a\u043e\u043b\u044c\u0446\u043e \u0440\u0435\u0437\u0447\u0438\u043a\u043e\u0432",
+    core_monsoon: "\u041c\u0443\u0441\u0441\u043e\u043d \u044f\u0434\u0435\u0440",
   },
 };
 
@@ -830,15 +1095,31 @@ export function getUpgradeCopy(locale: Locale, upgrade: RunUpgradeDef): UpgradeC
 }
 
 export function getMetaNodeName(locale: Locale, nodeId: string, fallbackName: string): string {
-  return META_NODE_COPY[locale][nodeId]?.title ?? META_NODE_COPY.en[nodeId]?.title ?? fallbackName;
+  return (
+    EXTRA_META_NODE_COPY[locale][nodeId]?.title ??
+    EXTRA_META_NODE_COPY.en[nodeId]?.title ??
+    META_NODE_COPY[locale][nodeId]?.title ??
+    META_NODE_COPY.en[nodeId]?.title ??
+    fallbackName
+  );
 }
 
 export function getMetaNodeDescription(locale: Locale, nodeId: string): string {
-  return META_NODE_COPY[locale][nodeId]?.desc ?? META_NODE_COPY.en[nodeId]?.desc ?? t(locale, "menu.workshopHint");
+  return (
+    EXTRA_META_NODE_COPY[locale][nodeId]?.desc ??
+    EXTRA_META_NODE_COPY.en[nodeId]?.desc ??
+    META_NODE_COPY[locale][nodeId]?.desc ??
+    META_NODE_COPY.en[nodeId]?.desc ??
+    t(locale, "menu.workshopHint")
+  );
 }
 
 export function getDailyVariantCopy(locale: Locale, variantId: string, fallbackTitle = "", fallbackDesc = ""): UpgradeCopy {
-  const copy = DAILY_VARIANT_COPY[locale][variantId] ?? DAILY_VARIANT_COPY.en[variantId];
+  const copy =
+    EXTRA_DAILY_VARIANT_COPY[locale][variantId] ??
+    EXTRA_DAILY_VARIANT_COPY.en[variantId] ??
+    DAILY_VARIANT_COPY[locale][variantId] ??
+    DAILY_VARIANT_COPY.en[variantId];
   return {
     title: copy?.title ?? fallbackTitle ?? variantId,
     desc: copy?.desc ?? fallbackDesc ?? "",

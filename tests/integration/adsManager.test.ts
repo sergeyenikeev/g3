@@ -56,6 +56,10 @@ const ADS_CFG: Balances["ads"] = {
   disableInterstitialUntilTutorialDone: false,
   interstitialMinRunsCompleted: 0,
   noInterstitialAfterRewardedSec: 0,
+  interstitialDailyCap: 2,
+  interstitialMinRunDurationSec: 75,
+  noInterstitialAfterFrustrationSec: 180,
+  noInterstitialAfterRewardedChain: 2,
   rewarded: {
     revive: { enabled: true, hpRestoreFrac: 0.5, invulnSec: 1, clearEnemies: true },
     x2Results: { enabled: true, mult: 2 },
@@ -83,6 +87,7 @@ describe("ads manager (integration)", () => {
 
     expect(res).toEqual({ ok: true, rewarded: true });
     expect(saveManager.get().ads.lastRewardedAtMs).toBe(1111);
+    expect(saveManager.get().ads.rewardedChainCount).toBe(1);
     expect(analytics.events.map((e) => e.name)).toEqual([
       ANALYTICS_EVENTS.AD_REWARDED_OFFER,
       ANALYTICS_EVENTS.AD_REWARDED_START,
@@ -117,6 +122,8 @@ describe("ads manager (integration)", () => {
     const s = makeDefaultSave();
     s.tutorial.completed = true;
     s.stats.runsCompleted = 10;
+    s.ads.lastRunDurationSec = 120;
+    s.ads.rewardedChainCount = 1;
     adapter.storage = s;
     const saveManager = new SaveManager(adapter);
     await saveManager.load();
@@ -129,11 +136,42 @@ describe("ads manager (integration)", () => {
 
     expect(res).toBe(true);
     expect(saveManager.get().ads.lastInterstitialAtMs).toBe(3333);
+    expect(saveManager.get().ads.rewardedChainCount).toBe(0);
+    expect(saveManager.get().ads.interstitialDateUtc).toBe("19700101");
+    expect(saveManager.get().ads.interstitialsShownToday).toBe(1);
     expect(adapter.interstitialCalls).toBe(1);
     expect(analytics.events.map((e) => e.name)).toEqual([
       ANALYTICS_EVENTS.AD_INTERSTITIAL_OFFER,
       ANALYTICS_EVENTS.AD_INTERSTITIAL_START,
       ANALYTICS_EVENTS.AD_INTERSTITIAL_COMPLETE,
+    ]);
+  });
+
+  it("tracks guard failures without calling adapter", async () => {
+    const adapter = new MemoryAdapter();
+    const s = makeDefaultSave();
+    s.tutorial.completed = true;
+    s.stats.runsCompleted = 10;
+    s.ads.lastRunDurationSec = 20;
+    adapter.storage = s;
+    const saveManager = new SaveManager(adapter);
+    await saveManager.load();
+    const analytics = new CaptureAnalytics();
+    const ads = new AdsManager(adapter, analytics, saveManager);
+
+    const res = await ads.showInterstitial(ADS_CFG, "results");
+    expect(res).toBe(false);
+    expect(adapter.interstitialCalls).toBe(0);
+    expect(analytics.events).toEqual([
+      {
+        name: ANALYTICS_EVENTS.AD_INTERSTITIAL_FAIL,
+        payload: {
+          placement: "results",
+          reason: "session_depth",
+          rewardedChainCount: 0,
+          lastRunDurationSec: 20,
+        },
+      },
     ]);
   });
 
@@ -148,6 +186,16 @@ describe("ads manager (integration)", () => {
     const res = await ads.showInterstitial(undefined, "results");
     expect(res).toBe(false);
     expect(adapter.interstitialCalls).toBe(0);
-    expect(analytics.events).toEqual([]);
+    expect(analytics.events).toEqual([
+      {
+        name: ANALYTICS_EVENTS.AD_INTERSTITIAL_FAIL,
+        payload: {
+          placement: "results",
+          reason: "ads_disabled",
+          rewardedChainCount: 0,
+          lastRunDurationSec: 0,
+        },
+      },
+    ]);
   });
 });

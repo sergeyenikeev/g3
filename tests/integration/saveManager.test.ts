@@ -36,6 +36,11 @@ describe("SaveManager (integration)", () => {
     expect(s.leaderboard.highestDivision).toBe("scrapper");
     expect(s.leaderboard.claimedRewardDivisions).toEqual([]);
     expect(s.leaderboard.claimedMilestones).toEqual([]);
+    expect(s.loginRewards).toEqual({ lastClaimDateUtc: null, day: 0 });
+    expect(s.liveops.sessionsStarted).toBe(0);
+    expect(s.liveops.streak.day).toBe(0);
+    expect(s.liveops.missions.daily.claimedIds).toEqual([]);
+    expect(s.liveops.weeklyLeaderboard.weekKey).toBeNull();
     expect(s.meta.wallet.bolts).toBe(0);
     expect(s.meta.wallet.cores).toBe(0);
   });
@@ -47,6 +52,13 @@ describe("SaveManager (integration)", () => {
     s.settings.language = "ru";
     s.settings.pilotName = "Nova";
     s.meta.wallet.bolts = 250;
+    s.loginRewards.lastClaimDateUtc = "20260407";
+    s.loginRewards.day = 3;
+    s.liveops.sessionsStarted = 2;
+    s.liveops.streak.day = 2;
+    s.liveops.missions.daily.dateUtc = "20260407";
+    s.liveops.missions.daily.progress.daily_bank_140 = 90;
+    s.liveops.weeklyLeaderboard.weekKey = "20260406";
     await sm.save(s);
 
     const s2 = await sm.load();
@@ -55,6 +67,11 @@ describe("SaveManager (integration)", () => {
     expect(s2.settings.pilotName).toBe("Nova");
     expect(s2.leaderboard.highestDivision).toBe("scrapper");
     expect(s2.leaderboard.claimedMilestones).toEqual([]);
+    expect(s2.loginRewards).toEqual({ lastClaimDateUtc: "20260407", day: 3 });
+    expect(s2.liveops.sessionsStarted).toBe(2);
+    expect(s2.liveops.streak.day).toBe(2);
+    expect(s2.liveops.missions.daily.progress.daily_bank_140).toBe(90);
+    expect(s2.liveops.weeklyLeaderboard.weekKey).toBe("20260406");
     expect(s2.meta.wallet.bolts).toBe(250);
   });
 
@@ -83,6 +100,7 @@ describe("SaveManager (integration)", () => {
     expect(s.leaderboard.highestDivision).toBe("scrapper");
     expect(s.leaderboard.claimedRewardDivisions).toEqual([]);
     expect(s.leaderboard.claimedMilestones).toEqual([]);
+    expect(s.loginRewards).toEqual({ lastClaimDateUtc: null, day: 0 });
   });
 
   it("falls back to defaults on invalid save version", async () => {

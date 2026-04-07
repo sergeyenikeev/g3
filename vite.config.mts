@@ -21,8 +21,10 @@ export default defineConfig(() => ({
         manualChunks(id) {
           if (id.includes("node_modules/phaser")) return "phaser";
           if (id.includes("/src/game/scenes/")) return "scenes";
+          // Keep the platform layer with core game systems so Rollup does not
+          // create a cross-chunk cycle between platform and game.
+          if (id.includes("/src/platform/")) return "game";
           if (id.includes("/src/game/")) return "game";
-          if (id.includes("/src/platform/")) return "platform";
           if (id.includes("/src/visual/")) return "visual";
           return undefined;
         },

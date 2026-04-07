@@ -1,4 +1,4 @@
-import type { PlatformAdapter, PlatformLifecycleListener, RewardedResult } from "../platformAdapter";
+import type { PlatformAdapter, PlatformLifecycleListener, PlatformLeaderboardSnapshot, RewardedResult } from "../platformAdapter";
 import { PLATFORM_SAVE_KEY } from "../storageKeys";
 import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "../utils/localStorage";
 
@@ -43,6 +43,21 @@ type YandexSdk = {
     };
   };
   getPlayer?: (opts?: { signed?: boolean; scopes?: boolean }) => Promise<YandexPlayer>;
+  getLeaderboards?: () => Promise<{
+    setLeaderboardScore?: (name: string, score: number, extraData?: string) => Promise<unknown>;
+    getLeaderboardEntries?: (
+      name: string,
+      opts?: { includeUser?: boolean; quantityAround?: number; quantityTop?: number }
+    ) => Promise<{
+      entries?: Array<{
+        rank?: number;
+        score?: number;
+        player?: { publicName?: string };
+      }>;
+      userRank?: number;
+      userScore?: number;
+    }>;
+  }>;
   on?: (eventName: string, listener: () => void) => (() => void) | void;
   off?: (eventName: string, listener: () => void) => void;
   serverTime?: () => number;
@@ -52,6 +67,23 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
   readonly name = "yandex";
   private ysdk: YandexSdk | null = null;
   private player: YandexPlayer | null = null;
+  private leaderboards:
+    | {
+        setLeaderboardScore?: (name: string, score: number, extraData?: string) => Promise<unknown>;
+        getLeaderboardEntries?: (
+          name: string,
+          opts?: { includeUser?: boolean; quantityAround?: number; quantityTop?: number }
+        ) => Promise<{
+          entries?: Array<{
+            rank?: number;
+            score?: number;
+            player?: { publicName?: string };
+          }>;
+          userRank?: number;
+          userScore?: number;
+        }>;
+      }
+    | null = null;
   private gameplayActive = false;
   private gameReadySent = false;
 
@@ -73,6 +105,12 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
       this.player = (await getPlayer({ scopes: false, signed: false })) ?? null;
     } catch {
       this.player = null;
+    }
+
+    try {
+      this.leaderboards = (await this.ysdk?.getLeaderboards?.()) ?? null;
+    } catch {
+      this.leaderboards = null;
     }
   }
 
@@ -231,6 +269,61 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
     }
 
     return safeJsonParse(safeLocalStorageGet(PLATFORM_SAVE_KEY));
+  }
+
+  async submitScore(boardId: string, score: number): Promise<void> {
+    const safeScore = Math.max(0, Math.floor(score));
+    if (this.leaderboards?.setLeaderboardScore) {
+      try {
+        await this.leaderboards.setLeaderboardScore(boardId, safeScore);
+        return;
+      } catch {
+        // fallback
+      }
+    }
+    const fallback = safeJsonParse(safeLocalStorageGet(`${PLATFORM_SAVE_KEY}:leaderboards:${boardId}`));
+    const nextScore = typeof fallback === "number" && Number.isFinite(fallback) ? Math.max(fallback, safeScore) : safeScore;
+    safeLocalStorageSet(`${PLATFORM_SAVE_KEY}:leaderboards:${boardId}`, String(nextScore));
+  }
+
+  async getLeaderboard(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): Promise<PlatformLeaderboardSnapshot | null> {
+    if (this.leaderboards?.getLeaderboardEntries) {
+      try {
+        const res = await this.leaderboards.getLeaderboardEntries(boardId, {
+          includeUser: true,
+          quantityAround: 1,
+          quantityTop: 5,
+        });
+        const entries = Array.isArray(res?.entries)
+          ? res.entries.map((entry, index) => ({
+              rank: Math.max(1, Math.floor(entry?.rank ?? index + 1)),
+              score: Math.max(0, Math.floor(entry?.score ?? 0)),
+              playerName: entry?.player?.publicName || `Pilot ${index + 1}`,
+            }))
+          : [];
+        return {
+          boardId,
+          scope,
+          source: "platform",
+          entries,
+          currentPlayerRank: typeof res?.userRank === "number" ? Math.max(1, Math.floor(res.userRank)) : null,
+          currentPlayerScore: typeof res?.userScore === "number" ? Math.max(0, Math.floor(res.userScore)) : null,
+        };
+      } catch {
+        // fallback
+      }
+    }
+
+    const raw = safeLocalStorageGet(`${PLATFORM_SAVE_KEY}:leaderboards:${boardId}`);
+    const score = raw ? Number.parseInt(raw, 10) : 0;
+    return {
+      boardId,
+      scope,
+      source: "local",
+      entries: score > 0 ? [{ rank: 1, score, playerName: "YOU", isCurrentPlayer: true }] : [],
+      currentPlayerRank: score > 0 ? 1 : null,
+      currentPlayerScore: score > 0 ? score : null,
+    };
   }
 
   private async withAdBreak<T>(run: () => Promise<T>): Promise<T> {

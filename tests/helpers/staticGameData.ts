@@ -4,6 +4,8 @@ import type {
   Balances,
   DailyConfig,
   EnemiesConfig,
+  LeaderboardsConfig,
+  LiveopsConfig,
   MetaTreeConfig,
   PatternsConfig,
   RunUpgradeDef,
@@ -18,9 +20,10 @@ export async function loadStaticGameData(): Promise<StaticGameData> {
     waveSets: await readJson<WaveSetsConfig>("public/assets/data/wave_sets.json"),
     patterns: await readJson<PatternsConfig>("public/assets/data/patterns.json"),
     daily: await readJson<DailyConfig>("public/assets/data/daily.json"),
+    liveops: await readJson<LiveopsConfig>("public/assets/data/liveops.json"),
+    leaderboards: await readJson<LeaderboardsConfig>("public/assets/data/leaderboards.json"),
     runUpgrades: await readJson<RunUpgradeDef[]>("public/assets/data/run_upgrades.json"),
     balancePresets: await readJson<BalancePresetsConfig>("public/assets/data/balance_presets.json"),
     metaTree: await readJson<MetaTreeConfig>("public/assets/data/meta_tree.json"),
   };
 }
-

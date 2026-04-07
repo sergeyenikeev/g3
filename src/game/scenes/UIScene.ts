@@ -12,6 +12,7 @@ import type { PlatformAdapter } from "../../platform/platformAdapter";
 import { addPlatformLifecycleListener, signalPlatformGameplayStop } from "../../platform/platformRuntime";
 import type { StaticGameData } from "../../data/staticGameData";
 import { getCurrentEndlessLevelFinale, getWaveInEndlessLevel } from "../run/endlessLevels";
+import { markActivationFlag } from "../liveops/liveops";
 import { VISUAL_PALETTE, createLightGradient, createVfxTextures, createVignette } from "../../visual/TextureFactory";
 import { languageStroke, nextVolumeStep, qualityStroke, snapVolumeStep } from "./uiSettingsHelpers";
 import { getDashHudBadgeSpecs } from "../upgrades/upgradeBadges";
@@ -144,9 +145,19 @@ export class UIScene extends Phaser.Scene {
     this.playSfx("sfx_dash_siphon");
   };
 
+  private readonly onAnalyticsScrap = (p: any) => void this.trackActivationOnce("firstScrapTracked", ANALYTICS_EVENTS.FIRST_SCRAP, p ?? {});
   private readonly onAnalyticsFlip = () => this.track(ANALYTICS_EVENTS.FLIP_USED, {});
-  private readonly onAnalyticsBank = (p: any) => this.track(ANALYTICS_EVENTS.RECYCLER_BANK_COMPLETE, { bolts: p?.bolts });
-  private readonly onAnalyticsUpgradePick = (p: any) => this.track(ANALYTICS_EVENTS.UPGRADE_PICK, p ?? {});
+  private readonly onAnalyticsBank = (p: any) => {
+    this.track(ANALYTICS_EVENTS.RECYCLER_BANK_COMPLETE, { bolts: p?.bolts });
+    void this.trackActivationOnce("firstBankTracked", ANALYTICS_EVENTS.FIRST_BANK, { bolts: p?.bolts ?? 0 });
+  };
+  private readonly onAnalyticsUpgradePick = (p: any) => {
+    this.track(ANALYTICS_EVENTS.UPGRADE_PICK, p ?? {});
+    void this.trackActivationOnce("firstUpgradeTracked", ANALYTICS_EVENTS.FIRST_UPGRADE, p ?? {});
+  };
+  private readonly onAnalyticsReviveOffer = () => this.track(ANALYTICS_EVENTS.REVIVE_OFFER, {});
+  private readonly onAnalyticsReviveAccept = () => this.track(ANALYTICS_EVENTS.REVIVE_ACCEPT, {});
+  private readonly onAnalyticsReviveDecline = () => this.track(ANALYTICS_EVENTS.REVIVE_DECLINE, {});
 
   constructor() {
     super("ui");
@@ -233,6 +244,10 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.FLIP_USED, this.onAnalyticsFlip, this);
       this.game.events.off(GAME_EVENTS.BANK_COMPLETE, this.onAnalyticsBank, this);
       this.game.events.off(GAME_EVENTS.UPGRADE_PICKED, this.onAnalyticsUpgradePick, this);
+      this.game.events.off(GAME_EVENTS.SCRAP_COLLECTED, this.onAnalyticsScrap, this);
+      this.game.events.off(GAME_EVENTS.REVIVE_OFFER, this.onAnalyticsReviveOffer, this);
+      this.game.events.off(GAME_EVENTS.REVIVE_ACCEPTED, this.onAnalyticsReviveAccept, this);
+      this.game.events.off(GAME_EVENTS.REVIVE_DECLINED, this.onAnalyticsReviveDecline, this);
       this.input.keyboard?.off("keydown-ESC", this.onEscapePressed, this);
       releasePageLifecycle();
       releasePlatformLifecycle();
@@ -722,9 +737,13 @@ export class UIScene extends Phaser.Scene {
   }
 
   private bindAnalyticsEvents(): void {
+    this.game.events.on(GAME_EVENTS.SCRAP_COLLECTED, this.onAnalyticsScrap, this);
     this.game.events.on(GAME_EVENTS.FLIP_USED, this.onAnalyticsFlip, this);
     this.game.events.on(GAME_EVENTS.BANK_COMPLETE, this.onAnalyticsBank, this);
     this.game.events.on(GAME_EVENTS.UPGRADE_PICKED, this.onAnalyticsUpgradePick, this);
+    this.game.events.on(GAME_EVENTS.REVIVE_OFFER, this.onAnalyticsReviveOffer, this);
+    this.game.events.on(GAME_EVENTS.REVIVE_ACCEPTED, this.onAnalyticsReviveAccept, this);
+    this.game.events.on(GAME_EVENTS.REVIVE_DECLINED, this.onAnalyticsReviveDecline, this);
   }
 
   private track(eventName: string, payload?: Record<string, unknown>): void {
@@ -733,6 +752,21 @@ export class UIScene extends Phaser.Scene {
     } catch {
       // ignore
     }
+  }
+
+  private async trackActivationOnce(
+    flag: keyof SaveData["liveops"]["activation"],
+    eventName: string,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    const saveManager = this.saveManager;
+    if (!saveManager) return;
+    const result = markActivationFlag(saveManager.get(), flag);
+    if (!result.changed) return;
+    this.track(eventName, payload);
+    await saveManager.save(result.save);
+    this.registry.set("saveData", saveManager.get());
+    this.saveData = saveManager.get();
   }
 
   private createReviveOverlay(): void {

@@ -5,6 +5,52 @@
     "extraAttemptRewardedMax": 2,
     "coreDropBonus": 0.05
   },
+  "rotations": [
+    {
+      "id": "salvage_week",
+      "fromDateUtc": "20260401",
+      "toDateUtc": "20260407",
+      "variantIds": ["daily_heavy_yard", "daily_salvage_rain", "daily_cash_surge"],
+      "ui": {
+        "badge": "SALVAGE WEEK",
+        "title": "Salvage Week",
+        "desc": "Heavy scrap, cash-out spikes, and recycler-focused seeds all week."
+      }
+    },
+    {
+      "id": "flip_wave",
+      "fromDateUtc": "20260408",
+      "toDateUtc": "20260414",
+      "variantIds": ["daily_fast_flip", "daily_shrapnel_field", "daily_hot_dash"],
+      "ui": {
+        "badge": "FLIP WAVE",
+        "title": "Flip Wave",
+        "desc": "Faster pulses, shrapnel starts, and momentum-heavy routes rotate this week."
+      }
+    },
+    {
+      "id": "caravan_week",
+      "fromDateUtc": "20260415",
+      "toDateUtc": "20260421",
+      "variantIds": ["daily_long_tail", "daily_fragile_tail", "daily_cash_surge"],
+      "ui": {
+        "badge": "CARAVAN WEEK",
+        "title": "Caravan Week",
+        "desc": "Longer chains, higher stakes, and scoring runs built around tail control."
+      }
+    },
+    {
+      "id": "pressure_week",
+      "fromDateUtc": "20260422",
+      "toDateUtc": "20260428",
+      "variantIds": ["daily_hot_dash", "daily_fragile_tail", "daily_salvage_rain"],
+      "ui": {
+        "badge": "PRESSURE WEEK",
+        "title": "Pressure Week",
+        "desc": "Riskier starts and faster pacing for players chasing leaderboard jumps."
+      }
+    }
+  ],
   "dailyVariants": [
     {
       "id": "daily_fast_flip",
@@ -38,9 +84,72 @@
       ],
       "ui": {
         "title": "Fragile Tail",
-        "desc": "Projectiles cut more tail segments. First reroll is cheaper (special)."
+        "desc": "Projectiles cut more tail segments. First reroll is cheaper."
       },
       "specialRule": { "type": "rewarded_reroll_discount", "times": 1 }
+    },
+    {
+      "id": "daily_cash_surge",
+      "weight": 28,
+      "modifiers": [
+        { "op": "add", "path": "recycler.boltsPerScrapCommon", "value": 1 },
+        { "op": "add", "path": "recycler.boltsPerScrapHeavy", "value": 1 },
+        { "op": "mul", "path": "waves.enemySpeedMultPerWave", "value": 1.08 }
+      ],
+      "ui": {
+        "title": "Cash Surge",
+        "desc": "Every bank pays better, but pressure ramps a little faster."
+      }
+    },
+    {
+      "id": "daily_long_tail",
+      "weight": 26,
+      "modifiers": [
+        { "op": "add", "path": "tail.maxLenBase", "value": 4 },
+        { "op": "mul", "path": "player.tailSpeedPenaltyPerSegment", "value": 0.85 }
+      ],
+      "ui": {
+        "title": "Long Tail",
+        "desc": "Longer chains feel great and stay a bit more controllable."
+      }
+    },
+    {
+      "id": "daily_hot_dash",
+      "weight": 22,
+      "modifiers": [
+        { "op": "mul", "path": "dash.cooldownSec", "value": 0.78 },
+        { "op": "mul", "path": "dash.durationSec", "value": 1.1 },
+        { "op": "mul", "path": "flip.cooldownBaseSec", "value": 1.08 }
+      ],
+      "ui": {
+        "title": "Hot Dash",
+        "desc": "Dash comes online faster, but Flip asks for cleaner timing."
+      }
+    },
+    {
+      "id": "daily_shrapnel_field",
+      "weight": 18,
+      "modifiers": [
+        { "op": "set", "path": "flip.shrapnel.enabled", "value": true },
+        { "op": "mul", "path": "flip.cooldownBaseSec", "value": 0.92 }
+      ],
+      "ui": {
+        "title": "Shrapnel Field",
+        "desc": "Every run starts with shrapnel pulses and a slightly faster Flip loop."
+      }
+    },
+    {
+      "id": "daily_salvage_rain",
+      "weight": 24,
+      "modifiers": [
+        { "op": "add", "path": "scrap.clusterCountBase", "value": 1 },
+        { "op": "mul", "path": "scrap.respawnTimeSec", "value": 0.85 },
+        { "op": "mul", "path": "recycler.bankTimeSec", "value": 1.08 }
+      ],
+      "ui": {
+        "title": "Salvage Rain",
+        "desc": "The yard is richer and denser, but banking asks for a longer hold."
+      }
     }
   ]
 }

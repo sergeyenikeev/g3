@@ -139,10 +139,14 @@
     }
   },
   "ads": {
-    "interstitialCooldownSec": 90,
+    "interstitialCooldownSec": 180,
     "disableInterstitialUntilTutorialDone": true,
-    "interstitialMinRunsCompleted": 2,
-    "noInterstitialAfterRewardedSec": 20,
+    "interstitialMinRunsCompleted": 3,
+    "noInterstitialAfterRewardedSec": 90,
+    "interstitialDailyCap": 2,
+    "interstitialMinRunDurationSec": 75,
+    "noInterstitialAfterFrustrationSec": 180,
+    "noInterstitialAfterRewardedChain": 2,
     "rewarded": {
       "revive": { "enabled": true, "hpRestoreFrac": 0.5, "invulnSec": 1.25, "clearEnemies": true },
       "x2Results": { "enabled": true, "mult": 2 },
