@@ -5,13 +5,26 @@ import type { StaticGameData } from "../../data/staticGameData";
 import { getUtcYyyymmdd, pickDailyVariant } from "../daily/daily";
 import { consumeDailyAttempt, getDailyAttemptsInfo, normalizeDailySave, planDailyStart, type DailyAttemptsInfo } from "../daily/dailyAttempts";
 import { getMetaNodeCost, getMetaNodeLevel, getMetaWalletAmount, purchaseMetaNode } from "../meta/metaProgression";
-import { filterLeaderboardEntries, getLeaderboardDivision, getLeaderboardNextDivision, type LeaderboardFilter } from "../run/leaderboard";
+import {
+  filterLeaderboardEntries,
+  getLeaderboardCareerMilestones,
+  getLeaderboardCareerProgress,
+  getLeaderboardDivision,
+  getLeaderboardNextDivision,
+  getNextLeaderboardCareerMilestone,
+  type LeaderboardFilter,
+} from "../run/leaderboard";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import { bindPageLifecycle } from "../../platform/pageLifecycle";
 import type { PlatformAdapter } from "../../platform/platformAdapter";
 import { getPlatformNowMs, signalPlatformGameReady, addPlatformLifecycleListener } from "../../platform/platformRuntime";
-import { sanitizePilotName, type LeaderboardDivisionId, type SaveData } from "../../platform/save/saveManager";
+import {
+  sanitizePilotName,
+  type LeaderboardCareerMilestoneId,
+  type LeaderboardDivisionId,
+  type SaveData,
+} from "../../platform/save/saveManager";
 import type { SaveManager } from "../../platform/save/saveManager";
 import { createEntityTextures } from "../../visual/EntityTextureFactory";
 import { getMetaNodeBadgeSpecs } from "../upgrades/upgradeBadges";
@@ -47,6 +60,7 @@ export class MenuScene extends Phaser.Scene {
   private workshopWalletText!: Phaser.GameObjects.Text;
   private workshopHintText!: Phaser.GameObjects.Text;
   private workshopFooterText!: Phaser.GameObjects.Text;
+  private workshopBuildChips: Phaser.GameObjects.Container[] = [];
   private workshopCards: Phaser.GameObjects.Container[] = [];
   private leaderboardDim!: Phaser.GameObjects.Rectangle;
   private leaderboardBox!: Phaser.GameObjects.Container;
@@ -68,6 +82,8 @@ export class MenuScene extends Phaser.Scene {
   private latestLeaderboardIsRecord = false;
   private latestPromotionDivision: LeaderboardDivisionId | null = null;
   private latestPromotionReward = { bolts: 0, cores: 0 };
+  private latestCareerMilestones: LeaderboardCareerMilestoneId[] = [];
+  private latestCareerMilestoneReward = { bolts: 0, cores: 0 };
   private workshopBusy = false;
   private locale: Locale = "en";
   private languageSetting: LanguageSetting = "auto";
@@ -116,6 +132,11 @@ export class MenuScene extends Phaser.Scene {
     this.latestPromotionReward = {
       bolts: (this.registry.get("lastLeaderboardPromotionBolts") as number | undefined) ?? 0,
       cores: (this.registry.get("lastLeaderboardPromotionCores") as number | undefined) ?? 0,
+    };
+    this.latestCareerMilestones = sanitizeCareerMilestoneIds(this.registry.get("lastLeaderboardCareerMilestones"));
+    this.latestCareerMilestoneReward = {
+      bolts: Math.max(0, Math.floor((this.registry.get("lastLeaderboardCareerMilestoneBolts") as number | undefined) ?? 0)),
+      cores: Math.max(0, Math.floor((this.registry.get("lastLeaderboardCareerMilestoneCores") as number | undefined) ?? 0)),
     };
     const storedLeaderboardFilter =
       (this.registry.get("lastLeaderboardFilter") as LeaderboardFilter | undefined) ?? (this.latestLeaderboardIsRecord ? "run" : "all");
@@ -704,9 +725,10 @@ export class MenuScene extends Phaser.Scene {
       .text(-270, -304, "", { fontSize: "16px", color: "#d9f2ff", fontStyle: "700", wordWrap: { width: 540 } })
       .setOrigin(0, 0);
     this.workshopHintText = this.add
-      .text(-270, -270, t(this.locale, "menu.workshopHint"), {
-        fontSize: "13px",
+      .text(-270, -270, t(this.locale, "menu.installedBuild"), {
+        fontSize: "12px",
         color: "#98b7c7",
+        fontStyle: "700",
         wordWrap: { width: 540 },
       })
       .setOrigin(0, 0);
@@ -889,6 +911,16 @@ export class MenuScene extends Phaser.Scene {
     const filtered = filterLeaderboardEntries(save.leaderboard.entries, this.leaderboardFilter);
     const bestScore = save.leaderboard.entries.reduce((best, entry) => Math.max(best, entry.score), 0);
     const nextDivision = getLeaderboardNextDivision(bestScore);
+    const careerMilestones = getLeaderboardCareerMilestones();
+    const claimedMilestones = new Set<LeaderboardCareerMilestoneId>(save.leaderboard.claimedMilestones);
+    for (const milestoneId of this.latestCareerMilestones) claimedMilestones.add(milestoneId);
+    const careerProgress = getLeaderboardCareerProgress({
+      bestScore,
+      bestWave: save.stats.bestWave,
+      bestBolts: save.stats.bestBolts,
+      highestDivision: save.leaderboard.highestDivision,
+    });
+    const nextMilestone = getNextLeaderboardCareerMilestone(careerProgress, [...claimedMilestones]);
 
     for (const entry of this.leaderboardFilterButtons) {
       const selected = entry.filter === this.leaderboardFilter;
@@ -901,10 +933,22 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.leaderboardHintText.setText(
-      t(this.locale, "menu.leaderboardHint", {
-        mode: t(this.locale, `leaderboard.filter.${this.leaderboardFilter}`),
-        pilot: save.settings.pilotName || t(this.locale, "menu.pilotAuto"),
-      })
+      [
+        t(this.locale, "menu.leaderboardHint", {
+          mode: t(this.locale, `leaderboard.filter.${this.leaderboardFilter}`),
+          pilot: save.settings.pilotName || t(this.locale, "menu.pilotAuto"),
+        }),
+        nextMilestone
+          ? t(this.locale, "menu.leaderboardCareerStatus", {
+              count: formatNumber(this.locale, claimedMilestones.size),
+              total: formatNumber(this.locale, careerMilestones.length),
+              title: t(this.locale, `leaderboard.milestone.${nextMilestone.id}`),
+            })
+          : t(this.locale, "menu.leaderboardCareerComplete", {
+              count: formatNumber(this.locale, claimedMilestones.size),
+              total: formatNumber(this.locale, careerMilestones.length),
+            }),
+      ].join("\n")
     );
 
     for (let i = 0; i < this.leaderboardRows.length; i++) {
@@ -948,6 +992,11 @@ export class MenuScene extends Phaser.Scene {
             division: t(this.locale, `leaderboard.division.${this.latestPromotionDivision}`),
             reward: formatLeaderboardReward(this.locale, this.latestPromotionReward),
           })
+        : this.latestCareerMilestones.length > 0
+          ? t(this.locale, "menu.leaderboardMilestoneUnlock", {
+              titles: formatCareerMilestoneTitles(this.locale, this.latestCareerMilestones),
+              reward: formatLeaderboardReward(this.locale, this.latestCareerMilestoneReward),
+            })
         : this.latestLeaderboardEntryId && this.latestLeaderboardRank
         ? this.latestLeaderboardIsRecord
           ? t(this.locale, "menu.leaderboardRecord", {
@@ -1003,7 +1052,25 @@ export class MenuScene extends Phaser.Scene {
         cores: formatResource(this.locale, "cores", getMetaWalletAmount(save, "cores")),
       })
     );
-    this.workshopHintText.setText(buildInstalledMetaSummary(this.locale, this.staticData.metaTree.nodes, save.meta.nodeLevels));
+    const activeMetaEntries = this.staticData.metaTree.nodes
+      .map((node) => ({ node, level: Math.max(0, Math.floor(save.meta.nodeLevels[node.id] ?? 0)) }))
+      .filter((entry) => entry.level > 0);
+    this.workshopHintText.setText(activeMetaEntries.length > 0 ? t(this.locale, "menu.installedBuild") : t(this.locale, "menu.installedNone"));
+
+    for (const chip of this.workshopBuildChips) chip.destroy();
+    this.workshopBuildChips = [];
+    let chipCursorX = -270;
+    for (const entry of activeMetaEntries) {
+      const badge = getMetaNodeBadgeSpecs(this.locale, entry.node.id, 1)[0];
+      if (!badge) continue;
+      const chip = createMenuBadge(this, 0, -244, `${badge.label} ${entry.level}`, badge.fill, badge.stroke, badge.textColor);
+      const chipBg = chip.list[0] as Phaser.GameObjects.Rectangle | undefined;
+      const chipWidth = chipBg?.width ?? 0;
+      chip.setPosition(chipCursorX + chipWidth / 2, -244);
+      chipCursorX += chipWidth + 8;
+      this.workshopBuildChips.push(chip);
+      this.workshopBox.add(chip);
+    }
 
     for (const card of this.workshopCards) card.destroy();
     this.workshopCards = [];
@@ -1408,6 +1475,21 @@ function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores:
   if (reward.bolts > 0) parts.push(formatResource(locale, "bolts", reward.bolts));
   if (reward.cores > 0) parts.push(formatResource(locale, "cores", reward.cores));
   return parts.join(" | ");
+}
+
+function formatCareerMilestoneTitles(locale: Locale, ids: readonly LeaderboardCareerMilestoneId[]): string {
+  return ids.map((id) => t(locale, `leaderboard.milestone.${id}`)).join(" | ");
+}
+
+function sanitizeCareerMilestoneIds(raw: unknown): LeaderboardCareerMilestoneId[] {
+  if (!Array.isArray(raw)) return [];
+  const unique = new Set<LeaderboardCareerMilestoneId>();
+  for (const item of raw) {
+    if (item === "score_25000" || item === "wave_20" || item === "salvage_400" || item === "legend_league") {
+      unique.add(item);
+    }
+  }
+  return [...unique];
 }
 
 function buildInstalledMetaSummary(

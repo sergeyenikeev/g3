@@ -1,7 +1,12 @@
 import Phaser from "phaser";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import type { AdsManager } from "../../platform/ads/adsManager";
-import type { LeaderboardDivisionId, SaveData, SaveManager } from "../../platform/save/saveManager";
+import type {
+  LeaderboardCareerMilestoneId,
+  LeaderboardDivisionId,
+  SaveData,
+  SaveManager,
+} from "../../platform/save/saveManager";
 import type { RunState } from "../run/runState";
 import { normalizeDailySave } from "../daily/dailyAttempts";
 import { grantMetaWallet } from "../meta/metaProgression";
@@ -10,10 +15,13 @@ import {
   computeRunScore,
   createLeaderboardEntryId,
   filterLeaderboardEntries,
+  getLeaderboardCareerMilestoneUnlocks,
+  getLeaderboardCareerProgress,
   getLeaderboardBestScore,
   getLeaderboardDivision,
   getLeaderboardHigherDivision,
   getLeaderboardNextDivision,
+  getNextLeaderboardCareerMilestone,
   getLeaderboardPromotionRewards,
   getLeaderboardRank,
   type LeaderboardFilter,
@@ -42,6 +50,8 @@ export class ResultsScene extends Phaser.Scene {
   private latestLeaderboardPreviousBest: number | null = null;
   private latestPromotionDivision: LeaderboardDivisionId | null = null;
   private latestPromotionReward = { bolts: 0, cores: 0 };
+  private latestCareerMilestones: LeaderboardCareerMilestoneId[] = [];
+  private latestCareerMilestoneReward = { bolts: 0, cores: 0 };
 
   constructor() {
     super("results");
@@ -67,6 +77,8 @@ export class ResultsScene extends Phaser.Scene {
     this.latestLeaderboardPreviousBest = null;
     this.latestPromotionDivision = null;
     this.latestPromotionReward = { bolts: 0, cores: 0 };
+    this.latestCareerMilestones = [];
+    this.latestCareerMilestoneReward = { bolts: 0, cores: 0 };
     this.input.enabled = true;
 
     const { width, height } = this.scale;
@@ -142,6 +154,15 @@ export class ResultsScene extends Phaser.Scene {
     const score = computeRunScore(this.state);
     const division = getLeaderboardDivision(score);
     const nextDivision = getLeaderboardNextDivision(score);
+    const careerProgress = getLeaderboardCareerProgress({
+      bestScore: Math.max(score, save?.leaderboard?.entries?.reduce((best, entry) => Math.max(best, entry.score), 0) ?? 0),
+      bestWave: Math.max(this.state.waveIndex, save?.stats?.bestWave ?? 0),
+      bestBolts: Math.max(this.state.bolts, save?.stats?.bestBolts ?? 0),
+      highestDivision: getLeaderboardHigherDivision(save?.leaderboard?.highestDivision ?? "scrapper", division.id),
+    });
+    const claimedMilestones = new Set<LeaderboardCareerMilestoneId>(save?.leaderboard?.claimedMilestones ?? []);
+    for (const milestoneId of this.latestCareerMilestones) claimedMilestones.add(milestoneId);
+    const nextMilestone = getNextLeaderboardCareerMilestone(careerProgress, [...claimedMilestones]);
     const leaderboardEntries = filterLeaderboardEntries(save?.leaderboard?.entries ?? [], this.latestLeaderboardFilter);
     const rank = this.latestLeaderboardRank ?? getLeaderboardRank(leaderboardEntries, this.getLeaderboardEntryId());
     const topLines = leaderboardEntries.slice(0, 3).map((entry, index) =>
@@ -168,6 +189,12 @@ export class ResultsScene extends Phaser.Scene {
               reward: formatLeaderboardReward(this.locale, this.latestPromotionReward),
             })
           : "",
+        this.latestCareerMilestones.length > 0
+          ? t(this.locale, "results.milestoneUnlock", {
+              titles: formatCareerMilestoneTitles(this.locale, this.latestCareerMilestones),
+              reward: formatLeaderboardReward(this.locale, this.latestCareerMilestoneReward),
+            })
+          : "",
         bestDelta === null
           ? t(this.locale, "results.bestDeltaNone")
           : t(this.locale, "results.bestDelta", {
@@ -179,6 +206,11 @@ export class ResultsScene extends Phaser.Scene {
               score: formatNumber(this.locale, nextDivision.minScore),
             })
           : t(this.locale, "results.topDivision"),
+        nextMilestone
+          ? t(this.locale, "results.nextMilestone", {
+              title: t(this.locale, `leaderboard.milestone.${nextMilestone.id}`),
+            })
+          : t(this.locale, "results.allMilestones"),
         rank ? t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) }) : "",
         this.latestLeaderboardIsRecord ? t(this.locale, "results.newRecord") : "",
         `${t(this.locale, "results.leaderboardTitle")} (${t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`)})`,
@@ -236,18 +268,32 @@ export class ResultsScene extends Phaser.Scene {
     const withPromotionRewards =
       promotionReward.bolts > 0 || promotionReward.cores > 0 ? grantMetaWallet(saveWithRewards, promotionReward) : saveWithRewards;
     const s = this.upsertRunLeaderboard(withPromotionRewards, entry, promotion.divisions);
-    const filteredEntries = filterLeaderboardEntries(s.leaderboard.entries, this.latestLeaderboardFilter);
+    const bestWave = Math.max(s.stats.bestWave, this.state.waveIndex);
+    const bestBolts = Math.max(s.stats.bestBolts, this.state.bolts);
+    const bestScore = s.leaderboard.entries.reduce((best, candidate) => Math.max(best, candidate.score), 0);
+    const milestoneUnlocks = getLeaderboardCareerMilestoneUnlocks(
+      {
+        bestScore,
+        bestWave,
+        bestBolts,
+        highestDivision: s.leaderboard.highestDivision,
+      },
+      s.leaderboard.claimedMilestones
+    );
+    const withMilestoneRewards =
+      milestoneUnlocks.reward.bolts > 0 || milestoneUnlocks.reward.cores > 0 ? grantMetaWallet(s, milestoneUnlocks.reward) : s;
+    const claimedMilestones = Array.from(new Set([...withMilestoneRewards.leaderboard.claimedMilestones, ...milestoneUnlocks.ids]));
+    const filteredEntries = filterLeaderboardEntries(withMilestoneRewards.leaderboard.entries, this.latestLeaderboardFilter);
     this.latestLeaderboardRank = getLeaderboardRank(filteredEntries, entry.id);
     this.latestLeaderboardPreviousBest = previousBestScore;
     this.latestLeaderboardIsRecord = Boolean(this.latestLeaderboardRank === 1 && entry.score > (previousBestScore ?? -1));
     this.latestPromotionDivision = promotedDivision;
     this.latestPromotionReward = promotionReward;
-
-    const bestWave = Math.max(s.stats.bestWave, this.state.waveIndex);
-    const bestBolts = Math.max(s.stats.bestBolts, this.state.bolts);
+    this.latestCareerMilestones = milestoneUnlocks.ids;
+    this.latestCareerMilestoneReward = milestoneUnlocks.reward;
     const runsCompleted = incrementRunsCompleted ? Math.max(0, Math.floor(s.stats.runsCompleted)) + 1 : s.stats.runsCompleted;
 
-    let daily = s.daily;
+    let daily = withMilestoneRewards.daily;
     if (this.state.mode === "daily" && this.state.daily?.dateUtc && daily.lastDateUtc === this.state.daily.dateUtc) {
       daily = {
         ...daily,
@@ -256,7 +302,15 @@ export class ResultsScene extends Phaser.Scene {
       };
     }
 
-    await this.saveManager.save({ ...s, stats: { ...s.stats, bestWave, bestBolts, runsCompleted }, daily });
+    await this.saveManager.save({
+      ...withMilestoneRewards,
+      stats: { ...withMilestoneRewards.stats, bestWave, bestBolts, runsCompleted },
+      leaderboard: {
+        ...withMilestoneRewards.leaderboard,
+        claimedMilestones,
+      },
+      daily,
+    });
     this.registry.set("saveData", this.saveManager.get());
     this.registry.set("lastLeaderboardEntryId", entry.id);
     this.registry.set("lastLeaderboardFilter", this.latestLeaderboardFilter);
@@ -265,6 +319,9 @@ export class ResultsScene extends Phaser.Scene {
     this.registry.set("lastLeaderboardPromotionDivision", this.latestPromotionDivision);
     this.registry.set("lastLeaderboardPromotionBolts", promotionReward.bolts);
     this.registry.set("lastLeaderboardPromotionCores", promotionReward.cores);
+    this.registry.set("lastLeaderboardCareerMilestones", this.latestCareerMilestones);
+    this.registry.set("lastLeaderboardCareerMilestoneBolts", milestoneUnlocks.reward.bolts);
+    this.registry.set("lastLeaderboardCareerMilestoneCores", milestoneUnlocks.reward.cores);
     this.refreshStatsText();
     const submit = this.platformAdapter?.submitScore?.(computeRunScore(this.state));
     if (submit) void submit.catch(() => {});
@@ -360,4 +417,8 @@ function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores:
   if (reward.bolts > 0) parts.push(formatResource(locale, "bolts", reward.bolts));
   if (reward.cores > 0) parts.push(formatResource(locale, "cores", reward.cores));
   return parts.join(" | ");
+}
+
+function formatCareerMilestoneTitles(locale: Locale, ids: readonly LeaderboardCareerMilestoneId[]): string {
+  return ids.map((id) => t(locale, `leaderboard.milestone.${id}`)).join(", ");
 }

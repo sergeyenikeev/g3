@@ -56,6 +56,7 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "menu.installedButton": "INSTALLED",
     "menu.maxed": "MAXED",
     "menu.installedList": (p) => `Installed: ${p?.items ?? ""}`,
+    "menu.installedBuild": "Installed build",
     "menu.installedNone": "Installed: none yet. Buy permanent upgrades to shape future runs.",
     "menu.notEnough": "Not enough resources.",
     "menu.upgradeUnavailable": "Upgrade unavailable.",
@@ -230,6 +231,7 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "menu.installedButton": "УСТАНОВЛЕНО",
     "menu.maxed": "МАКС.",
     "menu.installedList": (p) => `Установлено: ${p?.items ?? ""}`,
+    "menu.installedBuild": "Установленная сборка",
     "menu.installedNone": "Установлено: пока ничего. Постоянные улучшения задают стиль будущих заездов.",
     "menu.notEnough": "Не хватает ресурсов.",
     "menu.upgradeUnavailable": "Улучшение недоступно.",
@@ -349,6 +351,23 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
   },
 };
 
+Object.assign(MESSAGES.en, {
+  "menu.leaderboardMilestoneUnlock": (p?: Record<string, unknown>) =>
+    `Career badge unlocked: ${p?.titles ?? ""} | ${p?.reward ?? ""}`,
+  "menu.leaderboardCareerStatus": (p?: Record<string, unknown>) =>
+    `Career badges ${p?.count ?? 0}/${p?.total ?? 0}. Next: ${p?.title ?? "Unknown"}`,
+  "menu.leaderboardCareerComplete": (p?: Record<string, unknown>) =>
+    `Career badges ${p?.count ?? 0}/${p?.total ?? 0}. Full set unlocked.`,
+  "results.milestoneUnlock": (p?: Record<string, unknown>) =>
+    `Career badge unlocked: ${p?.titles ?? ""} (${p?.reward ?? ""})`,
+  "results.nextMilestone": (p?: Record<string, unknown>) => `Next badge: ${p?.title ?? "Unknown"}`,
+  "results.allMilestones": "All career badges unlocked",
+  "leaderboard.milestone.score_25000": "Quartermaster 25K",
+  "leaderboard.milestone.wave_20": "Frontline 20",
+  "leaderboard.milestone.salvage_400": "Scrap Baron",
+  "leaderboard.milestone.legend_league": "Legend League",
+});
+
 Object.assign(MESSAGES.ru, {
   "menu.pilotButton": (p?: Record<string, unknown>) => `\u041f\u0438\u043b\u043e\u0442: ${p?.name ?? "\u0410\u0412\u0422\u041e"}`,
   "menu.pilotAuto": "\u0410\u0412\u0422\u041e",
@@ -368,20 +387,31 @@ Object.assign(MESSAGES.ru, {
     `\u041d\u043e\u0432\u044b\u0439 \u0440\u0435\u043a\u043e\u0440\u0434: #${p?.rank ?? 0} \u0432 \u0442\u0430\u0431\u043b\u0438\u0446\u0435 ${p?.mode ?? "\u0412\u0421\u0415"}.`,
   "menu.leaderboardPromotion": (p?: Record<string, unknown>) =>
     `\u041f\u043e\u0432\u044b\u0448\u0435\u043d\u0438\u0435 \u043b\u0438\u0433\u0438: ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"} | ${p?.reward ?? ""}`,
+  "menu.leaderboardMilestoneUnlock": (p?: Record<string, unknown>) =>
+    `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0439 \u0431\u0435\u0439\u0434\u0436: ${p?.titles ?? ""} | ${p?.reward ?? ""}`,
   "menu.leaderboardCareerNext": (p?: Record<string, unknown>) =>
     `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u0430\u044f \u043b\u0438\u0433\u0430: ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"} | \u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f ${p?.nextDivision ?? "\u0420\u0435\u0439\u0434\u0435\u0440"} \u043d\u0430 ${p?.score ?? "0"}`,
   "menu.leaderboardCareerTop": (p?: Record<string, unknown>) =>
     `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u0430\u044f \u043b\u0438\u0433\u0430: ${p?.division ?? "\u041b\u0435\u0433\u0435\u043d\u0434\u0430"} | \u0412\u0435\u0440\u0445\u043d\u044f\u044f \u043b\u0438\u0433\u0430 \u0432\u0437\u044f\u0442\u0430`,
+  "menu.leaderboardCareerStatus": (p?: Record<string, unknown>) =>
+    `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0435 \u0431\u0435\u0439\u0434\u0436\u0438 ${p?.count ?? 0}/${p?.total ?? 0}. \u0414\u0430\u043b\u044c\u0448\u0435: ${p?.title ?? "?"}`,
+  "menu.leaderboardCareerComplete": (p?: Record<string, unknown>) =>
+    `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0435 \u0431\u0435\u0439\u0434\u0436\u0438 ${p?.count ?? 0}/${p?.total ?? 0}. \u0412\u0441\u044f \u043a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u044f \u0441\u043e\u0431\u0440\u0430\u043d\u0430.`,
   "toast.pilot": (p?: Record<string, unknown>) => `\u041f\u0438\u043b\u043e\u0442: ${p?.value ?? "\u0410\u0412\u0422\u041e"}`,
   "results.pilot": "\u041f\u0438\u043b\u043e\u0442",
   "results.division": "\u041b\u0438\u0433\u0430",
   "results.score": "\u041e\u0447\u043a\u0438",
   "results.promotion": (p?: Record<string, unknown>) => `\u041f\u043e\u0432\u044b\u0448\u0435\u043d\u0438\u0435: ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"} (${p?.reward ?? ""})`,
+  "results.milestoneUnlock": (p?: Record<string, unknown>) =>
+    `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0439 \u0431\u0435\u0439\u0434\u0436: ${p?.titles ?? ""} (${p?.reward ?? ""})`,
   "results.bestDelta": (p?: Record<string, unknown>) => `\u0414\u0435\u043b\u044c\u0442\u0430 \u043a \u043b\u0443\u0447\u0448\u0435\u043c\u0443: ${p?.value ?? "+0"}`,
   "results.bestDeltaNone": "\u041f\u0435\u0440\u0432\u044b\u0439 \u0440\u0435\u0439\u0442\u0438\u043d\u0433\u043e\u0432\u044b\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442",
   "results.nextDivision": (p?: Record<string, unknown>) =>
     `\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f \u043b\u0438\u0433\u0430: ${p?.division ?? "\u0420\u0435\u0439\u0434\u0435\u0440"} \u043d\u0430 ${p?.score ?? "0"}`,
   "results.topDivision": "\u0414\u043e\u0441\u0442\u0438\u0433\u043d\u0443\u0442\u0430 \u0432\u0435\u0440\u0445\u043d\u044f\u044f \u043b\u0438\u0433\u0430",
+  "results.nextMilestone": (p?: Record<string, unknown>) =>
+    `\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439 \u0431\u0435\u0439\u0434\u0436: ${p?.title ?? "?"}`,
+  "results.allMilestones": "\u0412\u0441\u0435 \u043a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0435 \u0431\u0435\u0439\u0434\u0436\u0438 \u0441\u043e\u0431\u0440\u0430\u043d\u044b",
   "results.rank": (p?: Record<string, unknown>) => `\u041c\u0435\u0441\u0442\u043e: #${p?.rank ?? 0}`,
   "results.newRecord": "\u041d\u043e\u0432\u044b\u0439 \u0440\u0435\u043a\u043e\u0440\u0434",
   "results.leaderboardTitle": "\u0420\u0435\u0439\u0442\u0438\u043d\u0433",
@@ -400,6 +430,10 @@ Object.assign(MESSAGES.ru, {
   "leaderboard.division.ace": "\u0410\u0441",
   "leaderboard.division.elite": "\u042d\u043b\u0438\u0442\u0430",
   "leaderboard.division.legend": "\u041b\u0435\u0433\u0435\u043d\u0434\u0430",
+  "leaderboard.milestone.score_25000": "\u041a\u0432\u0430\u0440\u0442\u0438\u0440\u043c\u0435\u0439\u0441\u0442\u0435\u0440 25K",
+  "leaderboard.milestone.wave_20": "\u0424\u0440\u043e\u043d\u0442 20",
+  "leaderboard.milestone.salvage_400": "\u0411\u0430\u0440\u043e\u043d \u043b\u043e\u043c\u0430",
+  "leaderboard.milestone.legend_league": "\u041b\u0438\u0433\u0430 \u041b\u0435\u0433\u0435\u043d\u0434",
   "leaderboard.lastRun": "\u041f\u041e\u0421\u041b\u0415\u0414\u041d\u0418\u0419 \u0417\u0410\u0415\u0417\u0414",
   "leaderboard.recordBadge": "\u041d\u041e\u0412\u042b\u0419 \u0420\u0415\u041a\u041e\u0420\u0414",
 });

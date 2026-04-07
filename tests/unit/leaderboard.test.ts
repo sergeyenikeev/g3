@@ -4,8 +4,11 @@ import {
   computeRunScore,
   filterLeaderboardEntries,
   getLeaderboardBestScore,
+  getLeaderboardCareerMilestoneUnlocks,
+  getLeaderboardCareerProgress,
   getLeaderboardDivision,
   getLeaderboardNextDivision,
+  getNextLeaderboardCareerMilestone,
   getLeaderboardPromotionRewards,
   getLeaderboardRank,
   upsertLeaderboardEntries,
@@ -101,5 +104,20 @@ describe("leaderboard", () => {
       divisions: ["legend"],
       reward: { bolts: 400, cores: 3 },
     });
+  });
+
+  it("unlocks career milestones and points to the next badge", () => {
+    const progress = getLeaderboardCareerProgress({
+      bestScore: 42_000,
+      bestWave: 22,
+      bestBolts: 405,
+      highestDivision: "ace",
+    });
+
+    expect(getLeaderboardCareerMilestoneUnlocks(progress, [])).toEqual({
+      ids: ["score_25000", "wave_20", "salvage_400"],
+      reward: { bolts: 300, cores: 2 },
+    });
+    expect(getNextLeaderboardCareerMilestone(progress, ["score_25000", "wave_20", "salvage_400"])?.id).toBe("legend_league");
   });
 });

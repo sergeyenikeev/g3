@@ -1,4 +1,9 @@
-import { sanitizePilotName, type LeaderboardDivisionId, type LeaderboardEntry } from "../../platform/save/saveManager";
+import {
+  sanitizePilotName,
+  type LeaderboardCareerMilestoneId,
+  type LeaderboardDivisionId,
+  type LeaderboardEntry,
+} from "../../platform/save/saveManager";
 import type { RunState } from "./runState";
 
 export const LEADERBOARD_MAX_ENTRIES = 10;
@@ -20,6 +25,19 @@ const LEADERBOARD_DIVISION_REWARDS: Record<LeaderboardDivisionId, { bolts: numbe
   elite: { bolts: 260, cores: 2 },
   legend: { bolts: 400, cores: 3 },
 };
+const LEADERBOARD_CAREER_MILESTONES: Array<{
+  id: LeaderboardCareerMilestoneId;
+  score?: number;
+  wave?: number;
+  bolts?: number;
+  division?: LeaderboardDivisionId;
+  reward: { bolts: number; cores: number };
+}> = [
+  { id: "score_25000", score: 25_000, reward: { bolts: 120, cores: 0 } },
+  { id: "wave_20", wave: 20, reward: { bolts: 0, cores: 1 } },
+  { id: "salvage_400", bolts: 400, reward: { bolts: 180, cores: 1 } },
+  { id: "legend_league", division: "legend", reward: { bolts: 0, cores: 4 } },
+];
 
 type LeaderboardRunState = Pick<
   RunState,
@@ -144,6 +162,83 @@ export function getLeaderboardHigherDivision(a: LeaderboardDivisionId, b: Leader
   return LEADERBOARD_DIVISION_ORDER.indexOf(a) >= LEADERBOARD_DIVISION_ORDER.indexOf(b) ? a : b;
 }
 
+export function getLeaderboardCareerMilestones(): readonly typeof LEADERBOARD_CAREER_MILESTONES {
+  return LEADERBOARD_CAREER_MILESTONES;
+}
+
+export function getLeaderboardCareerProgress(progress: {
+  bestScore: number;
+  bestWave: number;
+  bestBolts: number;
+  highestDivision: LeaderboardDivisionId;
+}): {
+  bestScore: number;
+  bestWave: number;
+  bestBolts: number;
+  highestDivision: LeaderboardDivisionId;
+} {
+  return {
+    bestScore: Math.max(0, Math.floor(progress.bestScore)),
+    bestWave: Math.max(0, Math.floor(progress.bestWave)),
+    bestBolts: Math.max(0, Math.floor(progress.bestBolts)),
+    highestDivision: progress.highestDivision,
+  };
+}
+
+export function getUnlockedLeaderboardCareerMilestones(progress: {
+  bestScore: number;
+  bestWave: number;
+  bestBolts: number;
+  highestDivision: LeaderboardDivisionId;
+}): LeaderboardCareerMilestoneId[] {
+  const safe = getLeaderboardCareerProgress(progress);
+  return LEADERBOARD_CAREER_MILESTONES.filter((milestone) => isCareerMilestoneUnlocked(safe, milestone)).map((milestone) => milestone.id);
+}
+
+export function getLeaderboardCareerMilestoneUnlocks(
+  progress: {
+    bestScore: number;
+    bestWave: number;
+    bestBolts: number;
+    highestDivision: LeaderboardDivisionId;
+  },
+  claimedMilestones: readonly LeaderboardCareerMilestoneId[] = []
+): { ids: LeaderboardCareerMilestoneId[]; reward: { bolts: number; cores: number } } {
+  const safe = getLeaderboardCareerProgress(progress);
+  const claimed = new Set(claimedMilestones);
+  const ids = LEADERBOARD_CAREER_MILESTONES.filter(
+    (milestone) => !claimed.has(milestone.id) && isCareerMilestoneUnlocked(safe, milestone)
+  ).map((milestone) => milestone.id);
+
+  return {
+    ids,
+    reward: ids.reduce(
+      (total, id) => {
+        const milestone = LEADERBOARD_CAREER_MILESTONES.find((entry) => entry.id === id);
+        return {
+          bolts: total.bolts + (milestone?.reward.bolts ?? 0),
+          cores: total.cores + (milestone?.reward.cores ?? 0),
+        };
+      },
+      { bolts: 0, cores: 0 }
+    ),
+  };
+}
+
+export function getNextLeaderboardCareerMilestone(
+  progress: {
+    bestScore: number;
+    bestWave: number;
+    bestBolts: number;
+    highestDivision: LeaderboardDivisionId;
+  },
+  claimedMilestones: readonly LeaderboardCareerMilestoneId[] = []
+): (typeof LEADERBOARD_CAREER_MILESTONES)[number] | null {
+  const safe = getLeaderboardCareerProgress(progress);
+  const claimed = new Set(claimedMilestones);
+  return LEADERBOARD_CAREER_MILESTONES.find((milestone) => !claimed.has(milestone.id) && !isCareerMilestoneUnlocked(safe, milestone)) ?? null;
+}
+
 function compareLeaderboardEntries(a: LeaderboardEntry, b: LeaderboardEntry): number {
   if (b.score !== a.score) return b.score - a.score;
   if (b.wave !== a.wave) return b.wave - a.wave;
@@ -162,4 +257,20 @@ function createCallsign(state: LeaderboardRunState): string {
   const prefix = CALLSIGN_PREFIXES[Math.abs(seed) % CALLSIGN_PREFIXES.length] ?? "RIG";
   const suffix = 100 + (Math.abs(seed) % 900);
   return `${prefix}-${suffix}`;
+}
+
+function isCareerMilestoneUnlocked(
+  progress: {
+    bestScore: number;
+    bestWave: number;
+    bestBolts: number;
+    highestDivision: LeaderboardDivisionId;
+  },
+  milestone: (typeof LEADERBOARD_CAREER_MILESTONES)[number]
+): boolean {
+  if (typeof milestone.score === "number" && progress.bestScore < milestone.score) return false;
+  if (typeof milestone.wave === "number" && progress.bestWave < milestone.wave) return false;
+  if (typeof milestone.bolts === "number" && progress.bestBolts < milestone.bolts) return false;
+  if (milestone.division && progress.highestDivision !== milestone.division) return false;
+  return true;
 }

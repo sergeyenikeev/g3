@@ -35,6 +35,7 @@ describe("SaveManager (integration)", () => {
     expect(s.settings.pilotName).toBe("");
     expect(s.leaderboard.highestDivision).toBe("scrapper");
     expect(s.leaderboard.claimedRewardDivisions).toEqual([]);
+    expect(s.leaderboard.claimedMilestones).toEqual([]);
     expect(s.meta.wallet.bolts).toBe(0);
     expect(s.meta.wallet.cores).toBe(0);
   });
@@ -53,6 +54,7 @@ describe("SaveManager (integration)", () => {
     expect(s2.settings.language).toBe("ru");
     expect(s2.settings.pilotName).toBe("Nova");
     expect(s2.leaderboard.highestDivision).toBe("scrapper");
+    expect(s2.leaderboard.claimedMilestones).toEqual([]);
     expect(s2.meta.wallet.bolts).toBe(250);
   });
 
@@ -80,6 +82,7 @@ describe("SaveManager (integration)", () => {
     expect(s.settings.pilotName).toBe("Long Pilot Name 12");
     expect(s.leaderboard.highestDivision).toBe("scrapper");
     expect(s.leaderboard.claimedRewardDivisions).toEqual([]);
+    expect(s.leaderboard.claimedMilestones).toEqual([]);
   });
 
   it("falls back to defaults on invalid save version", async () => {

@@ -37,10 +37,14 @@ describe("localization", () => {
     expect(getLevelFinaleCopy("en", "ion_tempest").title).toBe("Ion Tempest");
     expect(t("en", "menu.pilotButton", { name: "ORBIT-7" })).toBe("Pilot: ORBIT-7");
     expect(t("en", "leaderboard.division.elite")).toBe("Elite");
+    expect(t("en", "leaderboard.milestone.legend_league")).toBe("Legend League");
     expect(t("en", "leaderboard.filter.daily")).toBe("DAILY");
     expect(t("en", "results.newRecord")).toBe("New record");
     expect(t("en", "results.bestDelta", { value: "+1200" })).toBe("Best delta: +1200");
     expect(t("en", "results.nextDivision", { division: "Elite", score: "60000" })).toBe("Next division: Elite at 60000");
+    expect(t("en", "menu.leaderboardCareerStatus", { count: 2, total: 4, title: "Legend League" })).toBe(
+      "Career badges 2/4. Next: Legend League"
+    );
     expect(t("en", "results.pilot")).toBe("Pilot");
     expect(getRarityLabel("en", "epic")).toBe("EPIC");
     expect(formatResource("ru", "cores", 3)).toBe("3 ядра");

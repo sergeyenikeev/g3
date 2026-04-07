@@ -6,6 +6,7 @@ import { normalizeLanguageSetting } from "../../i18n/localization";
 
 export const SAVE_VERSION = 1 as const;
 export type LeaderboardDivisionId = "scrapper" | "raider" | "ace" | "elite" | "legend";
+export type LeaderboardCareerMilestoneId = "score_25000" | "wave_20" | "salvage_400" | "legend_league";
 
 export type LeaderboardEntry = {
   id: string;
@@ -57,6 +58,7 @@ export type SaveDataV1 = {
     entries: LeaderboardEntry[];
     highestDivision: LeaderboardDivisionId;
     claimedRewardDivisions: LeaderboardDivisionId[];
+    claimedMilestones: LeaderboardCareerMilestoneId[];
   };
 };
 
@@ -80,7 +82,7 @@ export function makeDefaultSave(): SaveData {
     stats: { bestWave: 0, bestBolts: 0, runsCompleted: 0 },
     ads: { lastInterstitialAtMs: 0, lastRewardedAtMs: 0 },
     daily: { lastDateUtc: null, attemptsUsed: 0, bestWave: 0, bestBolts: 0 },
-    leaderboard: { entries: [], highestDivision: "scrapper", claimedRewardDivisions: [] },
+    leaderboard: { entries: [], highestDivision: "scrapper", claimedRewardDivisions: [], claimedMilestones: [] },
   };
 }
 
@@ -162,6 +164,13 @@ function sanitize(raw: unknown): SaveData | null {
     highestDivision,
     leaderboardEntries.length > 0
   );
+  const claimedMilestones = sanitizeClaimedMilestones(
+    (raw as any).leaderboard?.claimedMilestones,
+    highestDivision,
+    bestWave,
+    bestBolts,
+    leaderboardEntries
+  );
 
   const lastInterstitialAtMs = clampNum((raw as any).ads?.lastInterstitialAtMs, 0, 0, 9e15);
   const lastRewardedAtMs = clampNum((raw as any).ads?.lastRewardedAtMs, 0, 0, 9e15);
@@ -174,7 +183,7 @@ function sanitize(raw: unknown): SaveData | null {
     stats: { bestWave, bestBolts, runsCompleted },
     ads: { lastInterstitialAtMs, lastRewardedAtMs },
     daily: { lastDateUtc, attemptsUsed, bestWave: dailyBestWave, bestBolts: dailyBestBolts },
-    leaderboard: { entries: leaderboardEntries, highestDivision, claimedRewardDivisions },
+    leaderboard: { entries: leaderboardEntries, highestDivision, claimedRewardDivisions, claimedMilestones },
   };
 }
 
@@ -285,7 +294,43 @@ function sanitizeLeaderboardDivisionId(raw: unknown): LeaderboardDivisionId | nu
   return null;
 }
 
+function sanitizeLeaderboardCareerMilestoneId(raw: unknown): LeaderboardCareerMilestoneId | null {
+  if (raw === "score_25000" || raw === "wave_20" || raw === "salvage_400" || raw === "legend_league") return raw;
+  return null;
+}
+
+function sanitizeClaimedMilestones(
+  raw: unknown,
+  highestDivision: LeaderboardDivisionId,
+  bestWave: number,
+  bestBolts: number,
+  entries: readonly LeaderboardEntry[]
+): LeaderboardCareerMilestoneId[] {
+  if (Array.isArray(raw)) {
+    const unique = new Set<LeaderboardCareerMilestoneId>();
+    for (const item of raw) {
+      const milestone = sanitizeLeaderboardCareerMilestoneId(item);
+      if (milestone) unique.add(milestone);
+    }
+    return LEADERBOARD_CAREER_MILESTONE_ORDER.filter((milestone) => unique.has(milestone));
+  }
+
+  const bestScore = entries.reduce((best, entry) => Math.max(best, entry.score), 0);
+  const unlocked = new Set<LeaderboardCareerMilestoneId>();
+  if (bestScore >= 25_000) unlocked.add("score_25000");
+  if (bestWave >= 20) unlocked.add("wave_20");
+  if (bestBolts >= 400) unlocked.add("salvage_400");
+  if (highestDivision === "legend") unlocked.add("legend_league");
+  return LEADERBOARD_CAREER_MILESTONE_ORDER.filter((milestone) => unlocked.has(milestone));
+}
+
 const LEADERBOARD_DIVISION_ORDER: LeaderboardDivisionId[] = ["scrapper", "raider", "ace", "elite", "legend"];
+const LEADERBOARD_CAREER_MILESTONE_ORDER: LeaderboardCareerMilestoneId[] = [
+  "score_25000",
+  "wave_20",
+  "salvage_400",
+  "legend_league",
+];
 
 function readMirror(): unknown | null {
   return safeJsonParse(safeLocalStorageGet(LOCAL_SAVE_MIRROR_KEY));
