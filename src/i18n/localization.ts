@@ -352,6 +352,9 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
 };
 
 Object.assign(MESSAGES.en, {
+  "menu.careerMilestonesTitle": "Career badges",
+  "menu.careerUnlocked": "Unlocked",
+  "menu.careerNewBadge": "NEW",
   "menu.leaderboardMilestoneUnlock": (p?: Record<string, unknown>) =>
     `Career badge unlocked: ${p?.titles ?? ""} | ${p?.reward ?? ""}`,
   "menu.leaderboardCareerStatus": (p?: Record<string, unknown>) =>
@@ -387,6 +390,9 @@ Object.assign(MESSAGES.ru, {
     `\u041d\u043e\u0432\u044b\u0439 \u0440\u0435\u043a\u043e\u0440\u0434: #${p?.rank ?? 0} \u0432 \u0442\u0430\u0431\u043b\u0438\u0446\u0435 ${p?.mode ?? "\u0412\u0421\u0415"}.`,
   "menu.leaderboardPromotion": (p?: Record<string, unknown>) =>
     `\u041f\u043e\u0432\u044b\u0448\u0435\u043d\u0438\u0435 \u043b\u0438\u0433\u0438: ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"} | ${p?.reward ?? ""}`,
+  "menu.careerMilestonesTitle": "\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0435 \u0431\u0435\u0439\u0434\u0436\u0438",
+  "menu.careerUnlocked": "\u041e\u0442\u043a\u0440\u044b\u0442",
+  "menu.careerNewBadge": "\u041d\u041e\u0412\u041e\u0415",
   "menu.leaderboardMilestoneUnlock": (p?: Record<string, unknown>) =>
     `\u041a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0439 \u0431\u0435\u0439\u0434\u0436: ${p?.titles ?? ""} | ${p?.reward ?? ""}`,
   "menu.leaderboardCareerNext": (p?: Record<string, unknown>) =>

@@ -11,6 +11,7 @@ import {
   getLeaderboardCareerProgress,
   getLeaderboardDivision,
   getLeaderboardNextDivision,
+  getUnlockedLeaderboardCareerMilestones,
   getNextLeaderboardCareerMilestone,
   type LeaderboardFilter,
 } from "../run/leaderboard";
@@ -65,6 +66,8 @@ export class MenuScene extends Phaser.Scene {
   private leaderboardDim!: Phaser.GameObjects.Rectangle;
   private leaderboardBox!: Phaser.GameObjects.Container;
   private leaderboardHintText!: Phaser.GameObjects.Text;
+  private leaderboardCareerTitleText!: Phaser.GameObjects.Text;
+  private leaderboardCareerText!: Phaser.GameObjects.Text;
   private leaderboardFooterText!: Phaser.GameObjects.Text;
   private leaderboardFilterButtons: Array<{
     filter: LeaderboardFilter;
@@ -767,7 +770,7 @@ export class MenuScene extends Phaser.Scene {
     this.leaderboardDim.setVisible(false);
     this.leaderboardDim.on("pointerdown", () => this.hideLeaderboard());
 
-    const panel = this.add.rectangle(0, 0, 700, 780, 0x0f1720, 0.98).setStrokeStyle(2, 0x5cc8ff, 0.82);
+    const panel = this.add.rectangle(0, 0, 700, 940, 0x0f1720, 0.98).setStrokeStyle(2, 0x5cc8ff, 0.82);
     const accent = this.add.rectangle(0, -336, 592, 2, 0xffd166, 0.9);
     const title = this.add
       .text(0, -360, t(this.locale, "menu.leaderboardTitle"), {
@@ -833,19 +836,36 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.leaderboardFooterText = this.add
-      .text(0, 332, "", {
+      .text(0, 418, "", {
         fontSize: "13px",
         color: "#98b7c7",
         align: "center",
         wordWrap: { width: 600 },
       })
       .setOrigin(0.5);
+    this.leaderboardCareerTitleText = this.add
+      .text(-290, 310, t(this.locale, "menu.careerMilestonesTitle"), {
+        fontSize: "14px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0, 0);
+    this.leaderboardCareerText = this.add
+      .text(-290, 336, "", {
+        fontSize: "12px",
+        color: "#98b7c7",
+        wordWrap: { width: 580 },
+      })
+      .setOrigin(0, 0)
+      .setLineSpacing(4);
 
     const children: Phaser.GameObjects.GameObject[] = [
       panel,
       accent,
       title,
       this.leaderboardHintText,
+      this.leaderboardCareerTitleText,
+      this.leaderboardCareerText,
       btnClose,
       labelClose,
       this.leaderboardFooterText,
@@ -869,7 +889,7 @@ export class MenuScene extends Phaser.Scene {
     if (!this.leaderboardDim || !this.leaderboardBox) return;
     const { width, height } = this.scale;
     this.leaderboardDim.setSize(width, height);
-    const scale = Math.min(1, (width - 32) / 700, (height - 32) / 780);
+    const scale = Math.min(1, (width - 32) / 700, (height - 32) / 940);
     this.leaderboardBox.setScale(scale).setPosition(width / 2, height / 2);
   }
 
@@ -920,6 +940,7 @@ export class MenuScene extends Phaser.Scene {
       bestBolts: save.stats.bestBolts,
       highestDivision: save.leaderboard.highestDivision,
     });
+    const unlockedMilestones = new Set<LeaderboardCareerMilestoneId>(getUnlockedLeaderboardCareerMilestones(careerProgress));
     const nextMilestone = getNextLeaderboardCareerMilestone(careerProgress, [...claimedMilestones]);
 
     for (const entry of this.leaderboardFilterButtons) {
@@ -985,6 +1006,21 @@ export class MenuScene extends Phaser.Scene {
         `${rank}. ${entry.pilot} [${modeLabel} | ${divisionLabel}]  ${formatNumber(this.locale, entry.score)}\n${secondary} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)} | ${t(this.locale, "hud.bolts")} ${formatNumber(this.locale, entry.bolts)} | ${t(this.locale, "results.cores")} ${formatNumber(this.locale, entry.cores)}${badge ? ` | ${badge}` : ""}`
       );
     }
+
+    this.leaderboardCareerTitleText.setText(t(this.locale, "menu.careerMilestonesTitle"));
+    this.leaderboardCareerText.setText(
+      careerMilestones
+        .map((milestone) =>
+          formatCareerMilestoneLine(
+            this.locale,
+            milestone,
+            careerProgress,
+            unlockedMilestones.has(milestone.id),
+            this.latestCareerMilestones.includes(milestone.id)
+          )
+        )
+        .join("\n")
+    );
 
     this.leaderboardFooterText.setText(
       this.latestPromotionDivision && (this.latestPromotionReward.bolts > 0 || this.latestPromotionReward.cores > 0)
@@ -1479,6 +1515,33 @@ function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores:
 
 function formatCareerMilestoneTitles(locale: Locale, ids: readonly LeaderboardCareerMilestoneId[]): string {
   return ids.map((id) => t(locale, `leaderboard.milestone.${id}`)).join(" | ");
+}
+
+function formatCareerMilestoneLine(
+  locale: Locale,
+  milestone: ReturnType<typeof getLeaderboardCareerMilestones>[number],
+  progress: ReturnType<typeof getLeaderboardCareerProgress>,
+  unlocked: boolean,
+  justUnlocked: boolean
+): string {
+  const title = t(locale, `leaderboard.milestone.${milestone.id}`);
+  const reward = formatLeaderboardReward(locale, milestone.reward);
+  const prefix = justUnlocked ? `${t(locale, "menu.careerNewBadge")} ` : "";
+  if (unlocked) return `${prefix}${title} | ${t(locale, "menu.careerUnlocked")} | ${reward}`;
+
+  if (typeof milestone.score === "number") {
+    return `${prefix}${title} | ${t(locale, "results.score")}: ${formatNumber(locale, progress.bestScore)}/${formatNumber(locale, milestone.score)} | ${reward}`;
+  }
+  if (typeof milestone.wave === "number") {
+    return `${prefix}${title} | ${t(locale, "hud.wave")}: ${formatNumber(locale, progress.bestWave)}/${formatNumber(locale, milestone.wave)} | ${reward}`;
+  }
+  if (typeof milestone.bolts === "number") {
+    return `${prefix}${title} | ${t(locale, "hud.bolts")}: ${formatNumber(locale, progress.bestBolts)}/${formatNumber(locale, milestone.bolts)} | ${reward}`;
+  }
+  if (milestone.division) {
+    return `${prefix}${title} | ${t(locale, "results.division")}: ${t(locale, `leaderboard.division.${progress.highestDivision}`)}/${t(locale, `leaderboard.division.${milestone.division}`)} | ${reward}`;
+  }
+  return `${prefix}${title} | ${reward}`;
 }
 
 function sanitizeCareerMilestoneIds(raw: unknown): LeaderboardCareerMilestoneId[] {

@@ -39,6 +39,8 @@ describe("localization", () => {
     expect(t("en", "leaderboard.division.elite")).toBe("Elite");
     expect(t("en", "leaderboard.milestone.legend_league")).toBe("Legend League");
     expect(t("en", "leaderboard.filter.daily")).toBe("DAILY");
+    expect(t("en", "menu.careerMilestonesTitle")).toBe("Career badges");
+    expect(t("en", "menu.careerUnlocked")).toBe("Unlocked");
     expect(t("en", "results.newRecord")).toBe("New record");
     expect(t("en", "results.bestDelta", { value: "+1200" })).toBe("Best delta: +1200");
     expect(t("en", "results.nextDivision", { division: "Elite", score: "60000" })).toBe("Next division: Elite at 60000");

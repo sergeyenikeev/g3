@@ -162,7 +162,7 @@ export function getLeaderboardHigherDivision(a: LeaderboardDivisionId, b: Leader
   return LEADERBOARD_DIVISION_ORDER.indexOf(a) >= LEADERBOARD_DIVISION_ORDER.indexOf(b) ? a : b;
 }
 
-export function getLeaderboardCareerMilestones(): readonly typeof LEADERBOARD_CAREER_MILESTONES {
+export function getLeaderboardCareerMilestones(): readonly (typeof LEADERBOARD_CAREER_MILESTONES)[number][] {
   return LEADERBOARD_CAREER_MILESTONES;
 }
 
