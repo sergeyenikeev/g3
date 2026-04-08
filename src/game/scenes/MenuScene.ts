@@ -101,6 +101,8 @@ export class MenuScene extends Phaser.Scene {
   private leaderboardCareerText!: Phaser.GameObjects.Text;
   private leaderboardFooterText!: Phaser.GameObjects.Text;
   private leaderboardPlatformText!: Phaser.GameObjects.Text;
+  private leaderboardEmptyPanel!: Phaser.GameObjects.Rectangle;
+  private leaderboardEmptyText!: Phaser.GameObjects.Text;
   private leaderboardFilterButtons: Array<{
     filter: LeaderboardFilter;
     button: Phaser.GameObjects.Rectangle;
@@ -746,6 +748,46 @@ export class MenuScene extends Phaser.Scene {
       .text(0, 0, t(this.locale, "menu.claimOpsIdle"), { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
     btnClaimOps.on("pointerdown", () => void claimOpsRewards());
+    const liveopsLayerBase = 12;
+    [
+      liveopsCardBg,
+      dailyInfoCardBg,
+      weeklyRaceCardBg,
+      ...dailyMissionRows.map((row) => row.bg),
+      ...weeklyMissionRows.map((row) => row.bg),
+    ].forEach((entry) => entry.setDepth(liveopsLayerBase));
+    [
+      liveopsTitle,
+      liveopsInfo,
+      liveopsReadyBadgeBg,
+      liveopsReadyBadgeText,
+      dailyInfoTitle,
+      dailyInfo,
+      weeklyRaceTitle,
+      weeklyRaceInfo,
+      weeklyRaceBadgeBg,
+      weeklyRaceBadgeText,
+      weeklyRaceJumpBadgeBg,
+      weeklyRaceJumpBadgeText,
+      weeklyRaceResetBadgeBg,
+      weeklyRaceResetBadgeText,
+      weeklyRaceRewardBadgeBg,
+      weeklyRaceRewardBadgeText,
+      weeklyRaceRiskBadgeBg,
+      weeklyRaceRiskBadgeText,
+      weeklyRaceProgressTrack,
+      weeklyRaceProgressFill,
+      weeklyRaceProgressText,
+      dailyMissionsTitle,
+      weeklyMissionsTitle,
+      ...dailyMissionRows.map((row) => row.text),
+      ...weeklyMissionRows.map((row) => row.text),
+      btnClaimOps,
+      claimOpsHalo,
+      labelClaimOps,
+      btnCloseMissions,
+      labelCloseMissions,
+    ].forEach((entry) => entry.setDepth(liveopsLayerBase + 1));
 
     const controlsText = this.add
       .text(0, 0, t(this.locale, "menu.controls"), {
@@ -1362,17 +1404,20 @@ export class MenuScene extends Phaser.Scene {
     this.createWorkshopUi();
     this.createLeaderboardUi();
 
+    const utilityDepthBase = 80;
     const utilityPanelBg = this.add
       .rectangle(0, 0, UTILITY_PANEL_WIDTH, UTILITY_PANEL_HEIGHT, 0x0f1720, 0.98)
       .setStrokeStyle(2, 0x5cc8ff, 0.8)
+      .setDepth(utilityDepthBase)
       .setVisible(false);
-    const utilityPanelAccent = this.add.rectangle(0, 0, UTILITY_PANEL_WIDTH - 64, 2, 0xffd166, 0.84).setVisible(false);
+    const utilityPanelAccent = this.add.rectangle(0, 0, UTILITY_PANEL_WIDTH - 64, 2, 0xffd166, 0.84).setDepth(utilityDepthBase + 1).setVisible(false);
     const utilityPanelTitle = this.add
       .text(0, 0, t(this.locale, "pause.title"), {
         fontSize: "24px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
+      .setDepth(utilityDepthBase + 1)
       .setOrigin(0.5)
       .setVisible(false);
     const utilityPanelHint = this.add
@@ -1382,11 +1427,14 @@ export class MenuScene extends Phaser.Scene {
         align: "center",
         wordWrap: { width: UTILITY_PANEL_WIDTH - 64 },
       })
+      .setDepth(utilityDepthBase + 1)
       .setOrigin(0.5)
       .setVisible(false);
     const btnCloseUtility = this.add
-      .rectangle(0, 0, 84, 34, 0x121a24, 0.95)
+      .rectangle(0, 0, 106, 34, 0x121a24, 0.95)
+      .setOrigin(0, 0)
       .setStrokeStyle(2, 0x5cc8ff, 0.76)
+      .setDepth(utilityDepthBase + 2)
       .setInteractive({ useHandCursor: true })
       .setVisible(false);
     const labelCloseUtility = this.add
@@ -1395,8 +1443,23 @@ export class MenuScene extends Phaser.Scene {
         color: "#d9f2ff",
         fontStyle: "700",
       })
+      .setDepth(utilityDepthBase + 3)
       .setOrigin(0.5)
       .setVisible(false);
+    [
+      btnWorkshop,
+      labelWorkshop,
+      btnLeaderboard,
+      labelLeaderboard,
+      btnQuality,
+      labelQuality,
+      btnSfx,
+      labelSfx,
+      btnMusic,
+      labelMusic,
+      btnLanguage,
+      labelLanguage,
+    ].forEach((entry) => entry.setDepth(utilityDepthBase + 2));
     const setUtilityVisible = (visible: boolean) => {
       utilityPanelBg.setVisible(visible);
       utilityPanelAccent.setVisible(visible);
@@ -1497,6 +1560,7 @@ export class MenuScene extends Phaser.Scene {
         utilityPanelHint.setPosition(panelCenterX, panelTop + 64).setWordWrapWidth(panelWidth - 48, true);
         btnCloseUtility.setPosition(panelLeft + panelWidth - 18 - btnCloseUtility.width, panelTop + 16);
         labelCloseUtility.setPosition(btnCloseUtility.x + btnCloseUtility.width / 2, btnCloseUtility.y + btnCloseUtility.height / 2);
+        fitTextScaleToWidth(labelCloseUtility, btnCloseUtility.width - 16, 0.76);
 
         btnWorkshop.setVisible(true).setPosition(panelLeft + 18, panelTop + 88).setSize(settingsButtonWidth, 38);
         labelWorkshop.setVisible(true).setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
@@ -1748,12 +1812,8 @@ export class MenuScene extends Phaser.Scene {
           row.text.setVisible(false);
         });
 
-        controlsText.setVisible(mode === "full");
-        if (controlsText.visible) {
-          controlsText.setPosition(leftX, summaryCenterY + summaryHeight / 2 + 18);
-          controlsText.setStyle({ fontSize: "13px" });
-        }
-        if (this.toastText) this.toastText.setPosition(s.width / 2, s.height * 0.93);
+        controlsText.setVisible(false);
+        if (this.toastText) this.toastText.setPosition(s.width / 2, Math.round((ctaBottom + summaryTop) / 2));
         this.layoutWorkshop();
         this.layoutLeaderboard();
         return;
@@ -1797,12 +1857,17 @@ export class MenuScene extends Phaser.Scene {
       const leftColumnCenter = panelLeft + 12 + columnWidth / 2;
       const rightColumnLeft = innerLeft + columnWidth + columnGap;
       const rightColumnCenter = panelLeft + 12 + columnWidth + columnGap + columnWidth / 2;
-      const claimButtonWidth = stackedMissions ? Math.min(166, innerWidth - 12) : 178;
-      const claimButtonHeight = stackedMissions ? 34 : 36;
+      const claimButtonWidth = stackedMissions ? Math.min(148, innerWidth - 116) : Math.min(160, innerWidth - 132);
+      const claimButtonHeight = 32;
       const denseDesktop = !stackedMissions && shortDesktop;
       const panelBottom = detailPanelTop + this.dailyPanel.height;
       const controlsTargetY = panelBottom - (stackedMissions ? 18 : 16);
       const maxMissionBottom = controlsTargetY - controlsText.displayHeight / 2 - 10;
+      const headerTitleY = detailPanelTop + 18;
+      const headerButtonY = detailPanelTop + 12;
+      const liveopsCardY = detailPanelTop + (denseDesktop ? 76 : 82);
+      const liveopsCardHeight = denseDesktop ? 52 : 58;
+      const detailSummaryLine = `${t(this.locale, "menu.summaryRewards")} ${summaryRewardsValue.text} | ${t(this.locale, "menu.summaryDaily")} ${summaryDailyValue.text} | ${t(this.locale, "menu.summaryWeekly")} ${summaryWeeklyValue.text}`;
 
       liveopsCardBg.setVisible(true);
       liveopsInfo.setVisible(true);
@@ -1834,11 +1899,12 @@ export class MenuScene extends Phaser.Scene {
         row.text.setVisible(true);
       });
 
-      liveopsTitle.setPosition(panelLeft + 16, detailPanelTop + 18);
+      liveopsTitle.setPosition(panelLeft + 16, headerTitleY);
+      btnCloseMissions.setSize(88, 32);
       btnClaimOps.setSize(claimButtonWidth, claimButtonHeight);
-      btnCloseMissions.setVisible(true).setOrigin(1, 0).setPosition(panelLeft + this.dailyPanel.width - 16, detailPanelTop + 10);
+      btnCloseMissions.setVisible(true).setOrigin(1, 0).setPosition(panelLeft + this.dailyPanel.width - 16, headerButtonY);
       labelCloseMissions.setVisible(true).setPosition(btnCloseMissions.x - btnCloseMissions.width / 2, btnCloseMissions.y + btnCloseMissions.height / 2);
-      btnClaimOps.setPosition(btnCloseMissions.x - btnCloseMissions.width - 12, detailPanelTop + 10).setOrigin(1, 0);
+      btnClaimOps.setPosition(btnCloseMissions.x - btnCloseMissions.width - 12, headerButtonY).setOrigin(1, 0);
       labelClaimOps.setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
       labelClaimOps.setStyle({ fontSize: stackedMissions ? "11px" : "12px" });
       claimOpsHalo
@@ -1846,46 +1912,47 @@ export class MenuScene extends Phaser.Scene {
         .setSize(btnClaimOps.width + 14, btnClaimOps.height + 12);
       const badgeX = Math.min(
         btnClaimOps.x - btnClaimOps.width - 14 - liveopsReadyBadgeBg.width / 2,
-        panelLeft + 22 + liveopsTitle.width + liveopsReadyBadgeBg.width / 2
+        panelLeft + 24 + liveopsTitle.width + liveopsReadyBadgeBg.width / 2
       );
-      liveopsReadyBadgeBg.setPosition(badgeX, detailPanelTop + 18);
-      liveopsReadyBadgeText.setPosition(badgeX, detailPanelTop + 18);
+      liveopsReadyBadgeBg.setPosition(badgeX, headerTitleY);
+      liveopsReadyBadgeText.setPosition(badgeX, headerTitleY);
 
-      liveopsCardBg.setPosition(detailCenterX, detailPanelTop + 58).setSize(innerWidth, 54);
-      liveopsInfo.setPosition(detailCenterX, detailPanelTop + 58);
-      liveopsCardBg.setSize(innerWidth, denseDesktop ? 48 : 54);
-      liveopsInfo.setPosition(detailCenterX, detailPanelTop + (denseDesktop ? 56 : 58));
-      liveopsInfo.setStyle({ fontSize: stackedMissions ? "10px" : denseDesktop ? "10px" : "11px" });
-      liveopsInfo.setWordWrapWidth(innerWidth - 24, true);
+      liveopsCardBg.setPosition(detailCenterX, liveopsCardY).setSize(innerWidth, liveopsCardHeight).setFillStyle(0x162330, 0.98);
+      liveopsInfo.setText(detailSummaryLine);
+      liveopsInfo.setOrigin(0, 0.5).setPosition(panelLeft + 16, liveopsCardY);
+      liveopsInfo.setStyle({ fontSize: stackedMissions ? "11px" : denseDesktop ? "10px" : "12px", align: "left" });
+      liveopsInfo.setWordWrapWidth(innerWidth - 32, true);
+      liveopsInfo.setColor("#d9f2ff");
       dailyMissionsTitle.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
       weeklyMissionsTitle.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
       fitTextScaleToWidth(dailyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.82);
       fitTextScaleToWidth(weeklyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.72);
 
       if (stackedMissions) {
-        const weeklyCardTop = detailPanelTop + 178;
-        dailyInfoCardBg.setPosition(detailCenterX, detailPanelTop + 132).setSize(innerWidth, 76);
-        dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + 104);
-        dailyInfo.setPosition(panelLeft + 16, detailPanelTop + 118);
-        dailyInfo.setStyle({ fontSize: "10px" });
+        const weeklyCardTop = detailPanelTop + 196;
+        dailyInfoCardBg.setPosition(detailCenterX, detailPanelTop + 148).setSize(innerWidth, 84).setFillStyle(0x14222d, 0.98);
+        dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + 118);
+        dailyInfo.setPosition(panelLeft + 16, detailPanelTop + 134);
+        dailyInfo.setStyle({ fontSize: "11px" });
         dailyInfo.setWordWrapWidth(innerWidth - 24, true);
+        dailyInfo.setColor("#d6e6ef");
 
-        weeklyRaceCardBg.setPosition(detailCenterX, detailPanelTop + 238).setSize(innerWidth, 120);
-        weeklyRaceTitle.setPosition(panelLeft + 16, detailPanelTop + 192);
-        weeklyRaceInfo.setPosition(panelLeft + 16, detailPanelTop + 230);
-        weeklyRaceInfo.setStyle({ fontSize: "10px" });
+        weeklyRaceCardBg.setPosition(detailCenterX, detailPanelTop + 258).setSize(innerWidth, 128);
+        weeklyRaceTitle.setPosition(panelLeft + 16, detailPanelTop + 210);
+        weeklyRaceInfo.setPosition(panelLeft + 16, detailPanelTop + 248);
+        weeklyRaceInfo.setStyle({ fontSize: "11px" });
         weeklyRaceInfo.setWordWrapWidth(innerWidth - 24, true);
-        weeklyRaceBadgeBg.setPosition(innerLeft + innerWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 192);
+        weeklyRaceBadgeBg.setPosition(innerLeft + innerWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 210);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
         positionWeeklyRaceResetBadge = () => {
-          weeklyRaceResetBadgeBg.setPosition(panelLeft + 16 + weeklyRaceResetBadgeBg.width / 2, detailPanelTop + 214);
+          weeklyRaceResetBadgeBg.setPosition(panelLeft + 16 + weeklyRaceResetBadgeBg.width / 2, detailPanelTop + 232);
           weeklyRaceResetBadgeText.setPosition(weeklyRaceResetBadgeBg.x, weeklyRaceResetBadgeBg.y);
         };
         positionWeeklyRaceResetBadge();
-        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, detailPanelTop + 214);
+        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, detailPanelTop + 232);
         weeklyRaceJumpBadgeText.setPosition(weeklyRaceJumpBadgeBg.x, weeklyRaceJumpBadgeBg.y);
         positionWeeklyRaceSignalBadges = () => {
-          const rowY = Math.max(detailPanelTop + 266, weeklyRaceInfo.y + weeklyRaceInfo.displayHeight + 16);
+          const rowY = Math.max(detailPanelTop + 286, weeklyRaceInfo.y + weeklyRaceInfo.displayHeight + 16);
           weeklyRaceRewardBadgeBg.setPosition(panelLeft + 16 + weeklyRaceRewardBadgeBg.width / 2, rowY);
           weeklyRaceRewardBadgeText.setPosition(weeklyRaceRewardBadgeBg.x, weeklyRaceRewardBadgeBg.y);
           weeklyRaceRiskBadgeBg.setPosition(panelLeft + innerWidth - 16 - weeklyRaceRiskBadgeBg.width / 2, rowY);
@@ -1939,29 +2006,33 @@ export class MenuScene extends Phaser.Scene {
         };
         positionWeeklyRaceBody();
       } else {
-        const weeklyCardTop = detailPanelTop + (denseDesktop ? 91 : 94);
-        dailyInfoCardBg.setPosition(leftColumnCenter, detailPanelTop + (denseDesktop ? 128 : 134)).setSize(columnWidth, denseDesktop ? 68 : 76);
-        dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 100 : 106));
-        dailyInfo.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 112 : 120));
-        dailyInfo.setStyle({ fontSize: denseDesktop ? "9px" : "10px" });
+        const weeklyCardTop = detailPanelTop + (denseDesktop ? 109 : 114);
+        dailyInfoCardBg
+          .setPosition(leftColumnCenter, detailPanelTop + (denseDesktop ? 146 : 154))
+          .setSize(columnWidth, denseDesktop ? 74 : 84)
+          .setFillStyle(0x14222d, 0.98);
+        dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 116 : 124));
+        dailyInfo.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 130 : 140));
+        dailyInfo.setStyle({ fontSize: denseDesktop ? "10px" : "11px" });
         dailyInfo.setWordWrapWidth(columnWidth - 24, true);
+        dailyInfo.setColor("#d6e6ef");
 
-        weeklyRaceCardBg.setPosition(rightColumnCenter, detailPanelTop + (denseDesktop ? 146 : 154)).setSize(columnWidth, denseDesktop ? 110 : 120);
-        weeklyRaceTitle.setPosition(rightColumnLeft + 4, detailPanelTop + 108);
-        weeklyRaceInfo.setPosition(rightColumnLeft + 4, detailPanelTop + (denseDesktop ? 142 : 146));
-        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "9px" : "10px" });
+        weeklyRaceCardBg.setPosition(rightColumnCenter, detailPanelTop + (denseDesktop ? 166 : 176)).setSize(columnWidth, denseDesktop ? 120 : 130);
+        weeklyRaceTitle.setPosition(rightColumnLeft + 4, detailPanelTop + 126);
+        weeklyRaceInfo.setPosition(rightColumnLeft + 4, detailPanelTop + (denseDesktop ? 158 : 166));
+        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "10px" : "11px" });
         weeklyRaceInfo.setWordWrapWidth(columnWidth - 24, true);
-        weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 108);
+        weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 126);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
         positionWeeklyRaceResetBadge = () => {
-          weeklyRaceResetBadgeBg.setPosition(rightColumnLeft + 4 + weeklyRaceResetBadgeBg.width / 2, detailPanelTop + 126);
+          weeklyRaceResetBadgeBg.setPosition(rightColumnLeft + 4 + weeklyRaceResetBadgeBg.width / 2, detailPanelTop + 144);
           weeklyRaceResetBadgeText.setPosition(weeklyRaceResetBadgeBg.x, weeklyRaceResetBadgeBg.y);
         };
         positionWeeklyRaceResetBadge();
-        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, detailPanelTop + 126);
+        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, detailPanelTop + 144);
         weeklyRaceJumpBadgeText.setPosition(weeklyRaceJumpBadgeBg.x, weeklyRaceJumpBadgeBg.y);
         positionWeeklyRaceSignalBadges = () => {
-          const rowY = Math.max(detailPanelTop + (denseDesktop ? 176 : 184), weeklyRaceInfo.y + weeklyRaceInfo.displayHeight + 14);
+          const rowY = Math.max(detailPanelTop + (denseDesktop ? 194 : 206), weeklyRaceInfo.y + weeklyRaceInfo.displayHeight + 14);
           weeklyRaceRewardBadgeBg.setPosition(rightColumnLeft + 4 + weeklyRaceRewardBadgeBg.width / 2, rowY);
           weeklyRaceRewardBadgeText.setPosition(weeklyRaceRewardBadgeBg.x, weeklyRaceRewardBadgeBg.y);
           weeklyRaceRiskBadgeBg.setPosition(rightColumnLeft + columnWidth - 20 - weeklyRaceRiskBadgeBg.width / 2, rowY);
@@ -2022,7 +2093,7 @@ export class MenuScene extends Phaser.Scene {
 
       controlsText.setPosition(leftX, controlsTargetY);
       controlsText.setStyle({ fontSize: compact ? "12px" : "13px" });
-      if (this.toastText) this.toastText.setPosition(s.width / 2, s.height * 0.93);
+      if (this.toastText) this.toastText.setPosition(s.width / 2, Math.min(s.height * 0.93, panelBottom - 18));
       this.layoutWorkshop();
       this.layoutLeaderboard();
     };
@@ -2295,10 +2366,21 @@ export class MenuScene extends Phaser.Scene {
     this.leaderboardDim.setVisible(false);
     this.leaderboardDim.on("pointerdown", () => this.hideLeaderboard());
 
-    const panel = this.add.rectangle(0, 0, 700, 940, 0x0f1720, 0.98).setStrokeStyle(2, 0x5cc8ff, 0.82);
-    const accent = this.add.rectangle(0, -336, 592, 2, 0xffd166, 0.9);
+    const panelWidth = 700;
+    const panelHeight = 940;
+    const halfWidth = panelWidth / 2;
+    const halfHeight = panelHeight / 2;
+    const headerTitleY = -halfHeight + 22;
+    const headerAccentY = -halfHeight + 48;
+    const headerHintY = -halfHeight + 92;
+    const filterY = -halfHeight + 152;
+    const rowsStartY = -halfHeight + 218;
+    const rowStep = 48;
+
+    const panel = this.add.rectangle(0, 0, panelWidth, panelHeight, 0x0f1720, 0.98).setStrokeStyle(2, 0x5cc8ff, 0.82);
+    const accent = this.add.rectangle(0, headerAccentY, 592, 2, 0xffd166, 0.9);
     const title = this.add
-      .text(0, -360, t(this.locale, "menu.leaderboardTitle"), {
+      .text(0, headerTitleY, t(this.locale, "menu.leaderboardTitle"), {
         fontSize: "28px",
         color: "#d9f2ff",
         fontStyle: "700",
@@ -2306,20 +2388,20 @@ export class MenuScene extends Phaser.Scene {
       .setShadow(0, 0, "#5cc8ff", 18, true, true)
       .setOrigin(0.5);
     this.leaderboardHintText = this.add
-      .text(0, -318, "", {
-        fontSize: "13px",
+      .text(0, headerHintY, "", {
+        fontSize: "12px",
         color: "#98b7c7",
         align: "center",
-        wordWrap: { width: 600 },
+        wordWrap: { width: 560 },
       })
       .setOrigin(0.5);
 
     const btnClose = this.add
-      .rectangle(292, -360, 72, 34, 0x121a24, 0.95)
+      .rectangle(halfWidth - 58, headerTitleY, 72, 34, 0x121a24, 0.95)
       .setStrokeStyle(2, 0x3aa4d4, 0.75)
       .setInteractive({ useHandCursor: true });
     const labelClose = this.add
-      .text(292, -360, t(this.locale, "menu.close"), { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .text(halfWidth - 58, headerTitleY, t(this.locale, "menu.close"), { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
     btnClose.on("pointerdown", () => this.hideLeaderboard());
 
@@ -2328,11 +2410,11 @@ export class MenuScene extends Phaser.Scene {
     filters.forEach((filter, index) => {
       const x = -184 + index * 184;
       const button = this.add
-        .rectangle(x, -270, 148, 38, 0x121a24, 0.96)
+        .rectangle(x, filterY, 148, 38, 0x121a24, 0.96)
         .setStrokeStyle(2, 0x5f6b76, 0.58)
         .setInteractive({ useHandCursor: true });
       const label = this.add
-        .text(x, -270, t(this.locale, `leaderboard.filter.${filter}`), {
+        .text(x, filterY, t(this.locale, `leaderboard.filter.${filter}`), {
           fontSize: "14px",
           color: "#d9f2ff",
           fontStyle: "700",
@@ -2347,7 +2429,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.leaderboardRows = [];
     for (let i = 0; i < 8; i++) {
-      const y = -208 + i * 54;
+      const y = rowsStartY + i * rowStep;
       const bg = this.add.rectangle(0, y, 620, 46, 0x121a24, 0.96).setStrokeStyle(2, 0x2a556d, 0.55);
       const text = this.add
         .text(-290, y - 16, "", {
@@ -2360,23 +2442,39 @@ export class MenuScene extends Phaser.Scene {
       this.leaderboardRows.push({ bg, text });
     }
 
+    this.leaderboardEmptyPanel = this.add
+      .rectangle(0, -86, 620, 172, 0x121a24, 0.96)
+      .setStrokeStyle(2, 0x2a556d, 0.55)
+      .setVisible(false);
+    this.leaderboardEmptyText = this.add
+      .text(0, -86, "", {
+        fontSize: "14px",
+        color: "#d9f2ff",
+        align: "center",
+        wordWrap: { width: 520 },
+      })
+      .setOrigin(0.5)
+      .setLineSpacing(5)
+      .setVisible(false);
+
     this.leaderboardFooterText = this.add
-      .text(0, 386, "", {
-        fontSize: "13px",
+      .text(0, 316, "", {
+        fontSize: "12px",
         color: "#98b7c7",
         align: "center",
-        wordWrap: { width: 600 },
+        wordWrap: { width: 560 },
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 0)
+      .setLineSpacing(3);
     this.leaderboardCareerTitleText = this.add
-      .text(-290, 240, t(this.locale, "menu.careerMilestonesTitle"), {
+      .text(-290, 170, t(this.locale, "menu.careerMilestonesTitle"), {
         fontSize: "14px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
       .setOrigin(0, 0);
     this.leaderboardCareerText = this.add
-      .text(-290, 266, "", {
+      .text(-290, 196, "", {
         fontSize: "12px",
         color: "#98b7c7",
         wordWrap: { width: 580 },
@@ -2384,14 +2482,14 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setLineSpacing(4);
     this.leaderboardPlatformText = this.add
-      .text(0, 442, "", {
-        fontSize: "12px",
+      .text(0, 392, "", {
+        fontSize: "10px",
         color: "#a9d7ee",
         align: "center",
-        wordWrap: { width: 600 },
+        wordWrap: { width: 520 },
       })
-      .setOrigin(0.5)
-      .setLineSpacing(4);
+      .setOrigin(0.5, 0)
+      .setLineSpacing(3);
 
     const children: Phaser.GameObjects.GameObject[] = [
       panel,
@@ -2404,6 +2502,8 @@ export class MenuScene extends Phaser.Scene {
       labelClose,
       this.leaderboardFooterText,
       this.leaderboardPlatformText,
+      this.leaderboardEmptyPanel,
+      this.leaderboardEmptyText,
       ...this.leaderboardFilterButtons.flatMap((entry) => [entry.button, entry.label]),
       ...this.leaderboardRows.flatMap((row) => [row.bg, row.text]),
     ];
@@ -2424,7 +2524,7 @@ export class MenuScene extends Phaser.Scene {
     if (!this.leaderboardDim || !this.leaderboardBox) return;
     const { width, height } = this.scale;
     this.leaderboardDim.setSize(width, height);
-    const scale = Math.min(1, (width - 32) / 700, (height - 32) / 940);
+    const scale = Math.min(1, (width - 48) / 700, (height - 48) / 940);
     this.leaderboardBox.setScale(scale).setPosition(width / 2, height / 2);
   }
 
@@ -2514,7 +2614,16 @@ export class MenuScene extends Phaser.Scene {
         }),
       ].join("\n")
     );
+    this.leaderboardHintText.setStyle({ fontSize: "12px" });
+    if (this.leaderboardHintText.height > 42) {
+      this.leaderboardHintText.setStyle({ fontSize: "11px" });
+    }
     this.leaderboardPlatformText.setText(getPortalBoardLoadingLabel(this.locale));
+    const hasVisibleEntries = filtered.length > 0;
+    this.leaderboardEmptyPanel.setVisible(!hasVisibleEntries);
+    this.leaderboardEmptyText
+      .setVisible(!hasVisibleEntries)
+      .setText([t(this.locale, "menu.leaderboardEmpty"), t(this.locale, "menu.leaderboardScoring")].join("\n\n"));
 
     for (let i = 0; i < this.leaderboardRows.length; i++) {
       const row = this.leaderboardRows[i]!;
@@ -2662,15 +2771,10 @@ export class MenuScene extends Phaser.Scene {
       null;
     const division = t(this.locale, `leaderboard.division.${getLeaderboardDivision(currentScore).id}`);
     const nextDivision = getLeaderboardNextDivision(currentScore);
-    const nextLabel = nextDivision
-      ? getPortalBoardTargetLabel(this.locale, t(this.locale, `leaderboard.division.${nextDivision.id}`), formatNumber(this.locale, nextDivision.minScore))
-      : getPortalBoardTopLabel(this.locale);
-    const leader = snapshot.entries[0]
-      ? getPortalBoardLeaderLabel(this.locale, snapshot.entries[0].playerName, formatNumber(this.locale, snapshot.entries[0].score))
-      : getPortalBoardEmptyLabel(this.locale);
+    const nextLabel = nextDivision ? `${t(this.locale, `leaderboard.division.${nextDivision.id}`)} ${formatNumber(this.locale, nextDivision.minScore)}` : getPortalBoardTopLabel(this.locale);
     const sourceSuffix = snapshot.source === "local" ? ` | ${getPortalBoardFallbackLabel(this.locale)}` : "";
 
-    return `${boardLabel}: ${currentRank ? `#${formatNumber(this.locale, currentRank)}` : getPortalBoardUnrankedLabel(this.locale)} | ${formatNumber(this.locale, currentScore)} | ${division} | ${nextLabel} | ${leader}${sourceSuffix}`;
+    return `${boardLabel}: ${currentRank ? `#${formatNumber(this.locale, currentRank)}` : getPortalBoardUnrankedLabel(this.locale)} | ${formatNumber(this.locale, currentScore)} | ${division} | ${nextLabel}${sourceSuffix}`;
   }
 
   private refreshWalletSummary(): void {
@@ -2754,6 +2858,7 @@ export class MenuScene extends Phaser.Scene {
       const textLeft = -cardWidth / 2 + 18;
       const buttonCenterX = cardWidth / 2 - 58;
       const buttonWidth = 108;
+      const buttonY = 6;
       const buttonLeft = buttonCenterX - buttonWidth / 2;
       const textWrapWidth = Math.max(120, Math.floor(buttonLeft - textLeft - 14));
 
@@ -2802,19 +2907,19 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(0, 0.5);
 
       const btn = this.add
-        .rectangle(buttonCenterX, 0, buttonWidth, 34, affordable ? 0x1b2635 : 0x0d131b, 0.98)
+        .rectangle(buttonCenterX, buttonY, buttonWidth, 34, affordable ? 0x1b2635 : 0x0d131b, 0.98)
         .setStrokeStyle(2, maxed ? 0x57c27d : affordable ? 0xffd166 : 0x5f6b76, 0.86);
       const priceLabel = cost ? formatResource(this.locale, cost.currency, cost.amount) : t(this.locale, "menu.maxed");
       const btnLabel = this.add
         .text(
           buttonCenterX,
-          -6,
+          buttonY - 6,
           maxed ? t(this.locale, "menu.installedButton") : affordable ? t(this.locale, "menu.buy") : t(this.locale, "menu.locked"),
           { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" }
         )
         .setOrigin(0.5);
       const costLabel = this.add
-        .text(buttonCenterX, 10, priceLabel, {
+        .text(buttonCenterX, buttonY + 10, priceLabel, {
           fontSize: "10px",
           color: maxed ? "#57c27d" : affordable ? "#ffd166" : "#98b7c7",
           fontStyle: "700",
@@ -2825,7 +2930,7 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(btnLabel, buttonWidth - 18, 0.76);
       fitTextScaleToWidth(costLabel, buttonWidth - 16, 0.76);
       if (badgeNode) {
-        badgeNode.setPosition(buttonCenterX, -28);
+        badgeNode.setPosition(buttonCenterX, -22);
       }
 
       if (!maxed && affordable) {
@@ -2884,14 +2989,8 @@ export class MenuScene extends Phaser.Scene {
       this.registry.set("saveData", this.saveManager.get());
     }
     this.saveData = this.saveManager.get();
-    if (loginRewardResult.claimed && loginRewardResult.day && loginRewardResult.reward) {
+    if (loginRewardResult.claimed) {
       this.refreshWalletSummary();
-      this.toast(
-        t(this.locale, "toast.loginReward", {
-          day: formatNumber(this.locale, loginRewardResult.day),
-          reward: formatLeaderboardReward(this.locale, loginRewardResult.reward),
-        })
-      );
     }
 
     const sel = pickDailyVariant(this.staticData.daily, dateUtc);

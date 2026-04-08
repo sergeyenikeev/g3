@@ -41,7 +41,18 @@ export class ResultsScene extends Phaser.Scene {
   private state!: RunState;
   private analytics: AnalyticsAdapter | null = null;
   private platformAdapter: PlatformAdapter | null = null;
-  private statsText!: Phaser.GameObjects.Text;
+  private resultsPanel!: Phaser.GameObjects.Rectangle;
+  private titleText!: Phaser.GameObjects.Text;
+  private summaryPanel!: Phaser.GameObjects.Rectangle;
+  private progressPanel!: Phaser.GameObjects.Rectangle;
+  private leaderboardPanel!: Phaser.GameObjects.Rectangle;
+  private summaryText!: Phaser.GameObjects.Text;
+  private progressText!: Phaser.GameObjects.Text;
+  private leaderboardText!: Phaser.GameObjects.Text;
+  private restartBtn!: Phaser.GameObjects.Rectangle;
+  private restartLabel!: Phaser.GameObjects.Text;
+  private menuBtn!: Phaser.GameObjects.Rectangle;
+  private menuLabel!: Phaser.GameObjects.Text;
   private exitBusy = false;
   private x2Used = false;
   private x2Btn: Phaser.GameObjects.Rectangle | null = null;
@@ -95,22 +106,58 @@ export class ResultsScene extends Phaser.Scene {
 
     const { width, height } = this.scale;
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.78).setDepth(2000);
+    this.resultsPanel = this.add
+      .rectangle(width / 2, height / 2, Math.min(720, width - 28), Math.min(820, height - 28), 0x08111a, 0.9)
+      .setStrokeStyle(2, 0x3aa4d4, 0.58)
+      .setDepth(2000.5);
 
-    this.add
-      .text(width / 2, height * 0.22, t(this.locale, "results.title"), { fontSize: "44px", color: "#d9f2ff", fontStyle: "700" })
+    this.titleText = this.add
+      .text(width / 2, 0, t(this.locale, "results.title"), { fontSize: "44px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(2001);
 
-    this.statsText = this.add
-      .text(width / 2, height * 0.36, "", {
-        fontSize: "18px",
-        color: "#98b7c7",
-        align: "center",
+    this.summaryPanel = this.add
+      .rectangle(width / 2, 0, 0, 0, 0x10202c, 0.96)
+      .setStrokeStyle(2, 0x57c27d, 0.72)
+      .setDepth(2000.8);
+    this.progressPanel = this.add
+      .rectangle(width / 2, 0, 0, 0, 0x0e1822, 0.96)
+      .setStrokeStyle(2, 0x3aa4d4, 0.72)
+      .setDepth(2000.8);
+    this.leaderboardPanel = this.add
+      .rectangle(width / 2, 0, 0, 0, 0x111923, 0.96)
+      .setStrokeStyle(2, 0xffd166, 0.72)
+      .setDepth(2000.8);
+
+    this.summaryText = this.add
+      .text(0, 0, "", {
+        fontSize: "16px",
+        color: "#d9f2ff",
+        align: "left",
         wordWrap: { width: Math.min(540, width * 0.84) },
       })
-      .setOrigin(0.5)
+      .setOrigin(0, 0)
       .setDepth(2001);
-    this.refreshStatsText();
+    this.progressText = this.add
+      .text(0, 0, "", {
+        fontSize: "13px",
+        color: "#a9d7ee",
+        align: "left",
+        wordWrap: { width: Math.min(540, width * 0.84) },
+      })
+      .setOrigin(0, 0)
+      .setLineSpacing(4)
+      .setDepth(2001);
+    this.leaderboardText = this.add
+      .text(0, 0, "", {
+        fontSize: "13px",
+        color: "#d9f2ff",
+        align: "left",
+        wordWrap: { width: Math.min(540, width * 0.84) },
+      })
+      .setOrigin(0, 0)
+      .setLineSpacing(4)
+      .setDepth(2001);
 
     const x2Cfg = this.state.config.ads?.rewarded?.x2Results;
     if (x2Cfg?.enabled) {
@@ -121,7 +168,7 @@ export class ResultsScene extends Phaser.Scene {
       });
       const boostedMult = this.getRewardedResultsMult();
       const btnX2 = this.add
-        .rectangle(width / 2, height * 0.52, 280, 52, 0x1b2635, 0.95)
+        .rectangle(width / 2, 0, 280, 52, 0x1b2635, 0.95)
         .setStrokeStyle(2, 0x57c27d, 0.9)
         .setInteractive({ useHandCursor: true })
         .setDepth(2001);
@@ -138,29 +185,36 @@ export class ResultsScene extends Phaser.Scene {
       this.x2Label = labelX2;
     }
 
-    const btnRestart = this.add
-      .rectangle(width / 2, height * 0.62, 280, 64, 0x1b2635, 0.95)
+    this.restartBtn = this.add
+      .rectangle(width / 2, 0, 280, 64, 0x1b2635, 0.95)
       .setStrokeStyle(2, 0x5cc8ff, 0.9)
       .setInteractive({ useHandCursor: true })
       .setDepth(2001);
-    this.add
-      .text(btnRestart.x, btnRestart.y, t(this.locale, "results.restart"), { fontSize: "24px", color: "#d9f2ff", fontStyle: "700" })
+    this.restartLabel = this.add
+      .text(this.restartBtn.x, this.restartBtn.y, t(this.locale, "results.restart"), { fontSize: "24px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(2001);
 
-    const btnMenu = this.add
-      .rectangle(width / 2, height * 0.74, 280, 52, 0x121a24, 0.95)
+    this.menuBtn = this.add
+      .rectangle(width / 2, 0, 280, 52, 0x121a24, 0.95)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true })
       .setDepth(2001);
-    this.add
-      .text(btnMenu.x, btnMenu.y, t(this.locale, "results.menu"), { fontSize: "20px", color: "#d9f2ff", fontStyle: "700" })
+    this.menuLabel = this.add
+      .text(this.menuBtn.x, this.menuBtn.y, t(this.locale, "results.menu"), { fontSize: "20px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(2001);
 
-    btnRestart.on("pointerdown", () => void this.exitTo("restart"));
-    btnMenu.on("pointerdown", () => void this.exitTo("menu"));
+    this.restartBtn.on("pointerdown", () => void this.exitTo("restart"));
+    this.menuBtn.on("pointerdown", () => void this.exitTo("menu"));
 
+    const onResize = () => this.layoutResults();
+    this.scale.on("resize", onResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off("resize", onResize);
+    });
+
+    this.refreshStatsText();
     void this.recordRunOnceAndPersistScores();
   }
 
@@ -187,19 +241,21 @@ export class ResultsScene extends Phaser.Scene {
     );
     const bestDelta =
       this.latestLeaderboardPreviousBest === null ? null : score - this.latestLeaderboardPreviousBest;
-    this.statsText.setText(
+    this.summaryText.setText(
       [
-        `${t(this.locale, "results.pilot")}: ${currentEntry.pilot}`,
-        `${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
-        `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)}`,
-        `${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)}`,
-        `${t(this.locale, "hud.bolts")}: ${formatNumber(this.locale, this.state.bolts)}`,
-        `${t(this.locale, "results.cores")}: ${formatNumber(this.locale, this.state.cores)}`,
+        `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
+        `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)} | ${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)}`,
+        `${t(this.locale, "hud.bolts")}: ${formatNumber(this.locale, this.state.bolts)} | ${t(this.locale, "results.cores")}: ${formatNumber(this.locale, this.state.cores)} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)}`,
         t(this.locale, "results.workshop", {
           bolts: formatNumber(this.locale, rewardPreview.bolts),
           cores: formatNumber(this.locale, rewardPreview.cores),
         }),
-        `${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)}`,
+      ].join("\n")
+    );
+    this.progressText.setText(
+      [
+        rank ? t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) }) : "",
+        this.latestLeaderboardIsRecord ? t(this.locale, "results.newRecord") : "",
         this.latestPromotionDivision
           ? t(this.locale, "results.promotion", {
               division: t(this.locale, `leaderboard.division.${this.latestPromotionDivision}`),
@@ -241,14 +297,99 @@ export class ResultsScene extends Phaser.Scene {
             : this.latestWeeklyRankDelta && this.latestWeeklyRankDelta < 0
               ? t(this.locale, "results.weeklyDeltaDown", { value: formatNumber(this.locale, Math.abs(this.latestWeeklyRankDelta)) })
               : "",
-        rank ? t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) }) : "",
-        this.latestLeaderboardIsRecord ? t(this.locale, "results.newRecord") : "",
-        `${t(this.locale, "results.leaderboardTitle")} (${t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`)})`,
-        ...(topLines.length > 0 ? topLines : [t(this.locale, "menu.leaderboardEmpty")]),
       ]
         .filter(Boolean)
         .join("\n")
     );
+    this.leaderboardText.setText(
+      [
+        `${t(this.locale, "results.leaderboardTitle")} (${t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`)})`,
+        ...(topLines.length > 0 ? topLines : [t(this.locale, "menu.leaderboardEmpty")]),
+      ].join("\n")
+    );
+    this.layoutResults();
+  }
+
+  private layoutResults(): void {
+    if (!this.resultsPanel || !this.titleText || !this.summaryText || !this.progressText || !this.leaderboardText || !this.restartBtn || !this.menuBtn) return;
+    const { width, height } = this.scale;
+    const panelWidth = Math.min(720, width - 28);
+    const panelHeight = Math.min(820, height - 28);
+    const panelTop = height / 2 - panelHeight / 2;
+    const panelBottom = panelTop + panelHeight;
+    const contentWidth = panelWidth - 56;
+    const titleFont = height < 680 ? 34 : height < 760 ? 38 : 44;
+    const x2Visible = Boolean(this.x2Btn?.visible && this.x2Label?.visible);
+    const x2Height = x2Visible ? (height < 700 ? 46 : 52) : 0;
+    const restartHeight = height < 700 ? 56 : 64;
+    const menuHeight = height < 700 ? 46 : 52;
+    const buttonGap = height < 700 ? 14 : 20;
+    const sectionGap = height < 700 ? 10 : 14;
+    const titleGap = height < 700 ? 14 : 18;
+    const reservedButtonsHeight = (x2Visible ? x2Height + buttonGap : 0) + restartHeight + buttonGap + menuHeight;
+
+    this.resultsPanel.setPosition(width / 2, height / 2).setSize(panelWidth, panelHeight);
+    this.titleText.setStyle({ fontSize: `${titleFont}px` }).setPosition(width / 2, panelTop + 42);
+    const contentLeft = width / 2 - panelWidth / 2 + 28;
+    const textLeft = contentLeft + 16;
+    const textWrapWidth = Math.max(240, contentWidth - 32);
+    const sectionsTop = this.titleText.y + this.titleText.displayHeight / 2 + titleGap;
+    const availableSectionHeight = Math.max(200, panelBottom - 24 - reservedButtonsHeight - sectionGap - sectionsTop);
+    const fontPresets = [
+      { summary: 16, progress: 13, leaderboard: 13 },
+      { summary: 15, progress: 12, leaderboard: 12 },
+      { summary: 14, progress: 11, leaderboard: 11 },
+    ];
+    let summaryHeight = 0;
+    let progressHeight = 0;
+    let leaderboardHeight = 0;
+
+    for (const preset of fontPresets) {
+      this.summaryText.setStyle({ fontSize: `${preset.summary}px`, wordWrap: { width: textWrapWidth }, align: "left" });
+      this.summaryText.setLineSpacing(preset.summary >= 16 ? 4 : 3);
+      this.progressText.setStyle({ fontSize: `${preset.progress}px`, wordWrap: { width: textWrapWidth }, align: "left" });
+      this.progressText.setLineSpacing(preset.progress <= 11 ? 3 : 4);
+      this.leaderboardText.setStyle({ fontSize: `${preset.leaderboard}px`, wordWrap: { width: textWrapWidth }, align: "left" });
+      this.leaderboardText.setLineSpacing(preset.leaderboard <= 11 ? 3 : 4);
+
+      summaryHeight = this.summaryText.height + 28;
+      progressHeight = this.progressText.height + 24;
+      leaderboardHeight = this.leaderboardText.height + 24;
+      const totalHeight = summaryHeight + progressHeight + leaderboardHeight + sectionGap * 2;
+      if (totalHeight <= availableSectionHeight || preset === fontPresets[fontPresets.length - 1]) break;
+    }
+
+    let cursorTop = sectionsTop;
+    this.summaryPanel.setPosition(width / 2, cursorTop + summaryHeight / 2).setSize(contentWidth, summaryHeight);
+    this.summaryText.setPosition(textLeft, cursorTop + 14);
+    cursorTop += summaryHeight + sectionGap;
+
+    this.progressPanel.setPosition(width / 2, cursorTop + progressHeight / 2).setSize(contentWidth, progressHeight);
+    this.progressText.setPosition(textLeft, cursorTop + 12);
+    cursorTop += progressHeight + sectionGap;
+
+    this.leaderboardPanel.setPosition(width / 2, cursorTop + leaderboardHeight / 2).setSize(contentWidth, leaderboardHeight);
+    this.leaderboardText.setPosition(textLeft, cursorTop + 12);
+
+    const statsBottom = cursorTop + leaderboardHeight;
+    const buttonWidth = Math.min(320, panelWidth - 140);
+    let nextTop = Math.min(panelBottom - 24 - reservedButtonsHeight, statsBottom + sectionGap);
+
+    if (x2Visible && this.x2Btn && this.x2Label) {
+      this.x2Btn.setSize(buttonWidth, x2Height).setPosition(width / 2, nextTop + x2Height / 2);
+      this.x2Label.setPosition(this.x2Btn.x, this.x2Btn.y);
+      fitTextScaleToWidth(this.x2Label, buttonWidth - 20, 0.76);
+      nextTop += x2Height + buttonGap;
+    }
+
+    this.restartBtn.setSize(buttonWidth, restartHeight).setPosition(width / 2, nextTop + restartHeight / 2);
+    this.restartLabel.setStyle({ fontSize: height < 700 ? "22px" : "24px" }).setPosition(this.restartBtn.x, this.restartBtn.y);
+    fitTextScaleToWidth(this.restartLabel, buttonWidth - 20, 0.76);
+    nextTop += restartHeight + buttonGap;
+
+    this.menuBtn.setSize(buttonWidth, menuHeight).setPosition(width / 2, nextTop + menuHeight / 2);
+    this.menuLabel.setStyle({ fontSize: height < 700 ? "18px" : "20px" }).setPosition(this.menuBtn.x, this.menuBtn.y);
+    fitTextScaleToWidth(this.menuLabel, buttonWidth - 20, 0.76);
   }
 
   private async handleX2(): Promise<void> {
@@ -524,6 +665,12 @@ export class ResultsScene extends Phaser.Scene {
 function positiveNum(v: unknown, fallback: number): number {
   const n = typeof v === "number" && Number.isFinite(v) ? v : fallback;
   return n > 0 ? n : fallback;
+}
+
+function fitTextScaleToWidth(text: Phaser.GameObjects.Text, maxWidth: number, minScale = 0.72): void {
+  text.setScale(1);
+  if (text.width <= 0 || text.width <= maxWidth) return;
+  text.setScale(Phaser.Math.Clamp(maxWidth / text.width, minScale, 1));
 }
 
 function formatMult(v: number): string {

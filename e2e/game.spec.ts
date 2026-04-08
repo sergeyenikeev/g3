@@ -3,6 +3,26 @@ import { test, expect } from "@playwright/test";
 test("smoke: training, daily, tutorial, upgrade, results", async ({ page }) => {
   const errors: Error[] = [];
   page.on("pageerror", (e) => errors.push(e));
+  const clickMenuText = async (fragments: string[]) => {
+    const target = await page.evaluate((parts) => {
+      const menu = (window as any).__MC_GAME__?.scene?.keys?.menu;
+      if (!menu) return null;
+      const normalizedParts = parts.map((part) => part.toLowerCase());
+      const texts = menu.children.list
+        .filter((obj: any) => obj?.type === "Text" && obj.visible)
+        .map((obj: any) => ({
+          text: String(obj.text ?? ""),
+          x: Number(obj.x ?? 0),
+          y: Number(obj.y ?? 0),
+        }));
+      return (
+        texts.find((entry: { text: string }) => normalizedParts.some((part) => entry.text.toLowerCase().includes(part))) ?? null
+      );
+    }, fragments);
+
+    expect(target, `menu text not found for: ${fragments.join(", ")}`).toBeTruthy();
+    await page.mouse.click(target!.x, target!.y);
+  };
 
   await page.addInitScript(() => {
     localStorage.clear();
@@ -12,18 +32,13 @@ test("smoke: training, daily, tutorial, upgrade, results", async ({ page }) => {
   await page.waitForSelector("canvas");
 
   await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("menu") === true);
-
   const vp = page.viewportSize();
   expect(vp).toBeTruthy();
   const width = vp!.width;
   const height = vp!.height;
-  const compact = width < 1100;
-  const menuX = compact ? width / 2 : Math.round(width * 0.31);
-  const ctaStartY = compact ? Math.round(height * 0.42) : Math.round(height * 0.43);
-  const rowGap = compact ? 72 : 68;
 
   // TRAINING
-  await page.mouse.click(menuX, ctaStartY + rowGap * 2);
+  await clickMenuText(["training", "обуч"]);
 
   await page.waitForFunction(() => {
     const g = (window as any).__MC_GAME__;
@@ -36,7 +51,7 @@ test("smoke: training, daily, tutorial, upgrade, results", async ({ page }) => {
   await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("menu") === true);
 
   // DAILY
-  await page.mouse.click(menuX, ctaStartY + rowGap * 3 + 6);
+  await clickMenuText(["daily", "ежеднев"]);
 
   await page.waitForFunction(() => {
     const g = (window as any).__MC_GAME__;

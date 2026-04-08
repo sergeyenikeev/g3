@@ -49,6 +49,7 @@ export class UIScene extends Phaser.Scene {
   private overlayVignette!: Phaser.GameObjects.Image;
   private overlayLight!: Phaser.GameObjects.Image;
 
+  private hudPanel!: Phaser.GameObjects.Rectangle;
   private hudText!: Phaser.GameObjects.Text;
   private boltsText!: Phaser.GameObjects.Text;
   private dailyText!: Phaser.GameObjects.Text;
@@ -194,6 +195,12 @@ export class UIScene extends Phaser.Scene {
       .setAlpha(0.14);
     this.overlayVignette = this.add.image(0, 0, "vignette").setScrollFactor(0).setDepth(21).setAlpha(0.55);
 
+    this.hudPanel = this.add
+      .rectangle(16, 12, 340, 122, 0x08111a, 0.72)
+      .setOrigin(0, 0)
+      .setStrokeStyle(2, 0x2a556d, 0.58)
+      .setDepth(999)
+      .setScrollFactor(0);
     const hudStyle = { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" };
     this.hudText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
     this.boltsText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
@@ -606,27 +613,54 @@ export class UIScene extends Phaser.Scene {
   private layoutHud(): void {
     const x = 16;
     const y = 12;
-    const gap = 8;
+    const panelPaddingX = 12;
+    const panelPaddingY = 10;
+    const rowGap = 6;
+    const panelWidth = Math.round(Math.min(Math.max(320, this.scale.width * 0.34), 388));
+    const contentLeft = x + panelPaddingX;
+    const contentTop = y + panelPaddingY;
+    const contentWidth = panelWidth - panelPaddingX * 2;
 
-    this.hudText.setPosition(x, y);
-    this.boltsText.setPosition(x + this.hudText.width + gap, y);
-    if (this.dailyText.visible) {
-      this.dailyText.setPosition(this.boltsText.x + this.boltsText.width + gap, y);
+    this.hudText.setStyle({ fontSize: this.scale.height < 700 ? "15px" : "16px" });
+    this.boltsText.setStyle({ fontSize: this.scale.height < 700 ? "15px" : "16px" });
+    this.waveText.setStyle({ fontSize: this.scale.height < 700 ? "13px" : "14px", wordWrap: { width: contentWidth } });
+    this.dailyText.setStyle({ fontSize: this.scale.height < 700 ? "13px" : "14px", wordWrap: { width: contentWidth } });
+    this.statusText.setStyle({ fontSize: this.scale.height < 700 ? "12px" : "13px", wordWrap: { width: contentWidth } });
+
+    let nextY = contentTop;
+    this.hudText.setPosition(contentLeft, nextY);
+    this.boltsText.setPosition(contentLeft + this.hudText.width + 10, nextY);
+    if (this.boltsText.x + this.boltsText.width > x + panelWidth - panelPaddingX) {
+      this.boltsText.setPosition(contentLeft, nextY + this.hudText.height + rowGap);
+      nextY += this.hudText.height + this.boltsText.height + rowGap;
+    } else {
+      nextY += Math.max(this.hudText.height, this.boltsText.height) + rowGap;
     }
-    this.waveText.setPosition(x, y + 22);
-    this.statusText.setPosition(x, y + 42);
-    this.statusText.setWordWrapWidth(Math.max(260, this.scale.width - 32), true);
 
-    const progressY = this.statusText.visible ? this.statusText.y + Math.max(18, this.statusText.height) + 14 : this.waveText.y + 30;
-    this.levelProgressFrame.setPosition(x, progressY);
-    this.levelProgressFill.setPosition(x + 4, progressY + this.levelProgressFrame.height / 2);
+    this.waveText.setPosition(contentLeft, nextY);
+    nextY += this.waveText.height + rowGap;
+
+    if (this.dailyText.visible) {
+      this.dailyText.setPosition(contentLeft, nextY);
+      nextY += this.dailyText.height + rowGap;
+    }
+
+    this.statusText.setPosition(contentLeft, nextY);
+    this.statusText.setWordWrapWidth(contentWidth, true);
+    nextY += (this.statusText.visible ? Math.max(18, this.statusText.height) + rowGap : 0);
+
+    const progressWidth = Math.max(200, contentWidth);
+    this.levelProgressFrame.setSize(progressWidth, 14).setPosition(contentLeft, nextY);
+    this.levelProgressFill.setPosition(contentLeft + 4, nextY + this.levelProgressFrame.height / 2);
     const usableWidth = Math.max(32, this.levelProgressFrame.width - 8);
     const segments = Math.max(1, this.levelProgressMarkers.length + 1);
     for (let i = 0; i < this.levelProgressMarkers.length; i++) {
       const marker = this.levelProgressMarkers[i]!;
       const ratio = (i + 1) / segments;
-      marker.setPosition(x + 4 + usableWidth * ratio, progressY + this.levelProgressFrame.height / 2);
+      marker.setPosition(contentLeft + 4 + usableWidth * ratio, nextY + this.levelProgressFrame.height / 2);
     }
+    const panelHeight = nextY + this.levelProgressFrame.height + panelPaddingY - y;
+    this.hudPanel.setPosition(x, y).setSize(panelWidth, panelHeight);
 
     const bounds = this.boltsText.getBounds();
     const bx = bounds.centerX;
