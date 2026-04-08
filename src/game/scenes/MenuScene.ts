@@ -65,6 +65,18 @@ import {
 const VOLUME_STEPS = [0, 0.3, 0.6, 0.8, 1] as const;
 const WORKSHOP_PANEL_WIDTH = 716;
 const WORKSHOP_PANEL_HEIGHT = 840;
+const UTILITY_PANEL_WIDTH = 472;
+const UTILITY_PANEL_HEIGHT = 360;
+const MISSIONS_PANEL_WIDTH = 760;
+const MISSIONS_PANEL_HEIGHT = 780;
+const MENU_LAYOUT_BREAKPOINTS = {
+  fullWidth: 1440,
+  fullHeight: 820,
+  minimalWidth: 1100,
+  minimalHeight: 760,
+} as const;
+
+type MenuLayoutMode = "full" | "compact" | "minimal";
 
 export class MenuScene extends Phaser.Scene {
   private staticData!: StaticGameData;
@@ -186,9 +198,12 @@ export class MenuScene extends Phaser.Scene {
       pause: () => this.setExternalPause("platform", true),
       resume: () => this.setExternalPause("platform", false),
     });
-    const stats = save?.stats ?? { bestWave: 0, bestBolts: 0 };
     const boosterCfg = this.staticData.balances.ads?.rewarded?.startBooster;
     const boosterEnabled = Boolean(boosterCfg?.enabled);
+    let rewardBoostEnabled = false;
+    let missionsExpanded = false;
+    let utilityOpen = false;
+    let currentLayoutMode: MenuLayoutMode = getMenuLayoutMode(this.scale.width, this.scale.height);
 
     const title = this.add
       .text(0, 0, t(this.locale, "app.title"), {
@@ -214,21 +229,7 @@ export class MenuScene extends Phaser.Scene {
       .text(
         0,
         0,
-        [
-          t(this.locale, "menu.best", {
-            bestWave: formatNumber(this.locale, stats.bestWave),
-            bestBolts: formatNumber(this.locale, stats.bestBolts),
-          }),
-          t(this.locale, "menu.leaderboardTitle"),
-          ...((save?.leaderboard?.entries?.length ?? 0) > 0
-            ? (save?.leaderboard?.entries ?? []).slice(0, 3).map((entry, index) => {
-                const modeLabel = entry.mode === "daily" ? t(this.locale, "leaderboard.mode.daily") : t(this.locale, "leaderboard.mode.run");
-                const divisionLabel = t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`);
-                return `${index + 1}. ${entry.pilot} [${modeLabel} | ${divisionLabel}] | ${formatNumber(this.locale, entry.score)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`;
-              })
-            : [t(this.locale, "menu.leaderboardEmpty")]),
-        ]
-          .join("\n"),
+        buildMenuBestText(this.locale, save, 3),
         {
           fontSize: "15px",
           color: "#98b7c7",
@@ -335,6 +336,18 @@ export class MenuScene extends Phaser.Scene {
         fontStyle: "700",
       })
       .setOrigin(0.5);
+    const btnUtility = this.add
+      .rectangle(0, 0, 112, 34, 0x121a24, 0.92)
+      .setOrigin(0, 0)
+      .setStrokeStyle(2, 0x5cc8ff, 0.76)
+      .setInteractive({ useHandCursor: true });
+    const labelUtility = this.add
+      .text(0, 0, t(this.locale, "pause.open"), {
+        fontSize: "14px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
 
     const order: SaveData["settings"]["visualQuality"][] = ["auto", "low", "medium", "high"];
     let qualityPref: SaveData["settings"]["visualQuality"] = save?.settings?.visualQuality ?? "auto";
@@ -422,7 +435,10 @@ export class MenuScene extends Phaser.Scene {
       .text(0, 0, t(this.locale, "menu.play"), { fontSize: "30px", color: "#f7fbff", fontStyle: "700" })
       .setOrigin(0.5);
 
-    btnPlay.on("pointerdown", () => void startStandardRun());
+    btnPlay.on("pointerdown", () => {
+      const onboarding = getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops);
+      void (boosterEnabled && rewardBoostEnabled && !onboarding.eligible ? this.startRunBoosted() : startStandardRun());
+    });
 
     const btnPlayBoost = this.add
       .rectangle(0, 0, 308, 52, 0x13221e, 0.96)
@@ -473,6 +489,100 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
     btnDailyBoost.setVisible(boosterEnabled);
     labelDailyBoost.setVisible(boosterEnabled);
+
+    const btnMissions = this.add
+      .rectangle(0, 0, 308, 46, 0x0f1720, 0.96)
+      .setStrokeStyle(2, 0x5cc8ff, 0.78)
+      .setInteractive({ useHandCursor: true });
+    const labelMissions = this.add
+      .text(0, 0, t(this.locale, "menu.missions"), {
+        fontSize: "18px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+
+    const boostToggleBg = this.add
+      .rectangle(0, 0, 10, 10, 0x101922, 0.96)
+      .setStrokeStyle(2, 0x57c27d, 0.58)
+      .setInteractive({ useHandCursor: true });
+    const boostToggleTrack = this.add.rectangle(0, 0, 42, 22, 0x0b1118, 0.98).setStrokeStyle(2, 0x38566f, 0.74);
+    const boostToggleFill = this.add.rectangle(0, 0, 42, 22, 0x57c27d, 0.26).setVisible(false);
+    const boostToggleKnob = this.add.rectangle(0, 0, 16, 16, 0xd9f2ff, 0.98).setStrokeStyle(1, 0x5cc8ff, 0.6);
+    const boostToggleTitle = this.add
+      .text(0, 0, t(this.locale, "menu.boostToggle"), {
+        fontSize: "12px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0, 0.5);
+    const boostToggleHint = this.add
+      .text(0, 0, t(this.locale, "menu.boostToggleHint"), {
+        fontSize: "10px",
+        color: "#98b7c7",
+      })
+      .setOrigin(0, 0.5);
+
+    const summaryRewardsCardBg = this.add.rectangle(0, 0, 10, 10, 0x101922, 0.96).setStrokeStyle(2, 0xffd166, 0.28);
+    const summaryDailyCardBg = this.add.rectangle(0, 0, 10, 10, 0x101922, 0.96).setStrokeStyle(2, 0x57c27d, 0.26);
+    const summaryWeeklyCardBg = this.add.rectangle(0, 0, 10, 10, 0x101922, 0.96).setStrokeStyle(2, 0x5cc8ff, 0.28);
+    const summaryRewardsTitle = this.add
+      .text(0, 0, t(this.locale, "menu.summaryRewards"), {
+        fontSize: "11px",
+        color: "#ffd78a",
+        fontStyle: "700",
+      })
+      .setOrigin(0, 0.5);
+    const summaryRewardsValue = this.add
+      .text(0, 0, "", {
+        fontSize: "12px",
+        color: "#f7fbff",
+        fontStyle: "700",
+        align: "left",
+      })
+      .setOrigin(0, 0.5);
+    const summaryDailyTitle = this.add
+      .text(0, 0, t(this.locale, "menu.summaryDaily"), {
+        fontSize: "11px",
+        color: "#8be3bc",
+        fontStyle: "700",
+      })
+      .setOrigin(0, 0.5);
+    const summaryDailyValue = this.add
+      .text(0, 0, "", {
+        fontSize: "12px",
+        color: "#f7fbff",
+        fontStyle: "700",
+        align: "left",
+      })
+      .setOrigin(0, 0.5);
+    const summaryWeeklyTitle = this.add
+      .text(0, 0, t(this.locale, "menu.summaryWeekly"), {
+        fontSize: "11px",
+        color: "#8fd5ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0, 0.5);
+    const summaryWeeklyValue = this.add
+      .text(0, 0, "", {
+        fontSize: "12px",
+        color: "#f7fbff",
+        fontStyle: "700",
+        align: "left",
+      })
+      .setOrigin(0, 0.5);
+
+    const btnCloseMissions = this.add
+      .rectangle(0, 0, 88, 34, 0x121a24, 0.95)
+      .setStrokeStyle(2, 0x5cc8ff, 0.76)
+      .setInteractive({ useHandCursor: true });
+    const labelCloseMissions = this.add
+      .text(0, 0, t(this.locale, "menu.close"), {
+        fontSize: "12px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
 
     const dailyInfoTitle = this.add
       .text(0, 0, getMenuDailySummaryTitle(this.locale), {
@@ -658,7 +768,6 @@ export class MenuScene extends Phaser.Scene {
 
     const refreshDailyButtons = (info: DailyAttemptsInfo) => {
       const regularPlan = planDailyStart(info, { boosted: false, boosterEnabled });
-      const boostedPlan = planDailyStart(info, { boosted: true, boosterEnabled });
 
       labelDaily.setText(
         regularPlan.canStart
@@ -668,17 +777,28 @@ export class MenuScene extends Phaser.Scene {
           : t(this.locale, "menu.dailyLocked")
       );
       applyDailyButtonState(btnDaily, labelDaily, regularPlan.canStart, regularPlan.kind === "rewarded" ? 0x57c27d : 0x3aa4d4);
+      const onboarding = getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops);
+      const boostVisible = boosterEnabled && !onboarding.eligible;
+      if (!boostVisible) rewardBoostEnabled = false;
+      boostToggleBg.setVisible(boostVisible);
+      boostToggleTrack.setVisible(boostVisible);
+      boostToggleFill.setVisible(boostVisible && rewardBoostEnabled);
+      boostToggleKnob.setVisible(boostVisible);
+      boostToggleTitle.setVisible(boostVisible);
+      boostToggleHint.setVisible(boostVisible);
+      btnPlayBoost.setVisible(false);
+      labelPlayBoost.setVisible(false);
+      btnDailyBoost.setVisible(false);
+      labelDailyBoost.setVisible(false);
+      if (!boostVisible) return;
 
-      if (!boosterEnabled) return;
-
-      labelDailyBoost.setText(
-        boostedPlan.canStart
-          ? boostedPlan.kind === "boosted_rewarded"
-            ? t(this.locale, "menu.dailyBoostExtra")
-            : t(this.locale, "menu.dailyBoost")
-          : t(this.locale, "menu.dailyBoostLocked")
-      );
-      applyDailyButtonState(btnDailyBoost, labelDailyBoost, boostedPlan.canStart, 0x57c27d);
+      boostToggleBg.setStrokeStyle(2, rewardBoostEnabled ? 0x57c27d : 0x38566f, rewardBoostEnabled ? 0.84 : 0.56);
+      boostToggleBg.setFillStyle(rewardBoostEnabled ? 0x13261d : 0x101922, 0.96);
+      boostToggleTrack.setStrokeStyle(2, rewardBoostEnabled ? 0x57c27d : 0x38566f, rewardBoostEnabled ? 0.82 : 0.7);
+      boostToggleTrack.setFillStyle(rewardBoostEnabled ? 0x163223 : 0x0b1118, 0.98);
+      boostToggleFill.setFillStyle(0x57c27d, rewardBoostEnabled ? 0.28 : 0);
+      boostToggleTitle.setColor(rewardBoostEnabled ? "#ecfff4" : "#d9f2ff");
+      boostToggleHint.setColor(rewardBoostEnabled ? "#9ff1c2" : "#98b7c7");
     };
 
     const syncSaveData = () => {
@@ -776,6 +896,7 @@ export class MenuScene extends Phaser.Scene {
     let weeklyRaceResetTicker: Phaser.Time.TimerEvent | null = null;
     let positionWeeklyRaceResetBadge = () => {};
     let positionWeeklyRaceSignalBadges = () => {};
+    let positionWeeklyRaceBody = () => {};
     const refreshWeeklyRaceResetBadge = () => {
       const remainingMs = getNextWeeklyResetAtMs(getPlatformNowMs(this.registry)) - getPlatformNowMs(this.registry);
       const resetState = remainingMs <= 6 * 60 * 60 * 1000 ? "closing" : remainingMs <= 24 * 60 * 60 * 1000 ? "soon" : "steady";
@@ -786,7 +907,8 @@ export class MenuScene extends Phaser.Scene {
             ? { fill: 0xffd166, stroke: 0xffd166, text: "#1b1305" }
             : { fill: 0x13283d, stroke: 0x5cc8ff, text: "#d9f2ff" };
       weeklyRaceResetBadgeText.setText(getMenuWeeklyResetBadgeLabel(this.locale, remainingMs));
-      weeklyRaceResetBadgeBg.setSize(Math.max(78, weeklyRaceResetBadgeText.width + 16), 18);
+      fitTextScaleToWidth(weeklyRaceResetBadgeText, 84, 0.64);
+      weeklyRaceResetBadgeBg.setSize(Math.max(64, weeklyRaceResetBadgeText.displayWidth + 16), 18);
       weeklyRaceResetBadgeBg.setFillStyle(style.fill, resetState === "steady" ? 0.22 : 0.24);
       weeklyRaceResetBadgeBg.setStrokeStyle(2, style.stroke, resetState === "steady" ? 0.62 : 0.76);
       weeklyRaceResetBadgeText.setColor(style.text);
@@ -920,7 +1042,6 @@ export class MenuScene extends Phaser.Scene {
       weeklyRaceRiskBadgeBg.setFillStyle(riskBadge.fill, riskBadge.alpha);
       weeklyRaceRiskBadgeBg.setStrokeStyle(2, riskBadge.stroke, riskBadge.strokeAlpha);
       weeklyRaceRiskBadgeText.setColor(riskBadge.text);
-      positionWeeklyRaceSignalBadges();
       if (weeklyJumpState) {
         const jumpStyle =
           weeklyJumpState === "debut"
@@ -1036,9 +1157,10 @@ export class MenuScene extends Phaser.Scene {
                 this.locale,
                 t(this.locale, `leaderboard.division.${activeRewardDivision}`),
                 nextDivision ? formatNumber(this.locale, nextDivision.minScore) : formatNumber(this.locale, 0)
-              ),
+          ),
         ].join("\n")
       );
+      positionWeeklyRaceBody();
     };
     let liveopsClaimBusy = false;
     const refreshPlayButton = () => {
@@ -1054,7 +1176,7 @@ export class MenuScene extends Phaser.Scene {
         labelPlay.setText(t(this.locale, "menu.play"));
         btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
       }
-      labelPlay.setStyle({ fontSize: onboarding.eligible ? "22px" : "28px", align: "center" });
+      labelPlay.setStyle({ fontSize: onboarding.eligible ? "18px" : "24px", align: "center" });
       labelPlay.setWordWrapWidth(Math.max(180, btnPlay.width - 28), true);
       fitTextScaleToWidth(labelPlay, Math.max(180, btnPlay.width - 28), 0.68);
     };
@@ -1099,6 +1221,9 @@ export class MenuScene extends Phaser.Scene {
           .filter(Boolean)
           .join("\n")
       );
+      summaryRewardsValue.setText(formatMenuRewardsSummary(this.locale, readyClaims));
+      summaryDailyValue.setText(formatMenuProgressSummary(this.locale, dailyDone, dailyMissions.length));
+      summaryWeeklyValue.setText(formatMenuProgressSummary(this.locale, weeklyDone, weeklyMissions.length));
       dailyMissionsTitle.setText(
         `${t(this.locale, "menu.dailyMissionsTitle")} ${formatNumber(this.locale, dailyDone)}/${formatNumber(this.locale, dailyMissions.length)}`
       );
@@ -1108,11 +1233,7 @@ export class MenuScene extends Phaser.Scene {
       applyMissionRows(dailyMissionRows, dailyMissions, 0x57c27d);
       applyMissionRows(weeklyMissionRows, weeklyMissions, 0xffd166);
       await refreshWeeklyCompetitionCard(save);
-      labelClaimOps.setText(
-        readyClaims > 0
-          ? t(this.locale, "menu.claimOpsReady", { count: formatNumber(this.locale, readyClaims) })
-          : t(this.locale, "menu.claimOpsIdle")
-      );
+      labelClaimOps.setText(t(this.locale, "menu.claimAction"));
       fitTextScaleToWidth(labelClaimOps, Math.max(96, btnClaimOps.width - 18), 0.76);
       btnClaimOps.setStrokeStyle(2, readyClaims > 0 ? 0xffd166 : 0x5f6b76, readyClaims > 0 ? 0.84 : 0.5);
       btnClaimOps.setFillStyle(readyClaims > 0 ? 0x101922 : 0x0c1117, readyClaims > 0 ? 0.96 : 0.9);
@@ -1124,6 +1245,7 @@ export class MenuScene extends Phaser.Scene {
       const info = await this.ensureDailyNormalizedAndRefresh(dailyInfo);
       refreshDailyButtons(info);
       await refreshLiveopsPanel();
+      layoutMenu(this.scale);
     };
     const claimOpsRewards = async () => {
       if (liveopsClaimBusy) return;
@@ -1218,46 +1340,206 @@ export class MenuScene extends Phaser.Scene {
       this.scene.launch("ui");
     };
 
-    btnDaily.on("pointerdown", () => void this.startDaily(false));
-    btnDailyBoost.on("pointerdown", () => void this.startDaily(true));
+    btnDaily.on("pointerdown", () => void this.startDaily(boosterEnabled && rewardBoostEnabled));
+    btnDailyBoost.disableInteractive();
+    btnMissions.on("pointerdown", () => {
+      missionsExpanded = true;
+      utilityOpen = false;
+      layoutMenu(this.scale);
+      void refreshDailyAndLiveops();
+    });
+    btnCloseMissions.on("pointerdown", () => {
+      missionsExpanded = false;
+      layoutMenu(this.scale);
+    });
+    boostToggleBg.on("pointerdown", () => {
+      if (!boosterEnabled) return;
+      rewardBoostEnabled = !rewardBoostEnabled;
+      refreshPlayButton();
+      refreshDailyButtons(getDailyAttemptsInfo(this.staticData.daily, this.saveManager.get(), this.getCurrentDateUtc()));
+      layoutMenu(this.scale);
+    });
     this.createWorkshopUi();
     this.createLeaderboardUi();
 
+    const utilityPanelBg = this.add
+      .rectangle(0, 0, UTILITY_PANEL_WIDTH, UTILITY_PANEL_HEIGHT, 0x0f1720, 0.98)
+      .setStrokeStyle(2, 0x5cc8ff, 0.8)
+      .setVisible(false);
+    const utilityPanelAccent = this.add.rectangle(0, 0, UTILITY_PANEL_WIDTH - 64, 2, 0xffd166, 0.84).setVisible(false);
+    const utilityPanelTitle = this.add
+      .text(0, 0, t(this.locale, "pause.title"), {
+        fontSize: "24px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    const utilityPanelHint = this.add
+      .text(0, 0, t(this.locale, "menu.utilityHint"), {
+        fontSize: "11px",
+        color: "#98b7c7",
+        align: "center",
+        wordWrap: { width: UTILITY_PANEL_WIDTH - 64 },
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    const btnCloseUtility = this.add
+      .rectangle(0, 0, 84, 34, 0x121a24, 0.95)
+      .setStrokeStyle(2, 0x5cc8ff, 0.76)
+      .setInteractive({ useHandCursor: true })
+      .setVisible(false);
+    const labelCloseUtility = this.add
+      .text(0, 0, t(this.locale, "menu.close"), {
+        fontSize: "12px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    const setUtilityVisible = (visible: boolean) => {
+      utilityPanelBg.setVisible(visible);
+      utilityPanelAccent.setVisible(visible);
+      utilityPanelTitle.setVisible(visible);
+      utilityPanelHint.setVisible(visible);
+      btnCloseUtility.setVisible(visible);
+      labelCloseUtility.setVisible(visible);
+      btnQuality.setVisible(visible);
+      labelQuality.setVisible(visible);
+      btnSfx.setVisible(visible);
+      labelSfx.setVisible(visible);
+      btnMusic.setVisible(visible);
+      labelMusic.setVisible(visible);
+      btnLanguage.setVisible(visible);
+      labelLanguage.setVisible(visible);
+    };
+    const closeUtility = () => {
+      utilityOpen = false;
+      setUtilityVisible(false);
+      layoutMenu(this.scale);
+    };
+    btnUtility.on("pointerdown", () => {
+      utilityOpen = !utilityOpen;
+      if (missionsExpanded) missionsExpanded = false;
+      setUtilityVisible(utilityOpen);
+      layoutMenu(this.scale);
+    });
+    btnCloseUtility.on("pointerdown", closeUtility);
+
     const layoutMenu = (s: { width: number; height: number }) => {
-      const compact = s.width < 1100;
-      const leftX = compact ? s.width / 2 : Math.round(s.width * 0.31);
-      const titleY = compact ? Math.round(s.height * 0.13) : Math.round(s.height * 0.2);
+      const mode = getMenuLayoutMode(s.width, s.height);
+      currentLayoutMode = mode;
+      const compact = mode !== "full";
+      const minimal = mode === "minimal";
+      const topInset = minimal ? 14 : 18;
+      const topGap = 10;
+      const topButtonHeight = 34;
+      const contentTop = topInset + topButtonHeight + (minimal ? 18 : compact ? 26 : 34);
+      const shortDesktop = mode === "compact" && s.height <= 820;
+      const utilityVisible = utilityOpen && !missionsExpanded;
+      const showPreview = !missionsExpanded && mode === "full";
+      const leftX = showPreview ? Math.round(s.width * 0.31) : s.width / 2;
+      const titleY = minimal
+        ? contentTop + 18
+        : compact
+          ? Math.max(contentTop + 16, Math.round(s.height * 0.14))
+          : Math.max(contentTop + 22, Math.round(s.height * 0.2));
+
+      this.walletText?.setPosition(topInset, topInset).setStyle({ fontSize: minimal ? "13px" : "14px" });
+      if (this.walletText) {
+        fitTextScaleToWidth(this.walletText, Math.max(180, Math.min(s.width * 0.34, minimal ? 220 : 320)), 0.74);
+      }
+
+      btnWorkshop.setOrigin(0, 0).setSize(146, topButtonHeight);
+      btnLeaderboard.setOrigin(0, 0).setSize(156, topButtonHeight);
+      btnPilot.setOrigin(0, 0).setSize(minimal ? 136 : 164, topButtonHeight);
+      btnUtility.setOrigin(0, 0).setSize(112, topButtonHeight);
+      btnQuality.setOrigin(0, 0);
+      btnSfx.setOrigin(0, 0);
+      btnMusic.setOrigin(0, 0);
+      btnLanguage.setOrigin(0, 0);
+
+      const placeTopButton = (
+        button: Phaser.GameObjects.Rectangle,
+        label: Phaser.GameObjects.Text,
+        width: number,
+        cursorX: number,
+        visible: boolean
+      ) => {
+        button.setVisible(visible);
+        label.setVisible(visible);
+        if (!visible) return cursorX;
+        button.setPosition(cursorX - width, topInset);
+        label.setPosition(button.x + width / 2, button.y + topButtonHeight / 2);
+        fitTextScaleToWidth(label, width - 18, 0.72);
+        return button.x - topGap;
+      };
+
+      let navCursorX = s.width - topInset;
+      navCursorX = placeTopButton(btnUtility, labelUtility, btnUtility.width, navCursorX, !missionsExpanded);
+      navCursorX = placeTopButton(btnLeaderboard, labelLeaderboard, btnLeaderboard.width, navCursorX, !missionsExpanded && !utilityVisible && !minimal);
+      navCursorX = placeTopButton(btnWorkshop, labelWorkshop, btnWorkshop.width, navCursorX, !missionsExpanded && !utilityVisible && !minimal);
+      navCursorX = placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, !missionsExpanded);
+
+      setUtilityVisible(utilityVisible);
+      if (utilityVisible) {
+        const panelWidth = Math.min(UTILITY_PANEL_WIDTH, s.width - 28);
+        const panelHeight = Math.min(UTILITY_PANEL_HEIGHT, s.height - 28);
+        const panelCenterX = s.width - topInset - panelWidth / 2;
+        const panelCenterY = topInset + topButtonHeight + 16 + panelHeight / 2;
+        const panelLeft = panelCenterX - panelWidth / 2;
+        const panelTop = panelCenterY - panelHeight / 2;
+        const settingsButtonWidth = Math.floor((panelWidth - 52) / 2);
+
+        utilityPanelBg.setSize(panelWidth, panelHeight).setPosition(panelCenterX, panelCenterY);
+        utilityPanelAccent.setSize(panelWidth - 48, 2).setPosition(panelCenterX, panelTop + 48);
+        utilityPanelTitle.setPosition(panelCenterX, panelTop + 24);
+        utilityPanelHint.setPosition(panelCenterX, panelTop + 64).setWordWrapWidth(panelWidth - 48, true);
+        btnCloseUtility.setPosition(panelLeft + panelWidth - 18 - btnCloseUtility.width, panelTop + 16);
+        labelCloseUtility.setPosition(btnCloseUtility.x + btnCloseUtility.width / 2, btnCloseUtility.y + btnCloseUtility.height / 2);
+
+        btnWorkshop.setVisible(true).setPosition(panelLeft + 18, panelTop + 88).setSize(settingsButtonWidth, 38);
+        labelWorkshop.setVisible(true).setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
+        btnLeaderboard.setVisible(true).setPosition(panelLeft + 34 + settingsButtonWidth, panelTop + 88).setSize(settingsButtonWidth, 38);
+        labelLeaderboard.setVisible(true).setPosition(btnLeaderboard.x + btnLeaderboard.width / 2, btnLeaderboard.y + btnLeaderboard.height / 2);
+        fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 18, 0.72);
+        fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 18, 0.72);
+
+        const settingsButtons = [
+          { button: btnQuality, label: labelQuality, x: panelLeft + 18, y: panelTop + 142 },
+          { button: btnSfx, label: labelSfx, x: panelLeft + 34 + settingsButtonWidth, y: panelTop + 142 },
+          { button: btnMusic, label: labelMusic, x: panelLeft + 18, y: panelTop + 196 },
+          { button: btnLanguage, label: labelLanguage, x: panelLeft + 34 + settingsButtonWidth, y: panelTop + 196 },
+        ];
+        for (const entry of settingsButtons) {
+          entry.button.setSize(settingsButtonWidth, 38).setPosition(entry.x, entry.y);
+          entry.label.setPosition(entry.button.x + entry.button.width / 2, entry.button.y + entry.button.height / 2);
+          fitTextScaleToWidth(entry.label, entry.button.width - 18, 0.72);
+        }
+      }
 
       title.setPosition(leftX, titleY);
-      taglineText.setPosition(leftX, titleY + 58);
-      bestText.setPosition(leftX, titleY + 110);
-      this.walletText?.setPosition(16, 16);
-      btnWorkshop.setPosition(16, 46);
-      labelWorkshop.setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
-      btnLeaderboard.setPosition(16, 88);
-      labelLeaderboard.setPosition(btnLeaderboard.x + btnLeaderboard.width / 2, btnLeaderboard.y + btnLeaderboard.height / 2);
-      btnPilot.setPosition(16, 130);
-      labelPilot.setPosition(btnPilot.x + btnPilot.width / 2, btnPilot.y + btnPilot.height / 2);
+      taglineText.setPosition(leftX, titleY + (shortDesktop ? 40 : 58));
+      bestText.setPosition(leftX, titleY + (shortDesktop ? 70 : 110));
 
-      btnQuality.setPosition(s.width - 16, 16);
-      labelQuality.setPosition(btnQuality.x - btnQuality.width / 2, btnQuality.y + btnQuality.height / 2);
-      btnSfx.setPosition(s.width - 16, 56);
-      labelSfx.setPosition(btnSfx.x - btnSfx.width / 2, btnSfx.y + btnSfx.height / 2);
-      btnMusic.setPosition(s.width - 16, 96);
-      labelMusic.setPosition(btnMusic.x - btnMusic.width / 2, btnMusic.y + btnMusic.height / 2);
-      btnLanguage.setPosition(s.width - 16, 136);
-      labelLanguage.setPosition(btnLanguage.x - btnLanguage.width / 2, btnLanguage.y + btnLanguage.height / 2);
-
-      this.layoutMenuBackdrop(s.width, s.height, compact, leftX);
+      this.layoutMenuBackdrop(s.width, s.height, showPreview ? "full" : mode, showPreview ? Math.round(s.width * 0.76) : 0, showPreview ? Math.round(s.height * 0.53) : 0, showPreview);
+      const menuPanelWidth = Math.min(showPreview ? 520 : minimal ? s.width - 28 : 560, s.width - 24);
+      this.menuPanel.setSize(menuPanelWidth, this.menuPanel.height);
       const menuInnerWidth = Math.max(280, this.menuPanel.width - 42);
+      title.setStyle({ fontSize: minimal ? "36px" : shortDesktop ? "40px" : "52px" });
       title.setScale(1);
-      fitTextScaleToWidth(title, menuInnerWidth, compact ? 0.72 : 0.84);
-      taglineText.setStyle({ fontSize: compact ? "16px" : "18px" });
+      fitTextScaleToWidth(title, menuInnerWidth, minimal ? 0.78 : compact ? 0.72 : shortDesktop ? 0.76 : 0.84);
+      taglineText.setStyle({ fontSize: minimal ? "14px" : compact ? "16px" : shortDesktop ? "13px" : "18px" });
       taglineText.setWordWrapWidth(menuInnerWidth, true);
-      bestText.setStyle({ fontSize: compact ? "13px" : "15px" });
+      bestText.setStyle({ fontSize: minimal ? "12px" : compact ? "13px" : shortDesktop ? "12px" : "15px" });
       bestText.setWordWrapWidth(menuInnerWidth, true);
       controlsText.setStyle({ fontSize: compact ? "14px" : "15px", align: "center" });
       controlsText.setWordWrapWidth(Math.max(260, this.dailyPanel.width - 28), true);
+      this.heroCaptionText.setStyle({ fontSize: "16px", align: "center" });
+      this.heroCaptionText.setWordWrapWidth(this.heroPanel.width - 42, true);
+      fitTextScaleToWidth(this.heroCaptionText, this.heroPanel.width - 42, 0.78);
+      this.heroHintText.setStyle({ fontSize: "12px", align: "center" });
+      this.heroHintText.setWordWrapWidth(this.heroPanel.width - 54, true);
       fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 18, 0.8);
       fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 18, 0.8);
       fitTextScaleToWidth(labelPilot, btnPilot.width - 18, 0.72);
@@ -1265,41 +1547,249 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(labelSfx, btnSfx.width - 18, 0.72);
       fitTextScaleToWidth(labelMusic, btnMusic.width - 18, 0.72);
       fitTextScaleToWidth(labelLanguage, btnLanguage.width - 18, 0.72);
-      const liveopsPanel = getLiveopsPanelMetrics(s.width, compact);
+      const liveopsPanel = getLiveopsPanelMetrics(s.width, compact, s.height);
       const stackedMissions = liveopsPanel.stacked;
+      const summaryWidth = Math.min(minimal ? s.width - 24 : showPreview ? 560 : liveopsPanel.width, s.width - 24);
+      const summaryHeight = minimal ? 168 : compact ? 132 : 140;
+      const summaryBottom = s.height - (minimal ? 12 : 18);
+      const summaryTop = summaryBottom - summaryHeight;
+      const summaryCenterY = summaryTop + summaryHeight / 2;
+      const ctaBottomLimit = summaryTop - (minimal ? 14 : 20);
+      btnPlayBoost.setVisible(false);
+      labelPlayBoost.setVisible(false);
+      btnDailyBoost.setVisible(false);
+      labelDailyBoost.setVisible(false);
 
-      const ctaStartY = compact ? Math.round(s.height * 0.42) : Math.round(s.height * 0.43);
-      const rowGap = compact ? (stackedMissions ? 68 : 72) : 68;
-      const ctaWidth = Math.min(this.menuPanel.width - 48, compact ? 336 : 352);
-      btnPlay.setSize(ctaWidth, 68);
-      btnPlayBoost.setSize(ctaWidth, 52);
-      btnTraining.setSize(ctaWidth, 46);
-      btnDaily.setSize(ctaWidth, 56);
-      btnDailyBoost.setSize(ctaWidth, 46);
-      btnPlay.setPosition(leftX, ctaStartY);
-      labelPlay.setPosition(btnPlay.x, btnPlay.y);
-      btnPlayBoost.setPosition(leftX, ctaStartY + rowGap);
-      labelPlayBoost.setPosition(btnPlayBoost.x, btnPlayBoost.y);
-      btnTraining.setPosition(leftX, ctaStartY + rowGap * 2);
-      labelTraining.setPosition(btnTraining.x, btnTraining.y);
-      btnDaily.setPosition(leftX, ctaStartY + rowGap * 3 + 6);
-      labelDaily.setPosition(btnDaily.x, btnDaily.y);
-      btnDailyBoost.setPosition(leftX, ctaStartY + rowGap * 4 + 4);
-      labelDailyBoost.setPosition(btnDailyBoost.x, btnDailyBoost.y);
-      labelPlayBoost.setStyle({ fontSize: "15px", align: "center" });
-      labelPlayBoost.setWordWrapWidth(btnPlayBoost.width - 24, true);
-      fitTextScaleToWidth(labelPlayBoost, btnPlayBoost.width - 24, 0.74);
-      labelTraining.setStyle({ fontSize: "18px", align: "center" });
+      const ctaWidth = Math.min(this.menuPanel.width - 48, minimal ? 320 : compact ? 336 : 352);
+      btnPlay.setSize(ctaWidth, minimal ? 52 : shortDesktop ? 50 : 56);
+      btnTraining.setSize(ctaWidth, minimal ? 36 : shortDesktop ? 38 : 40);
+      btnDaily.setSize(ctaWidth, minimal ? 40 : shortDesktop ? 42 : 46);
+      btnMissions.setSize(ctaWidth, minimal ? 36 : shortDesktop ? 38 : 40);
+      labelTraining.setStyle({ fontSize: minimal ? "15px" : "16px", align: "center" });
       fitTextScaleToWidth(labelTraining, btnTraining.width - 22, 0.76);
-      labelDaily.setStyle({ fontSize: "17px", align: "center" });
+      labelDaily.setStyle({ fontSize: minimal ? "14px" : "15px", align: "center" });
       labelDaily.setWordWrapWidth(btnDaily.width - 24, true);
       fitTextScaleToWidth(labelDaily, btnDaily.width - 24, 0.76);
-      labelDailyBoost.setStyle({ fontSize: "13px", align: "center" });
-      labelDailyBoost.setWordWrapWidth(btnDailyBoost.width - 24, true);
-      fitTextScaleToWidth(labelDailyBoost, btnDailyBoost.width - 24, 0.72);
+      labelMissions.setStyle({ fontSize: minimal ? "15px" : "16px", align: "center" });
+      fitTextScaleToWidth(labelMissions, btnMissions.width - 22, 0.76);
+      boostToggleTitle.setStyle({ fontSize: minimal ? "11px" : "12px", align: "left" });
+      boostToggleHint.setStyle({ fontSize: minimal ? "9px" : "10px", align: "left" });
+      const showBoostToggle = boosterEnabled && !getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops).eligible && !missionsExpanded;
+      title.setVisible(!missionsExpanded);
+      taglineText.setVisible(!missionsExpanded);
+      this.menuPanel.setVisible(!missionsExpanded);
+      btnPlay.setVisible(!missionsExpanded);
+      labelPlay.setVisible(!missionsExpanded);
+      btnDaily.setVisible(!missionsExpanded);
+      labelDaily.setVisible(!missionsExpanded);
+      btnTraining.setVisible(!missionsExpanded);
+      labelTraining.setVisible(!missionsExpanded);
+      btnMissions.setVisible(!missionsExpanded);
+      labelMissions.setVisible(!missionsExpanded);
+      boostToggleBg.setVisible(showBoostToggle);
+      boostToggleTrack.setVisible(showBoostToggle);
+      boostToggleFill.setVisible(showBoostToggle && rewardBoostEnabled);
+      boostToggleKnob.setVisible(showBoostToggle);
+      boostToggleTitle.setVisible(showBoostToggle);
+      boostToggleHint.setVisible(showBoostToggle);
+      const ctaEntries = [
+        { kind: "button" as const, button: btnPlay, label: labelPlay, height: btnPlay.height },
+        ...(showBoostToggle ? [{ kind: "boost" as const, height: 44 }] : []),
+        { kind: "button" as const, button: btnDaily, label: labelDaily, height: btnDaily.height },
+        { kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height },
+        { kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height },
+      ];
+      const ctaGap = minimal ? 6 : compact ? 6 : 8;
+      const ctaStackHeight =
+        ctaEntries.reduce((sum, entry) => sum + entry.height, 0) + Math.max(0, ctaEntries.length - 1) * ctaGap;
+      const titleBottom = titleY + title.displayHeight / 2;
+      const desiredTaglineY = Math.round(titleBottom + (minimal ? 8 : shortDesktop ? 8 : compact ? 10 : 14) + taglineText.displayHeight / 2);
+      taglineText.setPosition(leftX, desiredTaglineY);
+      const taglineBottom = taglineText.y + taglineText.displayHeight / 2;
+      bestText.setVisible(false);
+      if (!minimal) {
+        const bestTargetY = Math.round(taglineBottom + (shortDesktop ? 8 : 12) + bestText.displayHeight / 2);
+        const maxSummaryEntries = shortDesktop ? 1 : 3;
+        const maxBestBottom = ctaBottomLimit - ctaStackHeight - 10;
+        for (let summaryEntries = maxSummaryEntries; summaryEntries >= 0; summaryEntries -= 1) {
+          bestText.setText(buildMenuBestText(this.locale, this.saveManager.get(), summaryEntries));
+          bestText.setPosition(leftX, bestTargetY);
+          if (bestText.y + bestText.displayHeight / 2 <= maxBestBottom) {
+            bestText.setVisible(true);
+            break;
+          }
+        }
+      }
+      const bestBottom = bestText.visible ? bestText.y + bestText.displayHeight / 2 : taglineBottom;
+      const preferredCtaTop = minimal ? Math.round(s.height * 0.29) : compact ? Math.round(s.height * 0.34) : Math.round(s.height * 0.39);
+      const minCtaTop = bestBottom + (minimal ? 12 : 16);
+      const maxCtaTop = ctaBottomLimit - ctaStackHeight;
+      const ctaTop = Phaser.Math.Clamp(preferredCtaTop, minCtaTop, Math.max(minCtaTop, maxCtaTop));
+      let ctaCursor = ctaTop;
+      for (const entry of ctaEntries) {
+        const y = ctaCursor + entry.height / 2;
+        if (entry.kind === "button") {
+          entry.button.setPosition(leftX, y);
+          entry.label.setPosition(entry.button.x, y);
+        } else {
+          boostToggleBg.setSize(Math.min(ctaWidth, 312), 40).setPosition(leftX, y);
+          boostToggleTrack.setPosition(boostToggleBg.x - boostToggleBg.width / 2 + 34, boostToggleBg.y);
+          boostToggleFill.setPosition(boostToggleTrack.x, boostToggleTrack.y).setSize(boostToggleTrack.width, boostToggleTrack.height);
+          boostToggleKnob.setPosition(boostToggleTrack.x + (rewardBoostEnabled ? 10 : -10), boostToggleTrack.y);
+          boostToggleTitle.setPosition(boostToggleTrack.x + 30, boostToggleBg.y - 8);
+          boostToggleHint.setPosition(boostToggleTrack.x + 30, boostToggleBg.y + 10);
+          fitTextScaleToWidth(boostToggleTitle, boostToggleBg.width - 84, 0.72);
+          fitTextScaleToWidth(boostToggleHint, boostToggleBg.width - 84, 0.72);
+        }
+        ctaCursor += entry.height + ctaGap;
+      }
+      const ctaBottom = ctaCursor - ctaGap;
+      const menuPanelTop = Math.max(contentTop - 20, titleY - title.displayHeight / 2 - 18);
+      const menuPanelBottom = Math.min(summaryTop - 12, ctaBottom + 18);
+      this.menuPanel.setPosition(leftX, (menuPanelTop + menuPanelBottom) / 2).setSize(this.menuPanel.width, Math.max(180, menuPanelBottom - menuPanelTop));
       refreshPlayButton();
-      const panelTop = this.dailyPanel.y - this.dailyPanel.height / 2;
-      const panelLeft = leftX - this.dailyPanel.width / 2;
+      if (!missionsExpanded) {
+        const summaryLeft = leftX - summaryWidth / 2;
+
+        this.dailyPanel.setPosition(leftX, summaryCenterY).setSize(summaryWidth, summaryHeight);
+
+        liveopsTitle.setPosition(summaryLeft + 16, summaryTop + 18).setVisible(true);
+        btnCloseMissions.setVisible(false);
+        labelCloseMissions.setVisible(false);
+
+        btnClaimOps.setSize(minimal ? 104 : 116, 30).setPosition(summaryLeft + summaryWidth - 14, summaryTop + 12).setOrigin(1, 0);
+        labelClaimOps.setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
+        fitTextScaleToWidth(labelClaimOps, Math.max(88, btnClaimOps.width - 16), 0.72);
+        claimOpsHalo
+          .setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2)
+          .setSize(btnClaimOps.width + 12, btnClaimOps.height + 10);
+        liveopsReadyBadgeBg.setPosition(btnClaimOps.x - btnClaimOps.width - 12 - liveopsReadyBadgeBg.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
+        liveopsReadyBadgeText.setPosition(liveopsReadyBadgeBg.x, liveopsReadyBadgeBg.y);
+
+        liveopsCardBg.setVisible(false);
+        liveopsInfo.setVisible(false);
+        summaryRewardsTitle.setStyle({ fontSize: minimal ? "10px" : "11px" });
+        summaryDailyTitle.setStyle({ fontSize: minimal ? "10px" : "11px" });
+        summaryWeeklyTitle.setStyle({ fontSize: minimal ? "10px" : "11px" });
+        summaryRewardsValue.setStyle({ fontSize: minimal ? "12px" : "13px" });
+        summaryDailyValue.setStyle({ fontSize: minimal ? "12px" : "13px" });
+        summaryWeeklyValue.setStyle({ fontSize: minimal ? "12px" : "13px" });
+
+        summaryRewardsCardBg.setVisible(true);
+        summaryDailyCardBg.setVisible(true);
+        summaryWeeklyCardBg.setVisible(true);
+        summaryRewardsTitle.setVisible(true);
+        summaryRewardsValue.setVisible(true);
+        summaryDailyTitle.setVisible(true);
+        summaryDailyValue.setVisible(true);
+        summaryWeeklyTitle.setVisible(true);
+        summaryWeeklyValue.setVisible(true);
+
+        if (minimal) {
+          const cardWidth = summaryWidth - 24;
+          const cardHeight = 34;
+          const rows = [
+            { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, y: summaryTop + 66 },
+            { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, y: summaryTop + 104 },
+            { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, y: summaryTop + 142 },
+          ];
+          for (const entry of rows) {
+            entry.bg.setPosition(leftX, entry.y).setSize(cardWidth, cardHeight);
+            entry.title.setPosition(summaryLeft + 14, entry.y - 8);
+            entry.value.setPosition(summaryLeft + 14, entry.y + 8);
+            fitTextScaleToWidth(entry.title, cardWidth - 18, 0.72);
+            fitTextScaleToWidth(entry.value, cardWidth - 18, 0.72);
+          }
+        } else {
+          const cardGap = 10;
+          const cardWidth = Math.floor((summaryWidth - 24 - cardGap * 2) / 3);
+          const cardY = summaryTop + 88;
+          const cards = [
+            { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, x: summaryLeft + 12 + cardWidth / 2 },
+            { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, x: summaryLeft + 12 + cardWidth * 1.5 + cardGap },
+            { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, x: summaryLeft + 12 + cardWidth * 2.5 + cardGap * 2 },
+          ];
+          for (const entry of cards) {
+            entry.bg.setPosition(entry.x, cardY).setSize(cardWidth, 54);
+            entry.title.setPosition(entry.x - cardWidth / 2 + 12, cardY - 12);
+            entry.value.setPosition(entry.x - cardWidth / 2 + 12, cardY + 9);
+            fitTextScaleToWidth(entry.title, cardWidth - 18, 0.72);
+            fitTextScaleToWidth(entry.value, cardWidth - 16, 0.72);
+          }
+        }
+
+        dailyInfoCardBg.setVisible(false);
+        dailyInfoTitle.setVisible(false);
+        dailyInfo.setVisible(false);
+        weeklyRaceCardBg.setVisible(false);
+        weeklyRaceTitle.setVisible(false);
+        weeklyRaceInfo.setVisible(false);
+        weeklyRaceBadgeBg.setVisible(false);
+        weeklyRaceBadgeText.setVisible(false);
+        weeklyRaceJumpBadgeBg.setVisible(false);
+        weeklyRaceJumpBadgeText.setVisible(false);
+        weeklyRaceResetBadgeBg.setVisible(false);
+        weeklyRaceResetBadgeText.setVisible(false);
+        weeklyRaceRewardBadgeBg.setVisible(false);
+        weeklyRaceRewardBadgeText.setVisible(false);
+        weeklyRaceRiskBadgeBg.setVisible(false);
+        weeklyRaceRiskBadgeText.setVisible(false);
+        weeklyRaceProgressTrack.setVisible(false);
+        weeklyRaceProgressFill.setVisible(false);
+        weeklyRaceProgressText.setVisible(false);
+        dailyMissionsTitle.setVisible(false);
+        weeklyMissionsTitle.setVisible(false);
+        dailyMissionRows.forEach((row) => {
+          row.bg.setVisible(false);
+          row.text.setVisible(false);
+        });
+        weeklyMissionRows.forEach((row) => {
+          row.bg.setVisible(false);
+          row.text.setVisible(false);
+        });
+
+        controlsText.setVisible(mode === "full");
+        if (controlsText.visible) {
+          controlsText.setPosition(leftX, summaryCenterY + summaryHeight / 2 + 18);
+          controlsText.setStyle({ fontSize: "13px" });
+        }
+        if (this.toastText) this.toastText.setPosition(s.width / 2, s.height * 0.93);
+        this.layoutWorkshop();
+        this.layoutLeaderboard();
+        return;
+      }
+      title.setVisible(false);
+      taglineText.setVisible(false);
+      bestText.setVisible(false);
+      this.menuPanel.setVisible(false);
+      btnPlay.setVisible(false);
+      labelPlay.setVisible(false);
+      btnDaily.setVisible(false);
+      labelDaily.setVisible(false);
+      btnTraining.setVisible(false);
+      labelTraining.setVisible(false);
+      btnMissions.setVisible(false);
+      labelMissions.setVisible(false);
+      boostToggleBg.setVisible(false);
+      boostToggleTrack.setVisible(false);
+      boostToggleFill.setVisible(false);
+      boostToggleKnob.setVisible(false);
+      boostToggleTitle.setVisible(false);
+      boostToggleHint.setVisible(false);
+      summaryRewardsCardBg.setVisible(false);
+      summaryDailyCardBg.setVisible(false);
+      summaryWeeklyCardBg.setVisible(false);
+      summaryRewardsTitle.setVisible(false);
+      summaryRewardsValue.setVisible(false);
+      summaryDailyTitle.setVisible(false);
+      summaryDailyValue.setVisible(false);
+      summaryWeeklyTitle.setVisible(false);
+      summaryWeeklyValue.setVisible(false);
+      controlsText.setVisible(false);
+      this.dailyPanel.setPosition(s.width / 2, s.height / 2).setSize(Math.min(s.width - 28, MISSIONS_PANEL_WIDTH), Math.min(s.height - 28, MISSIONS_PANEL_HEIGHT));
+      const detailCenterX = this.dailyPanel.x;
+      const detailPanelTop = this.dailyPanel.y - this.dailyPanel.height / 2;
+      const panelLeft = detailCenterX - this.dailyPanel.width / 2;
       const innerWidth = this.dailyPanel.width - 24;
       const innerLeft = panelLeft + 12;
       const columnGap = 12;
@@ -1309,10 +1799,46 @@ export class MenuScene extends Phaser.Scene {
       const rightColumnCenter = panelLeft + 12 + columnWidth + columnGap + columnWidth / 2;
       const claimButtonWidth = stackedMissions ? Math.min(166, innerWidth - 12) : 178;
       const claimButtonHeight = stackedMissions ? 34 : 36;
+      const denseDesktop = !stackedMissions && shortDesktop;
+      const panelBottom = detailPanelTop + this.dailyPanel.height;
+      const controlsTargetY = panelBottom - (stackedMissions ? 18 : 16);
+      const maxMissionBottom = controlsTargetY - controlsText.displayHeight / 2 - 10;
 
-      liveopsTitle.setPosition(panelLeft + 16, panelTop + 18);
+      liveopsCardBg.setVisible(true);
+      liveopsInfo.setVisible(true);
+      dailyInfoCardBg.setVisible(true);
+      dailyInfoTitle.setVisible(true);
+      dailyInfo.setVisible(true);
+      weeklyRaceCardBg.setVisible(true);
+      weeklyRaceTitle.setVisible(true);
+      weeklyRaceInfo.setVisible(true);
+      weeklyRaceBadgeBg.setVisible(true);
+      weeklyRaceBadgeText.setVisible(true);
+      weeklyRaceResetBadgeBg.setVisible(true);
+      weeklyRaceResetBadgeText.setVisible(true);
+      weeklyRaceRewardBadgeBg.setVisible(true);
+      weeklyRaceRewardBadgeText.setVisible(true);
+      weeklyRaceRiskBadgeBg.setVisible(true);
+      weeklyRaceRiskBadgeText.setVisible(true);
+      weeklyRaceProgressTrack.setVisible(true);
+      weeklyRaceProgressFill.setVisible(true);
+      weeklyRaceProgressText.setVisible(true);
+      dailyMissionsTitle.setVisible(true);
+      weeklyMissionsTitle.setVisible(true);
+      dailyMissionRows.forEach((row) => {
+        row.bg.setVisible(true);
+        row.text.setVisible(true);
+      });
+      weeklyMissionRows.forEach((row) => {
+        row.bg.setVisible(true);
+        row.text.setVisible(true);
+      });
+
+      liveopsTitle.setPosition(panelLeft + 16, detailPanelTop + 18);
       btnClaimOps.setSize(claimButtonWidth, claimButtonHeight);
-      btnClaimOps.setPosition(panelLeft + this.dailyPanel.width - 16, panelTop + 10).setOrigin(1, 0);
+      btnCloseMissions.setVisible(true).setOrigin(1, 0).setPosition(panelLeft + this.dailyPanel.width - 16, detailPanelTop + 10);
+      labelCloseMissions.setVisible(true).setPosition(btnCloseMissions.x - btnCloseMissions.width / 2, btnCloseMissions.y + btnCloseMissions.height / 2);
+      btnClaimOps.setPosition(btnCloseMissions.x - btnCloseMissions.width - 12, detailPanelTop + 10).setOrigin(1, 0);
       labelClaimOps.setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
       labelClaimOps.setStyle({ fontSize: stackedMissions ? "11px" : "12px" });
       claimOpsHalo
@@ -1322,122 +1848,179 @@ export class MenuScene extends Phaser.Scene {
         btnClaimOps.x - btnClaimOps.width - 14 - liveopsReadyBadgeBg.width / 2,
         panelLeft + 22 + liveopsTitle.width + liveopsReadyBadgeBg.width / 2
       );
-      liveopsReadyBadgeBg.setPosition(badgeX, panelTop + 18);
-      liveopsReadyBadgeText.setPosition(badgeX, panelTop + 18);
+      liveopsReadyBadgeBg.setPosition(badgeX, detailPanelTop + 18);
+      liveopsReadyBadgeText.setPosition(badgeX, detailPanelTop + 18);
 
-      liveopsCardBg.setPosition(leftX, panelTop + 58).setSize(innerWidth, 54);
-      liveopsInfo.setPosition(leftX, panelTop + 58);
-      liveopsInfo.setStyle({ fontSize: stackedMissions ? "10px" : "11px" });
+      liveopsCardBg.setPosition(detailCenterX, detailPanelTop + 58).setSize(innerWidth, 54);
+      liveopsInfo.setPosition(detailCenterX, detailPanelTop + 58);
+      liveopsCardBg.setSize(innerWidth, denseDesktop ? 48 : 54);
+      liveopsInfo.setPosition(detailCenterX, detailPanelTop + (denseDesktop ? 56 : 58));
+      liveopsInfo.setStyle({ fontSize: stackedMissions ? "10px" : denseDesktop ? "10px" : "11px" });
       liveopsInfo.setWordWrapWidth(innerWidth - 24, true);
+      dailyMissionsTitle.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
+      weeklyMissionsTitle.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
+      fitTextScaleToWidth(dailyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.82);
+      fitTextScaleToWidth(weeklyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.72);
 
       if (stackedMissions) {
-        dailyInfoCardBg.setPosition(leftX, panelTop + 132).setSize(innerWidth, 76);
-        dailyInfoTitle.setPosition(panelLeft + 16, panelTop + 104);
-        dailyInfo.setPosition(panelLeft + 16, panelTop + 118);
+        const weeklyCardTop = detailPanelTop + 178;
+        dailyInfoCardBg.setPosition(detailCenterX, detailPanelTop + 132).setSize(innerWidth, 76);
+        dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + 104);
+        dailyInfo.setPosition(panelLeft + 16, detailPanelTop + 118);
         dailyInfo.setStyle({ fontSize: "10px" });
         dailyInfo.setWordWrapWidth(innerWidth - 24, true);
 
-        weeklyRaceCardBg.setPosition(leftX, panelTop + 232).setSize(innerWidth, 108);
-        weeklyRaceTitle.setPosition(panelLeft + 16, panelTop + 192);
-        weeklyRaceInfo.setPosition(panelLeft + 16, panelTop + 204);
+        weeklyRaceCardBg.setPosition(detailCenterX, detailPanelTop + 238).setSize(innerWidth, 120);
+        weeklyRaceTitle.setPosition(panelLeft + 16, detailPanelTop + 192);
+        weeklyRaceInfo.setPosition(panelLeft + 16, detailPanelTop + 230);
         weeklyRaceInfo.setStyle({ fontSize: "10px" });
         weeklyRaceInfo.setWordWrapWidth(innerWidth - 24, true);
-        weeklyRaceBadgeBg.setPosition(innerLeft + innerWidth - 12 - weeklyRaceBadgeBg.width / 2, panelTop + 192);
+        weeklyRaceBadgeBg.setPosition(innerLeft + innerWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 192);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
         positionWeeklyRaceResetBadge = () => {
-          const minX = panelLeft + 16 + weeklyRaceTitle.width + 10 + weeklyRaceResetBadgeBg.width / 2;
-          const maxX = weeklyRaceBadgeBg.x - weeklyRaceBadgeBg.width / 2 - 8 - weeklyRaceResetBadgeBg.width / 2;
-          const targetX = maxX >= minX ? minX : Math.max(panelLeft + 16 + weeklyRaceResetBadgeBg.width / 2, maxX);
-          weeklyRaceResetBadgeBg.setPosition(targetX, panelTop + 192);
+          weeklyRaceResetBadgeBg.setPosition(panelLeft + 16 + weeklyRaceResetBadgeBg.width / 2, detailPanelTop + 214);
           weeklyRaceResetBadgeText.setPosition(weeklyRaceResetBadgeBg.x, weeklyRaceResetBadgeBg.y);
         };
         positionWeeklyRaceResetBadge();
-        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, panelTop + 214);
+        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, detailPanelTop + 214);
         weeklyRaceJumpBadgeText.setPosition(weeklyRaceJumpBadgeBg.x, weeklyRaceJumpBadgeBg.y);
         positionWeeklyRaceSignalBadges = () => {
-          const rowY = panelTop + 250;
+          const rowY = Math.max(detailPanelTop + 266, weeklyRaceInfo.y + weeklyRaceInfo.displayHeight + 16);
           weeklyRaceRewardBadgeBg.setPosition(panelLeft + 16 + weeklyRaceRewardBadgeBg.width / 2, rowY);
           weeklyRaceRewardBadgeText.setPosition(weeklyRaceRewardBadgeBg.x, weeklyRaceRewardBadgeBg.y);
           weeklyRaceRiskBadgeBg.setPosition(panelLeft + innerWidth - 16 - weeklyRaceRiskBadgeBg.width / 2, rowY);
           weeklyRaceRiskBadgeText.setPosition(weeklyRaceRiskBadgeBg.x, weeklyRaceRiskBadgeBg.y);
         };
-        positionWeeklyRaceSignalBadges();
-        weeklyRaceProgressTrack.setPosition(innerLeft + 14, panelTop + 276).setSize(innerWidth - 28, 10);
-        weeklyRaceProgressFill.setPosition(weeklyRaceProgressTrack.x, weeklyRaceProgressTrack.y).setSize(weeklyRaceProgressFill.width, 10);
-        weeklyRaceProgressText.setPosition(weeklyRaceProgressTrack.x + weeklyRaceProgressTrack.width / 2, weeklyRaceProgressTrack.y);
+        positionWeeklyRaceBody = () => {
+          positionWeeklyRaceSignalBadges();
+          const signalRowY = weeklyRaceRewardBadgeBg.y;
+          const progressY = signalRowY + 26;
+          weeklyRaceProgressTrack.setPosition(innerLeft + 14, progressY).setSize(innerWidth - 28, 10);
+          weeklyRaceProgressFill.setPosition(weeklyRaceProgressTrack.x, weeklyRaceProgressTrack.y).setSize(weeklyRaceProgressFill.width, 10);
+          weeklyRaceProgressText.setPosition(weeklyRaceProgressTrack.x + weeklyRaceProgressTrack.width / 2, weeklyRaceProgressTrack.y);
+          const cardBottom = progressY + 12;
+          weeklyRaceCardBg.setPosition(detailCenterX, (weeklyCardTop + cardBottom) / 2).setSize(innerWidth, cardBottom - weeklyCardTop);
 
-        dailyMissionsTitle.setPosition(panelLeft + 16, panelTop + 320);
-        weeklyMissionsTitle.setPosition(panelLeft + 16, panelTop + 442);
+          const stackedRowWidth = innerWidth;
+          const dailyTitleY = cardBottom + 30;
+          const weeklyTitleY = dailyTitleY + 114;
 
-        const stackedRowWidth = innerWidth;
-        const dailyMissionYs = [panelTop + 356, panelTop + 400];
-        dailyMissionRows.forEach((row, index) => {
-          row.bg.setPosition(leftX, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(stackedRowWidth, 38);
-          row.text.setPosition(leftX, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]);
-          row.text.setWordWrapWidth(stackedRowWidth - 18, true);
-        });
+          const dailyMissionYs = [dailyTitleY + 34, dailyTitleY + 78];
+          dailyMissionRows.forEach((row, index) => {
+            row.bg.setPosition(detailCenterX, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(stackedRowWidth, 38);
+            row.text.setPosition(detailCenterX, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]);
+            row.text.setWordWrapWidth(stackedRowWidth - 18, true);
+          });
+          dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? dailyTitleY + 34) - 38);
 
-        const weeklyMissionYs = [panelTop + 478, panelTop + 522, panelTop + 566];
-        weeklyMissionRows.forEach((row, index) => {
-          row.bg.setPosition(leftX, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(stackedRowWidth, 38);
-          row.text.setPosition(leftX, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]);
-          row.text.setWordWrapWidth(stackedRowWidth - 18, true);
-        });
+          const weeklyMissionYs = [weeklyTitleY + 34, weeklyTitleY + 78, weeklyTitleY + 122];
+          weeklyMissionRows.forEach((row, index) => {
+            row.bg.setPosition(detailCenterX, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(stackedRowWidth, 38);
+            row.text.setPosition(detailCenterX, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]);
+            row.text.setWordWrapWidth(stackedRowWidth - 18, true);
+          });
+          weeklyMissionsTitle.setPosition(panelLeft + 16, (weeklyMissionYs[0] ?? weeklyTitleY + 34) - 40);
+          const lastWeeklyMissionBottom =
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.y ?? weeklyTitleY) +
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.height ?? 38) / 2;
+          const overflow = Math.max(0, lastWeeklyMissionBottom - maxMissionBottom);
+          if (overflow > 0) {
+            dailyMissionsTitle.y -= overflow;
+            weeklyMissionsTitle.y -= overflow;
+            dailyMissionRows.forEach((row) => {
+              row.bg.y -= overflow;
+              row.text.y -= overflow;
+            });
+            weeklyMissionRows.forEach((row) => {
+              row.bg.y -= overflow;
+              row.text.y -= overflow;
+            });
+          }
+        };
+        positionWeeklyRaceBody();
       } else {
-        dailyInfoCardBg.setPosition(leftColumnCenter, panelTop + 134).setSize(columnWidth, 76);
-        dailyInfoTitle.setPosition(panelLeft + 16, panelTop + 106);
-        dailyInfo.setPosition(panelLeft + 16, panelTop + 120);
-        dailyInfo.setStyle({ fontSize: "10px" });
+        const weeklyCardTop = detailPanelTop + (denseDesktop ? 91 : 94);
+        dailyInfoCardBg.setPosition(leftColumnCenter, detailPanelTop + (denseDesktop ? 128 : 134)).setSize(columnWidth, denseDesktop ? 68 : 76);
+        dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 100 : 106));
+        dailyInfo.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 112 : 120));
+        dailyInfo.setStyle({ fontSize: denseDesktop ? "9px" : "10px" });
         dailyInfo.setWordWrapWidth(columnWidth - 24, true);
 
-        weeklyRaceCardBg.setPosition(rightColumnCenter, panelTop + 150).setSize(columnWidth, 112);
-        weeklyRaceTitle.setPosition(rightColumnLeft + 4, panelTop + 108);
-        weeklyRaceInfo.setPosition(rightColumnLeft + 4, panelTop + 122);
-        weeklyRaceInfo.setStyle({ fontSize: "10px" });
+        weeklyRaceCardBg.setPosition(rightColumnCenter, detailPanelTop + (denseDesktop ? 146 : 154)).setSize(columnWidth, denseDesktop ? 110 : 120);
+        weeklyRaceTitle.setPosition(rightColumnLeft + 4, detailPanelTop + 108);
+        weeklyRaceInfo.setPosition(rightColumnLeft + 4, detailPanelTop + (denseDesktop ? 142 : 146));
+        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "9px" : "10px" });
         weeklyRaceInfo.setWordWrapWidth(columnWidth - 24, true);
-        weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - 12 - weeklyRaceBadgeBg.width / 2, panelTop + 108);
+        weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 108);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
         positionWeeklyRaceResetBadge = () => {
-          const minX = rightColumnLeft + 4 + weeklyRaceTitle.width + 10 + weeklyRaceResetBadgeBg.width / 2;
-          const maxX = weeklyRaceBadgeBg.x - weeklyRaceBadgeBg.width / 2 - 8 - weeklyRaceResetBadgeBg.width / 2;
-          const targetX = maxX >= minX ? minX : Math.max(rightColumnLeft + 4 + weeklyRaceResetBadgeBg.width / 2, maxX);
-          weeklyRaceResetBadgeBg.setPosition(targetX, panelTop + 108);
+          weeklyRaceResetBadgeBg.setPosition(rightColumnLeft + 4 + weeklyRaceResetBadgeBg.width / 2, detailPanelTop + 126);
           weeklyRaceResetBadgeText.setPosition(weeklyRaceResetBadgeBg.x, weeklyRaceResetBadgeBg.y);
         };
         positionWeeklyRaceResetBadge();
-        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, panelTop + 130);
+        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, detailPanelTop + 126);
         weeklyRaceJumpBadgeText.setPosition(weeklyRaceJumpBadgeBg.x, weeklyRaceJumpBadgeBg.y);
         positionWeeklyRaceSignalBadges = () => {
-          const rowY = panelTop + 178;
+          const rowY = Math.max(detailPanelTop + (denseDesktop ? 176 : 184), weeklyRaceInfo.y + weeklyRaceInfo.displayHeight + 14);
           weeklyRaceRewardBadgeBg.setPosition(rightColumnLeft + 4 + weeklyRaceRewardBadgeBg.width / 2, rowY);
           weeklyRaceRewardBadgeText.setPosition(weeklyRaceRewardBadgeBg.x, weeklyRaceRewardBadgeBg.y);
           weeklyRaceRiskBadgeBg.setPosition(rightColumnLeft + columnWidth - 20 - weeklyRaceRiskBadgeBg.width / 2, rowY);
           weeklyRaceRiskBadgeText.setPosition(weeklyRaceRiskBadgeBg.x, weeklyRaceRiskBadgeBg.y);
         };
-        positionWeeklyRaceSignalBadges();
-        weeklyRaceProgressTrack.setPosition(rightColumnLeft + 4, panelTop + 200).setSize(columnWidth - 24, 10);
-        weeklyRaceProgressFill.setPosition(weeklyRaceProgressTrack.x, weeklyRaceProgressTrack.y).setSize(weeklyRaceProgressFill.width, 10);
-        weeklyRaceProgressText.setPosition(weeklyRaceProgressTrack.x + weeklyRaceProgressTrack.width / 2, weeklyRaceProgressTrack.y);
+        positionWeeklyRaceBody = () => {
+          positionWeeklyRaceSignalBadges();
+          const signalRowY = weeklyRaceRewardBadgeBg.y;
+          const progressY = signalRowY + 24;
+          weeklyRaceProgressTrack.setPosition(rightColumnLeft + 4, progressY).setSize(columnWidth - 24, 10);
+          weeklyRaceProgressFill.setPosition(weeklyRaceProgressTrack.x, weeklyRaceProgressTrack.y).setSize(weeklyRaceProgressFill.width, 10);
+          weeklyRaceProgressText.setPosition(weeklyRaceProgressTrack.x + weeklyRaceProgressTrack.width / 2, weeklyRaceProgressTrack.y);
+          weeklyRaceProgressText.setStyle({ fontSize: denseDesktop ? "8px" : "9px" });
+          const cardBottom = progressY + 12;
+          weeklyRaceCardBg.setPosition(rightColumnCenter, (weeklyCardTop + cardBottom) / 2).setSize(columnWidth, cardBottom - weeklyCardTop);
 
-        dailyMissionsTitle.setPosition(panelLeft + 16, panelTop + 218);
-        weeklyMissionsTitle.setPosition(panelLeft + 28 + columnWidth, panelTop + 218);
+          const missionTitleY = cardBottom + (denseDesktop ? 13 : 10);
 
-        const dailyMissionYs = [panelTop + 254, panelTop + 300];
-        dailyMissionRows.forEach((row, index) => {
-          row.bg.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(columnWidth, 40);
-          row.text.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]);
-          row.text.setWordWrapWidth(columnWidth - 16, true);
-        });
+          const dailyMissionYs = denseDesktop ? [missionTitleY + 30, missionTitleY + 68] : [missionTitleY + 36, missionTitleY + 82];
+          dailyMissionRows.forEach((row, index) => {
+            row.bg.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 34 : 40);
+            row.text.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]);
+            row.text.setStyle({ fontSize: denseDesktop ? "9px" : "10px" });
+            row.text.setWordWrapWidth(columnWidth - 16, true);
+          });
+          dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? missionTitleY + (denseDesktop ? 30 : 36)) - (denseDesktop ? 30 : 38));
 
-        const weeklyMissionYs = [panelTop + 254, panelTop + 300, panelTop + 346];
-        weeklyMissionRows.forEach((row, index) => {
-          row.bg.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(columnWidth, 40);
-          row.text.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]);
-          row.text.setWordWrapWidth(columnWidth - 16, true);
-        });
+          const weeklyMissionYs = denseDesktop ? [missionTitleY + 30, missionTitleY + 68, missionTitleY + 106] : [missionTitleY + 36, missionTitleY + 82, missionTitleY + 128];
+          weeklyMissionRows.forEach((row, index) => {
+            row.bg.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 34 : 40);
+            row.text.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]);
+            row.text.setStyle({ fontSize: denseDesktop ? "9px" : "10px" });
+            row.text.setWordWrapWidth(columnWidth - 16, true);
+          });
+          weeklyMissionsTitle.setPosition(
+            panelLeft + 28 + columnWidth,
+            (weeklyMissionYs[0] ?? missionTitleY + (denseDesktop ? 30 : 36)) - (denseDesktop ? 32 : 40)
+          );
+          const lastWeeklyMissionBottom =
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.y ?? missionTitleY) +
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.height ?? (denseDesktop ? 34 : 40)) / 2;
+          const overflow = Math.max(0, lastWeeklyMissionBottom - maxMissionBottom);
+          if (overflow > 0) {
+            dailyMissionsTitle.y -= overflow;
+            weeklyMissionsTitle.y -= overflow;
+            dailyMissionRows.forEach((row) => {
+              row.bg.y -= overflow;
+              row.text.y -= overflow;
+            });
+            weeklyMissionRows.forEach((row) => {
+              row.bg.y -= overflow;
+              row.text.y -= overflow;
+            });
+          }
+        };
+        positionWeeklyRaceBody();
       }
 
-      controlsText.setPosition(leftX, panelTop + this.dailyPanel.height - (stackedMissions ? 18 : 16));
+      controlsText.setPosition(leftX, controlsTargetY);
       controlsText.setStyle({ fontSize: compact ? "12px" : "13px" });
       if (this.toastText) this.toastText.setPosition(s.width / 2, s.height * 0.93);
       this.layoutWorkshop();
@@ -1523,26 +2106,26 @@ export class MenuScene extends Phaser.Scene {
     this.heroRecycler.setRotation(this.menuTime * 0.15);
     this.heroTruck.setPosition(
       this.heroBaseX - 8 + Math.sin(this.menuTime * 1.4) * 10,
-      this.heroBaseY + 126 + Math.cos(this.menuTime * 1.1) * 6
+      this.heroBaseY + 104 + Math.cos(this.menuTime * 1.1) * 6
     );
     this.heroTruck.setRotation(-0.08 + Math.sin(this.menuTime * 0.9) * 0.04);
 
     this.heroEscortA.setPosition(
       this.heroBaseX - 82 + Math.cos(this.menuTime * 1.8) * 8,
-      this.heroBaseY + 38 + Math.sin(this.menuTime * 1.2) * 12
+      this.heroBaseY + 22 + Math.sin(this.menuTime * 1.2) * 10
     );
     this.heroEscortB.setPosition(
       this.heroBaseX + 94 + Math.cos(this.menuTime * 1.35 + 1.1) * 10,
-      this.heroBaseY - 16 + Math.sin(this.menuTime * 1.55 + 0.7) * 10
+      this.heroBaseY - 28 + Math.sin(this.menuTime * 1.55 + 0.7) * 10
     );
     this.heroThreatA.setPosition(
       this.heroBaseX - 122 + Math.sin(this.menuTime * 1.5) * 12,
-      this.heroBaseY - 102 + Math.cos(this.menuTime * 1.8) * 10
+      this.heroBaseY - 112 + Math.cos(this.menuTime * 1.8) * 8
     );
     this.heroThreatA.setRotation(0.25 + Math.sin(this.menuTime * 1.25) * 0.1);
     this.heroThreatB.setPosition(
       this.heroBaseX + 132 + Math.cos(this.menuTime * 1.1) * 12,
-      this.heroBaseY + 84 + Math.sin(this.menuTime * 1.6) * 10
+      this.heroBaseY + 62 + Math.sin(this.menuTime * 1.6) * 10
     );
     this.heroThreatB.setRotation(-this.menuTime * 0.8);
   }
@@ -1573,27 +2156,28 @@ export class MenuScene extends Phaser.Scene {
 
     this.menuPanel = this.add.rectangle(0, 0, 420, 446, 0x08111a, 0.76).setDepth(-12).setStrokeStyle(2, 0x3aa4d4, 0.42);
     this.dailyPanel = this.add.rectangle(0, 0, 420, 356, 0x0b141d, 0.84).setDepth(-12).setStrokeStyle(2, 0x5cc8ff, 0.32);
-    this.heroPanel = this.add.rectangle(0, 0, 470, 470, 0x08111a, 0.72).setDepth(-12).setStrokeStyle(2, 0xffd166, 0.36);
+    this.heroPanel = this.add.rectangle(0, 0, 450, 520, 0x08111a, 0.72).setDepth(-12).setStrokeStyle(2, 0xffd166, 0.36);
 
-    this.heroRecycler = this.add.image(0, 0, "recycler").setDepth(-10).setScale(1.28);
-    this.heroTruck = this.add.image(0, 0, "player").setDepth(-9).setScale(4.4);
-    this.heroEscortA = this.add.image(0, 0, "scrap_heavy").setDepth(-9).setScale(1.7).setAlpha(0.92);
-    this.heroEscortB = this.add.image(0, 0, "scrap_rare").setDepth(-9).setScale(1.7).setAlpha(0.92);
-    this.heroThreatA = this.add.image(0, 0, "enemy_chaser").setDepth(-9).setScale(2.2).setAlpha(0.95);
-    this.heroThreatB = this.add.image(0, 0, "enemy_cutter").setDepth(-9).setScale(2.1).setAlpha(0.95);
+    this.heroRecycler = this.add.image(0, 0, "recycler").setDepth(-10).setScale(1.08);
+    this.heroTruck = this.add.image(0, 0, "player").setDepth(-9).setScale(3.7);
+    this.heroEscortA = this.add.image(0, 0, "scrap_heavy").setDepth(-9).setScale(1.4).setAlpha(0.92);
+    this.heroEscortB = this.add.image(0, 0, "scrap_rare").setDepth(-9).setScale(1.42).setAlpha(0.92);
+    this.heroThreatA = this.add.image(0, 0, "enemy_chaser").setDepth(-9).setScale(1.8).setAlpha(0.95);
+    this.heroThreatB = this.add.image(0, 0, "enemy_cutter").setDepth(-9).setScale(1.72).setAlpha(0.95);
 
     this.heroCaptionText = this.add
       .text(0, 0, t(this.locale, "menu.tagline"), {
-        fontSize: "18px",
+        fontSize: "17px",
         color: "#f3f7fb",
         fontStyle: "700",
         align: "center",
+        wordWrap: { width: 360 },
       })
       .setDepth(-8)
       .setOrigin(0.5);
     this.heroHintText = this.add
       .text(0, 0, t(this.locale, "menu.heroLead"), {
-        fontSize: "14px",
+        fontSize: "13px",
         color: "#9eb6c4",
         align: "center",
         wordWrap: { width: 340 },
@@ -1602,36 +2186,36 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
   }
 
-  private layoutMenuBackdrop(width: number, height: number, compact: boolean, leftX: number): void {
+  private layoutMenuBackdrop(
+    width: number,
+    height: number,
+    mode: MenuLayoutMode,
+    previewX: number,
+    previewY: number,
+    showPreview: boolean
+  ): void {
     this.bgFar.setSize(width, height).setDisplaySize(width, height);
     this.bgTile.setSize(width, height).setDisplaySize(width, height);
     this.menuGlowLeft.setPosition(Math.round(width * 0.2), Math.round(height * 0.2));
     this.menuGlowRight.setPosition(Math.round(width * 0.83), Math.round(height * 0.66));
 
-    this.menuPanel.setPosition(leftX, compact ? Math.round(height * 0.48) : Math.round(height * 0.55));
-    this.menuPanel.setSize(compact ? Math.min(width - 44, 500) : 472, compact ? 418 : 444);
+    this.heroBaseX = previewX;
+    this.heroBaseY = previewY;
 
-    const liveopsPanel = getLiveopsPanelMetrics(width, compact);
-    this.dailyPanel.setPosition(leftX, height - (liveopsPanel.height / 2 + 14));
-    this.dailyPanel.setSize(liveopsPanel.width, liveopsPanel.height);
+    this.heroPanel.setVisible(showPreview);
+    this.heroRecycler.setVisible(showPreview);
+    this.heroTruck.setVisible(showPreview);
+    this.heroEscortA.setVisible(showPreview);
+    this.heroEscortB.setVisible(showPreview);
+    this.heroThreatA.setVisible(showPreview);
+    this.heroThreatB.setVisible(showPreview);
+    this.heroCaptionText.setVisible(showPreview);
+    this.heroHintText.setVisible(showPreview);
 
-    this.heroBaseX = compact ? Math.round(width / 2) : Math.round(width * 0.74);
-    this.heroBaseY = compact ? Math.round(height * 0.8) : Math.round(height * 0.48);
-
-    this.heroPanel.setVisible(!compact);
-    this.heroRecycler.setVisible(!compact);
-    this.heroTruck.setVisible(!compact);
-    this.heroEscortA.setVisible(!compact);
-    this.heroEscortB.setVisible(!compact);
-    this.heroThreatA.setVisible(!compact);
-    this.heroThreatB.setVisible(!compact);
-    this.heroCaptionText.setVisible(!compact);
-    this.heroHintText.setVisible(!compact);
-
-    if (!compact) {
-      this.heroPanel.setPosition(this.heroBaseX, this.heroBaseY + 18);
-      this.heroCaptionText.setPosition(this.heroBaseX, this.heroBaseY - 184);
-      this.heroHintText.setPosition(this.heroBaseX, this.heroBaseY + 200);
+    if (showPreview) {
+      this.heroPanel.setPosition(this.heroBaseX, this.heroBaseY + 18).setSize(mode === "full" ? 450 : 400, mode === "full" ? 520 : 460);
+      this.heroCaptionText.setPosition(this.heroBaseX, this.heroBaseY - (mode === "full" ? 206 : 176));
+      this.heroHintText.setPosition(this.heroBaseX, this.heroBaseY + (mode === "full" ? 206 : 176));
       this.heroRecycler.setPosition(this.heroBaseX, this.heroBaseY);
     }
   }
@@ -2142,13 +2726,17 @@ export class MenuScene extends Phaser.Scene {
     this.workshopCards = [];
 
     const cardWidth = 304;
-    const cardHeight = 74;
+    const cardHeight = 92;
     const cardGapX = 16;
     const cardGapY = 6;
     const cardOriginLeft = -312;
-    const cardsStartY = this.workshopBuildChips.length > 0 ? chipCursorY + 44 : -184;
     const leftCardX = cardOriginLeft + cardWidth / 2;
     const rightCardX = leftCardX + cardWidth + cardGapX;
+    const cardRows = Math.ceil(this.staticData.metaTree.nodes.length / 2);
+    const desiredCardsStartY = this.workshopBuildChips.length > 0 ? chipCursorY + 44 : -184;
+    const maxCardsBottom = this.workshopFooterText.y - 22;
+    const maxCardsStartY = maxCardsBottom - cardHeight / 2 - Math.max(0, cardRows - 1) * (cardHeight + cardGapY);
+    const cardsStartY = Math.min(desiredCardsStartY, maxCardsStartY);
 
     this.staticData.metaTree.nodes.forEach((node, idx) => {
       const level = getMetaNodeLevel(save, node.id);
@@ -2163,40 +2751,50 @@ export class MenuScene extends Phaser.Scene {
       const x = column === 0 ? leftCardX : rightCardX;
       const y = cardsStartY + row * (cardHeight + cardGapY);
       const accentColor = maxed ? 0x57c27d : badge?.stroke ?? (cost?.currency === "cores" ? 0xffd166 : idx % 2 === 0 ? 0x5cc8ff : 0x3aa4d4);
+      const textLeft = -cardWidth / 2 + 18;
+      const buttonCenterX = cardWidth / 2 - 58;
+      const buttonWidth = 108;
+      const buttonLeft = buttonCenterX - buttonWidth / 2;
+      const textWrapWidth = Math.max(120, Math.floor(buttonLeft - textLeft - 14));
 
       const bg = this.add.rectangle(0, 0, cardWidth, cardHeight, 0x121a24, 0.97).setStrokeStyle(2, accentColor, maxed ? 0.72 : 0.58);
       const accent = this.add.rectangle(-cardWidth / 2 + 4, 0, 6, cardHeight, accentColor, 0.92);
       const title = this.add
-        .text(-cardWidth / 2 + 18, -28, getMetaNodeName(this.locale, node.id, node.name), {
-          fontSize: "16px",
+        .text(textLeft, -32, getMetaNodeName(this.locale, node.id, node.name), {
+          fontSize: "14px",
           color: "#d9f2ff",
           fontStyle: "700",
-          wordWrap: { width: 176 },
+          wordWrap: { width: Math.min(140, textWrapWidth) },
         })
         .setOrigin(0, 0);
-      const badgeNode = badge
-        ? createMenuBadge(this, 48, -20, badge.label, badge.fill, badge.stroke, badge.textColor)
-        : null;
+      const badgeNode = badge ? createMenuBadge(this, 0, -24, badge.label, badge.fill, badge.stroke, badge.textColor) : null;
       const desc = this.add
-        .text(-cardWidth / 2 + 18, -2, getMetaNodeDescription(this.locale, node.id), {
-          fontSize: "11px",
+        .text(textLeft, -10, getMetaNodeDescription(this.locale, node.id), {
+          fontSize: "9px",
           color: "#98b7c7",
-          wordWrap: { width: 184 },
+          wordWrap: { width: Math.min(148, textWrapWidth + 4) },
         })
         .setOrigin(0, 0);
+      if (desc.displayHeight > 18) {
+        desc.setScale(Phaser.Math.Clamp(18 / desc.displayHeight, 0.76, 1));
+      }
+      const levelY = Math.max(14, Math.min(22, desc.y + desc.displayHeight + 5));
+      const progressY = Math.min(cardHeight / 2 - 12, levelY + 14);
       const levelText = this.add
-        .text(-cardWidth / 2 + 18, 22, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
-          fontSize: "11px",
+        .text(textLeft, levelY, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
+          fontSize: "10px",
           color: maxed ? "#57c27d" : "#7fdfff",
           fontStyle: "700",
         })
         .setOrigin(0, 0);
-      const progressBg = this.add.rectangle(-cardWidth / 2 + 18, 32, 132, 6, 0x0b141d, 0.95).setOrigin(0, 0.5);
+      const progressWidth = Math.max(98, textWrapWidth - 10);
+      fitTextScaleToWidth(levelText, progressWidth, 0.84);
+      const progressBg = this.add.rectangle(textLeft, progressY, progressWidth, 6, 0x0b141d, 0.95).setOrigin(0, 0.5);
       const progressFill = this.add
         .rectangle(
-          -cardWidth / 2 + 18,
-          32,
-          132 * Phaser.Math.Clamp(node.maxLevel <= 0 ? 1 : level / node.maxLevel, 0, 1),
+          textLeft,
+          progressY,
+          progressWidth * Phaser.Math.Clamp(node.maxLevel <= 0 ? 1 : level / node.maxLevel, 0, 1),
           6,
           accentColor,
           0.98
@@ -2204,19 +2802,19 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(0, 0.5);
 
       const btn = this.add
-        .rectangle(cardWidth / 2 - 62, 0, 108, 34, affordable ? 0x1b2635 : 0x0d131b, 0.98)
+        .rectangle(buttonCenterX, 0, buttonWidth, 34, affordable ? 0x1b2635 : 0x0d131b, 0.98)
         .setStrokeStyle(2, maxed ? 0x57c27d : affordable ? 0xffd166 : 0x5f6b76, 0.86);
       const priceLabel = cost ? formatResource(this.locale, cost.currency, cost.amount) : t(this.locale, "menu.maxed");
       const btnLabel = this.add
         .text(
-          cardWidth / 2 - 62,
+          buttonCenterX,
           -6,
           maxed ? t(this.locale, "menu.installedButton") : affordable ? t(this.locale, "menu.buy") : t(this.locale, "menu.locked"),
           { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" }
         )
         .setOrigin(0.5);
       const costLabel = this.add
-        .text(cardWidth / 2 - 62, 10, priceLabel, {
+        .text(buttonCenterX, 10, priceLabel, {
           fontSize: "10px",
           color: maxed ? "#57c27d" : affordable ? "#ffd166" : "#98b7c7",
           fontStyle: "700",
@@ -2224,6 +2822,11 @@ export class MenuScene extends Phaser.Scene {
           wordWrap: { width: 98 },
         })
         .setOrigin(0.5);
+      fitTextScaleToWidth(btnLabel, buttonWidth - 18, 0.76);
+      fitTextScaleToWidth(costLabel, buttonWidth - 16, 0.76);
+      if (badgeNode) {
+        badgeNode.setPosition(buttonCenterX, -28);
+      }
 
       if (!maxed && affordable) {
         btn.setInteractive({ useHandCursor: true });
@@ -2620,6 +3223,38 @@ function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores:
   return parts.join(" | ");
 }
 
+function buildMenuBestText(locale: Locale, save: SaveData | null | undefined, topEntries: number): string {
+  const stats = save?.stats ?? { bestWave: 0, bestBolts: 0 };
+  const entries = save?.leaderboard?.entries ?? [];
+  const lines = [
+    t(locale, "menu.best", {
+      bestWave: formatNumber(locale, stats.bestWave),
+      bestBolts: formatNumber(locale, stats.bestBolts),
+    }),
+  ];
+
+  if (topEntries <= 0) {
+    return lines.join("\n");
+  }
+
+  lines.push(t(locale, "menu.leaderboardTitle"));
+
+  if (entries.length <= 0) {
+    lines.push(t(locale, "menu.leaderboardEmpty"));
+    return lines.join("\n");
+  }
+
+  for (const [index, entry] of entries.slice(0, Math.max(1, topEntries)).entries()) {
+    const modeLabel = entry.mode === "daily" ? t(locale, "leaderboard.mode.daily") : t(locale, "leaderboard.mode.run");
+    const divisionLabel = t(locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`);
+    lines.push(
+      `${index + 1}. ${entry.pilot} [${modeLabel} | ${divisionLabel}] | ${formatNumber(locale, entry.score)} | ${t(locale, "hud.wave")} ${formatNumber(locale, entry.wave)}`
+    );
+  }
+
+  return lines.join("\n");
+}
+
 function formatMissionObjectiveLabel(locale: Locale, type: MissionObjectiveType, target: number): string {
   return t(locale, `menu.mission.${type}`, { target: formatNumber(locale, target) });
 }
@@ -2711,6 +3346,26 @@ function formatMenuDailyStatusLine(
           ? "start ad"
           : "start locked";
   return locale === "ru" ? `\u041f\u043e\u043f\u044b\u0442\u043a\u0438 ${used}/${max} | ${best} | ${nextLabel}` : `Attempts ${used}/${max} | ${best} | ${nextLabel}`;
+}
+
+function formatMenuRewardsSummary(locale: Locale, readyClaims: number): string {
+  const ready = Math.max(0, Math.floor(readyClaims));
+  if (locale === "ru") {
+    return ready > 0 ? `\u0413\u043e\u0442\u043e\u0432\u043e ${ready}` : "\u041f\u043e\u043a\u0430 \u0442\u0438\u0445\u043e";
+  }
+  return ready > 0 ? `Ready ${ready}` : "Quiet for now";
+}
+
+function formatMenuProgressSummary(locale: Locale, done: number, total: number): string {
+  const safeDone = formatNumber(locale, Math.max(0, Math.floor(done)));
+  const safeTotal = formatNumber(locale, Math.max(0, Math.floor(total)));
+  return locale === "ru" ? `${safeDone}/${safeTotal} \u0432\u044b\u043f.` : `${safeDone}/${safeTotal} complete`;
+}
+
+function getMenuLayoutMode(width: number, height: number): MenuLayoutMode {
+  if (width >= MENU_LAYOUT_BREAKPOINTS.fullWidth && height >= MENU_LAYOUT_BREAKPOINTS.fullHeight) return "full";
+  if (width < MENU_LAYOUT_BREAKPOINTS.minimalWidth || height < MENU_LAYOUT_BREAKPOINTS.minimalHeight) return "minimal";
+  return "compact";
 }
 
 function getMenuWeeklyRaceTopLine(locale: Locale): string {
@@ -2902,12 +3557,13 @@ function fitTextScaleToWidth(text: Phaser.GameObjects.Text, maxWidth: number, mi
   text.setScale(Phaser.Math.Clamp(maxWidth / text.width, minScale, 1));
 }
 
-function getLiveopsPanelMetrics(width: number, compact: boolean): { width: number; height: number; stacked: boolean } {
+function getLiveopsPanelMetrics(width: number, compact: boolean, height = 1080): { width: number; height: number; stacked: boolean } {
   const panelWidth = compact ? Math.max(332, Math.min(width - 44, 540)) : 468;
   const stacked = compact && panelWidth <= 430;
+  const shortDesktop = !compact && height <= 820;
   return {
     width: panelWidth,
-    height: stacked ? 622 : compact ? 412 : 396,
+    height: stacked ? 640 : compact ? 412 : shortDesktop ? 344 : 396,
     stacked,
   };
 }
