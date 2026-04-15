@@ -59,16 +59,13 @@ async function captureDesktop(url, desktopDir, cardDir) {
 
   const metrics = await page.evaluate(() => {
     const g = globalThis.__MC_GAME__;
-    const width = g.scale.width;
-    const height = g.scale.height;
-    const compact = width < 1100;
-    const menuX = compact ? width / 2 : Math.round(width * 0.31);
-    const ctaStartY = compact ? Math.round(height * 0.42) : Math.round(height * 0.43);
-    const rowGap = compact ? 72 : 68;
-    return { width, height, menuX, ctaStartY, rowGap };
+    return {
+      width: g.scale.width,
+      height: g.scale.height,
+    };
   });
 
-  await page.mouse.click(metrics.menuX, metrics.ctaStartY + metrics.rowGap * 3 + 6);
+  await clickMenuEntry(page, ["daily", "ежеднев"]);
   await page.waitForFunction(() => {
     const s = globalThis.__MC_GAME__?.registry?.get("runState");
     return s?.mode === "daily";
@@ -92,8 +89,7 @@ async function captureDesktop(url, desktopDir, cardDir) {
   await waitForScene(page, "upgrade");
   await page.screenshot({ path: join(desktopDir, "03_upgrade_1600x900.png") });
 
-  await page.mouse.click(metrics.width / 2, metrics.height * 0.36);
-  await page.waitForFunction(() => globalThis.__MC_GAME__?.scene?.isActive("upgrade") === false);
+  await chooseUpgrade(page, metrics.width, metrics.height);
   await page.waitForFunction(() => typeof globalThis.__MC_E2E__?.endRun === "function");
   await page.evaluate(() => globalThis.__MC_E2E__.endRun());
   await waitForScene(page, "results");
@@ -389,7 +385,7 @@ async function renderCardAssets(cardDir) {
           <div class="copy">
             <h1>Magnet Caravan</h1>
             <p class="lead">Переверни поле. Сдай лом. Переживи натиск.</p>
-            <div class="badge">Аркадное выживание с daily-режимом</div>
+            <div class="badge">Аркадное выживание с ежедневным режимом</div>
           </div>
           <div class="hero">
             <div class="fog"></div>
@@ -678,16 +674,13 @@ async function captureMobile(url, mobileDir) {
 
   const metrics = await page.evaluate(() => {
     const g = globalThis.__MC_GAME__;
-    const width = g.scale.width;
-    const height = g.scale.height;
-    const compact = width < 1100;
-    const menuX = compact ? width / 2 : Math.round(width * 0.31);
-    const ctaStartY = compact ? Math.round(height * 0.42) : Math.round(height * 0.43);
-    const rowGap = compact ? 72 : 68;
-    return { width, height, menuX, ctaStartY, rowGap };
+    return {
+      width: g.scale.width,
+      height: g.scale.height,
+    };
   });
 
-  await page.mouse.click(metrics.menuX, metrics.ctaStartY + metrics.rowGap * 3 + 6);
+  await clickMenuEntry(page, ["daily", "ежеднев"]);
   await page.waitForFunction(() => {
     const s = globalThis.__MC_GAME__?.registry?.get("runState");
     return s?.mode === "daily";
@@ -700,8 +693,7 @@ async function captureMobile(url, mobileDir) {
 
   await moveToUpgrade(page);
   await waitForScene(page, "upgrade");
-  await page.mouse.click(metrics.width / 2, metrics.height * 0.36);
-  await page.waitForFunction(() => globalThis.__MC_GAME__?.scene?.isActive("upgrade") === false);
+  await chooseUpgrade(page, metrics.width, metrics.height);
   await page.waitForFunction(() => typeof globalThis.__MC_E2E__?.endRun === "function");
   await page.evaluate(() => globalThis.__MC_E2E__.endRun());
   await waitForScene(page, "results");
@@ -728,6 +720,46 @@ async function moveToUpgrade(page) {
     return Boolean(state && typeof state.bolts === "number" && state.bolts > 0);
   });
   await page.waitForFunction(() => globalThis.__MC_GAME__?.scene?.isActive("upgrade") === true, null, { timeout: 20_000 });
+}
+
+async function clickMenuEntry(page, fragments) {
+  const target = await page.evaluate((parts) => {
+    const menu = globalThis.__MC_GAME__?.scene?.keys?.menu;
+    if (!menu) return null;
+    const normalizedParts = parts.map((part) => part.toLowerCase());
+    const texts = menu.children.list
+      .filter((obj) => obj?.type === "Text" && obj.visible)
+      .map((obj) => ({
+        text: String(obj.text ?? ""),
+        x: Number(obj.x ?? 0),
+        y: Number(obj.y ?? 0),
+      }));
+
+    return texts.find((entry) => normalizedParts.some((part) => entry.text.toLowerCase().includes(part))) ?? null;
+  }, fragments);
+
+  if (!target) {
+    throw new Error(`Menu entry not found for fragments: ${fragments.join(", ")}`);
+  }
+
+  await page.mouse.click(target.x, target.y);
+}
+
+async function chooseUpgrade(page, width, height) {
+  const clickTargets = [0.49, 0.36, 0.58];
+  for (const ratio of clickTargets) {
+    await page.mouse.click(width / 2, Math.round(height * ratio));
+    try {
+      await page.waitForFunction(() => globalThis.__MC_GAME__?.scene?.isActive("upgrade") === false, null, {
+        timeout: 1_500,
+      });
+      return;
+    } catch {
+      // Try the next card position if the current click misses the offer hitbox.
+    }
+  }
+
+  throw new Error("Unable to dismiss upgrade scene during Yandex media capture");
 }
 
 async function waitForHttp(url, timeoutMs) {

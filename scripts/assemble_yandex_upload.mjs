@@ -18,13 +18,17 @@ const uploadZipChecksum = join(distDir, "upload_ready", "magnet-caravan_yandex_p
 const consoleUploadArchiveName = "UPLOAD_THIS_TO_YANDEX_magnet-caravan_yandex.zip";
 const legacyUploadZip = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.zip");
 const legacyUploadZipChecksum = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.sha256.txt");
+const ruDocPath = join(rootDir, "docs", "platform_texts", "yandex_ru.md");
+const enDocPath = join(rootDir, "docs", "platform_texts", "yandex_en.md");
 
 const packageJson = JSON.parse(await readFile(join(rootDir, "package.json"), "utf8"));
 const version = String(packageJson.version ?? "0.0.0");
 const generatedAt = new Date().toISOString();
+const ruDoc = await readFile(ruDocPath, "utf8");
+const enDoc = await readFile(enDocPath, "utf8");
 
 const card = {
-  title: "Magnet Caravan",
+  title: extractMarkdownSection(enDoc, "Title") || extractMarkdownSection(ruDoc, "Название"),
   languages: ["ru", "en"],
   platforms: ["desktop", "mobile"],
   orientation: "landscape",
@@ -39,20 +43,14 @@ const card = {
   },
   descriptions: {
     ru: {
-      short:
-        "Собирайте металлолом магнитом, выстраивайте хвост-караван и сдавайте его в переработчик. Импульс помогает оттолкнуть врагов и отразить снаряды.",
-      full:
-        "Magnet Caravan — аркадная игра с видом сверху для горизонтального экрана. Управляйте тягачом виртуальным джойстиком или клавиатурой, собирайте металлолом, удлиняйте караван и в нужный момент сдавайте добычу в зону переработки, получая болты и восстановление прочности.\n\nВраги приходят волнами, а сложность нарастает постепенно: игра следит за безопасной дистанцией появления, предупреждает о новых угрозах и меняет состав роя по ходу забега. Между волнами вы выбираете улучшения и собираете свой стиль игры.\n\nЕсть ежедневный режим с особым набором правил и модификаторов дня.",
-      howToPlay:
-        "Ведите тягач джойстиком, клавишами WASD или стрелками. Собирайте металлолом, чтобы увеличить караван. Нажимайте импульс, чтобы отталкивать врагов и отражать снаряды. Заезжайте в зону переработки и оставайтесь в ней, пока добыча не будет сдана. После каждой волны выбирайте улучшение и подстраивайте сборку под текущий забег.",
+      short: normalizeParagraphSection(extractMarkdownSection(ruDoc, "Об игре (коротко)")),
+      full: normalizeParagraphSection(extractMarkdownSection(ruDoc, "Полное описание")),
+      howToPlay: normalizeBulletSection(extractMarkdownSection(ruDoc, "Как играть")),
     },
     en: {
-      short:
-        "Collect scrap with a magnet, grow a caravan tail, bank it for bolts and healing, and survive waves with a powerful Flip pulse.",
-      full:
-        "Magnet Caravan is a landscape-friendly mobile-first top-down arcade. Use the virtual joystick and Flip button to dodge danger, pull scrap into your tail, and bank it at the Recycler Zone.\n\nWaves are driven by a fairness-first director: safe spawn distance, spawn telegraph, caps per enemy type, and pressure gating. Between waves you pick upgrades that apply to the run configuration.\n\nDaily mode uses a UTC seed with unique modifiers and rules.",
-      howToPlay:
-        "Move with the joystick or WASD. Collect scrap to grow your tail. Press Flip to pulse and deflect shots. Stay in the Recycler Zone to bank your haul. Pick upgrades between waves and adapt your build to the current run.",
+      short: normalizeParagraphSection(extractMarkdownSection(enDoc, "About (short)")),
+      full: normalizeParagraphSection(extractMarkdownSection(enDoc, "Full description")),
+      howToPlay: normalizeBulletSection(extractMarkdownSection(enDoc, "How to play")),
     },
   },
   developerComment:
@@ -89,8 +87,8 @@ await mkdir(uploadRoot, { recursive: true });
 
 await ensureFilesExist([
   gameArchivePath,
-  join(rootDir, "docs", "platform_texts", "yandex_ru.md"),
-  join(rootDir, "docs", "platform_texts", "yandex_en.md"),
+  ruDocPath,
+  enDocPath,
   join(rootDir, "docs", "promo", "yandex", "card", "icon_512x512.png"),
   join(rootDir, "docs", "promo", "yandex", "card", "cover_800x470.png"),
   join(rootDir, "docs", "promo", "yandex", "desktop", "01_menu_1600x900.png"),
@@ -104,14 +102,8 @@ await mkdir(join(uploadRoot, "instructions"), { recursive: true });
 
 await copyFile(gameArchivePath, join(uploadRoot, "game", "magnet-caravan_yandex.zip"));
 await copyFile(gameArchivePath, join(uploadRoot, consoleUploadArchiveName));
-await copyFile(
-  join(rootDir, "docs", "platform_texts", "yandex_ru.md"),
-  join(uploadRoot, "texts", "source", "yandex_ru.md")
-);
-await copyFile(
-  join(rootDir, "docs", "platform_texts", "yandex_en.md"),
-  join(uploadRoot, "texts", "source", "yandex_en.md")
-);
+await copyFile(ruDocPath, join(uploadRoot, "texts", "source", "yandex_ru.md"));
+await copyFile(enDocPath, join(uploadRoot, "texts", "source", "yandex_en.md"));
 await copyFile(join(rootDir, "docs", "YANDEX_PUBLISH.md"), join(uploadRoot, "instructions", "YANDEX_PUBLISH.md"));
 await cp(join(rootDir, "docs", "promo", "yandex"), join(uploadRoot, "media"), { recursive: true });
 
@@ -279,6 +271,37 @@ function buildUploadChecklist() {
 3. Сверьте файлы с \`metadata/checksums.sha256\`, если пакет переносился между машинами.
 4. Перед отправкой в модерацию при необходимости перечитайте \`instructions/YANDEX_PUBLISH.md\`.
 `;
+}
+
+function extractMarkdownSection(markdown, heading) {
+  const marker = `## ${heading}`;
+  const startIndex = markdown.indexOf(marker);
+  if (startIndex === -1) return "";
+
+  const lineEndIndex = markdown.indexOf("\n", startIndex);
+  if (lineEndIndex === -1) return "";
+
+  const sectionStart = lineEndIndex + 1;
+  const remaining = markdown.slice(sectionStart);
+  const nextHeadingOffset = remaining.search(/\r?\n## /);
+  const rawSection = nextHeadingOffset === -1 ? remaining : remaining.slice(0, nextHeadingOffset);
+  return rawSection.trim();
+}
+
+function normalizeParagraphSection(section) {
+  return section
+    .split(/\r?\n\r?\n/)
+    .map((paragraph) => paragraph.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).join(" "))
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function normalizeBulletSection(section) {
+  return section
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*-\s*/, "").trim())
+    .filter(Boolean)
+    .join(" ");
 }
 
 async function ensureFilesExist(paths) {
