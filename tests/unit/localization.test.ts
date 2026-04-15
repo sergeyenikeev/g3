@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   formatResource,
+  getDailyRotationCopy,
   getDailyVariantCopy,
   getLevelFinaleCopy,
   getLevelModifierCopy,
   getLevelObjectiveCopy,
+  getLiveopsEventCopy,
   getMetaNodeName,
   getRarityLabel,
   normalizeLanguageSetting,
@@ -32,6 +34,9 @@ describe("localization", () => {
     expect(t("ru", "menu.play")).toBe("ИГРАТЬ");
     expect(getDailyVariantCopy("ru", "daily_fast_flip").title).toBe("Быстрый флип");
     expect(getDailyVariantCopy("ru", "daily_cash_surge").title).toBe("Кассовый всплеск");
+    expect(getDailyRotationCopy("ru", "caravan_week").title).toBe("Неделя каравана");
+    expect(getDailyRotationCopy("ru", "caravan_week").badge).toBe("НЕДЕЛЯ КАРАВАНА");
+    expect(getLiveopsEventCopy("ru", "tomorrow_offer").title).toBe("Завтрашний бонус двора");
     expect(getMetaNodeName("ru", "meta_dash_unlock", "Dash")).toBe("Тюнинг рывка");
     expect(getMetaNodeName("ru", "meta_salvage_routes", "Routes")).toBe("Маршруты добычи");
     expect(getLevelModifierCopy("en", "salvage_surge").title).toBe("Salvage Surge");
@@ -73,5 +78,16 @@ describe("localization", () => {
     expect(t("en", "results.pilot")).toBe("Pilot");
     expect(getRarityLabel("en", "epic")).toBe("EPIC");
     expect(formatResource("ru", "cores", 3)).toBe("3 ядра");
+  });
+
+  it("keeps russian leaderboard and rewards copy free from leftover english labels", () => {
+    expect(t("ru", "toast.noOpsReady")).not.toContain("liveops");
+    expect(t("ru", "toast.opsClaimed", { reward: "120 болтов" })).not.toContain("liveops");
+    expect(t("ru", "toast.weeklyBoardReward", { division: "Старатель", reward: "120 болтов" })).not.toContain("weekly");
+    expect(t("ru", "results.weeklyDeltaUp", { value: "3" })).not.toContain("weekly");
+    expect(t("ru", "results.weeklyDeltaDown", { value: "2" })).not.toContain("weekly");
+    expect(t("ru", "results.weeklyDeltaNew")).not.toContain("weekly");
+    expect(getDailyRotationCopy("ru", "caravan_week").title).not.toContain("Caravan");
+    expect(getLiveopsEventCopy("ru", "tomorrow_offer").title).not.toContain("Tomorrow");
   });
 });

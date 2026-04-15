@@ -115,16 +115,8 @@ export class UpgradeScene extends Phaser.Scene {
           shortLayout ? 6 : 4
         );
         addHeaderLine(
-          t(this.locale, "upgrade.objective", { objective: objectiveCopy.title }),
-          {
-            fontSize: shortLayout ? "11px" : "13px",
-            color: "#d9f2ff",
-            align: "center",
-          },
-          4
-        );
-        addHeaderLine(
           [
+            t(this.locale, "upgrade.objective", { objective: objectiveCopy.title }),
             lastCleared.objectiveCompleted
               ? t(this.locale, "upgrade.objectiveDone", {
                   reward: formatUpgradeReward(this.locale, lastCleared.objectiveRewardBolts, lastCleared.objectiveRewardCores),
@@ -133,14 +125,14 @@ export class UpgradeScene extends Phaser.Scene {
             finaleCopy ? t(this.locale, "upgrade.finale", { finale: finaleCopy.title }) : "",
           ]
             .filter(Boolean)
-            .join("\n"),
+            .join(" | "),
           {
             fontSize: shortLayout ? "10px" : "12px",
             color: lastCleared.objectiveCompleted ? "#98ffb9" : "#ffb084",
             align: "center",
             wordWrap: { width: Math.min(420, width * 0.84) },
           },
-          shortLayout ? 8 : 12
+          shortLayout ? 8 : 10
         );
       }
     }
@@ -162,19 +154,18 @@ export class UpgradeScene extends Phaser.Scene {
       if (!compactLayout) {
         addHeaderLine(
           [
-            shortLayout ? "" : modifierCopy.desc,
             t(this.locale, "upgrade.objective", { objective: `${objectiveCopy.title} ${formatNumber(this.locale, pendingLevel.objective.target)}` }),
             finaleCopy ? t(this.locale, "upgrade.finale", { finale: finaleCopy.title }) : "",
           ]
             .filter(Boolean)
-            .join("\n"),
+            .join(" | "),
           {
-            fontSize: shortLayout ? "10px" : "13px",
+            fontSize: shortLayout ? "10px" : "12px",
             color: "#7fdfff",
             align: "center",
             wordWrap: { width: Math.min(420, width * 0.82) },
           },
-          shortLayout ? 10 : 14
+          shortLayout ? 10 : 12
         );
       }
     }

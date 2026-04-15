@@ -54,8 +54,10 @@ import {
   formatQualityLabel,
   formatResource,
   formatVolume,
+  getDailyRotationCopy,
   getDailyVariantCopy,
   getLanguageSettingLabel,
+  getLiveopsEventCopy,
   getMetaNodeDescription,
   getMetaNodeName,
   normalizeLanguageSetting,
@@ -1278,16 +1280,26 @@ export class MenuScene extends Phaser.Scene {
         weeklyMissions.filter((mission) => mission.completed && !mission.claimed).length;
       const rotation = getActiveDailyRotation(this.staticData.daily, dateUtc);
       const tomorrow = getTomorrowOfferPreview(this.staticData.liveops);
+      const rotationCopy = rotation
+        ? getDailyRotationCopy(
+            this.locale,
+            rotation.id,
+            rotation.ui?.badge ?? rotation.id,
+            rotation.ui?.title ?? rotation.id,
+            rotation.ui?.desc ?? ""
+          )
+        : null;
+      const tomorrowCopy = getLiveopsEventCopy(this.locale, "tomorrow_offer", tomorrow.title, tomorrow.desc);
       liveopsInfo.setText(
         [
           formatMenuLiveopsHeadline(
             this.locale,
-            rotation?.ui?.badge ?? null,
-            rotation?.ui?.title ?? rotation?.id ?? null,
+            rotationCopy?.badge ?? null,
+            rotationCopy?.title ?? null,
             comeback.eligible,
             comeback.daysAway,
             formatLeaderboardReward(this.locale, comeback.reward),
-            tomorrow.title
+            tomorrowCopy.title
           ),
           formatMenuLiveopsStatusLine(
             this.locale,
@@ -2939,7 +2951,7 @@ export class MenuScene extends Phaser.Scene {
     this.workshopCards = [];
 
     const cardWidth = 304;
-    const cardHeight = 92;
+    const cardHeight = 96;
     const cardGapX = 16;
     const cardGapY = 6;
     const cardOriginLeft = -312;
@@ -2990,7 +3002,7 @@ export class MenuScene extends Phaser.Scene {
       const accent = this.add.rectangle(-cardWidth / 2 + 4, 0, 6, cardHeight, accentColor, 0.92);
       const title = this.add
         .text(textLeft, -32, getMetaNodeName(this.locale, node.id, node.name), {
-          fontSize: "14px",
+          fontSize: "15px",
           color: "#d9f2ff",
           fontStyle: "700",
         })
@@ -2998,19 +3010,20 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(title, titleMaxWidth, 0.56);
       const desc = this.add
         .text(textLeft, -10, getMetaNodeDescription(this.locale, node.id), {
-          fontSize: "9px",
+          fontSize: "10px",
           color: "#98b7c7",
           wordWrap: { width: Math.min(148, textWrapWidth + 4) },
         })
         .setOrigin(0, 0);
-      if (desc.displayHeight > 18) {
-        desc.setScale(Phaser.Math.Clamp(18 / desc.displayHeight, 0.76, 1));
+      desc.setLineSpacing(1);
+      if (desc.displayHeight > 24) {
+        desc.setScale(Phaser.Math.Clamp(24 / desc.displayHeight, 0.82, 1));
       }
-      const levelY = Math.max(14, Math.min(22, desc.y + desc.displayHeight + 5));
+      const levelY = Math.max(16, Math.min(24, desc.y + desc.displayHeight + 6));
       const progressY = Math.min(cardHeight / 2 - 12, levelY + 14);
       const levelText = this.add
         .text(textLeft, levelY, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
-          fontSize: "10px",
+          fontSize: "11px",
           color: maxed ? "#57c27d" : "#7fdfff",
           fontStyle: "700",
         })
@@ -3495,11 +3508,11 @@ function getMenuWeeklyRaceTitle(locale: Locale): string {
 }
 
 function getMenuWeeklyRaceEntryLine(locale: Locale): string {
-  return locale === "ru" ? "Сделай заезд и войди в weekly" : "Post a run to enter weekly";
+  return locale === "ru" ? "Сделай заезд и войди в недельный рейтинг" : "Post a run to enter weekly";
 }
 
 function formatMenuWeeklyRaceRankLine(locale: Locale, rank: number, division: string, score: string): string {
-  return locale === "ru" ? `Weekly #${rank} | ${division} | ${score}` : `Weekly #${rank} | ${division} | ${score}`;
+  return locale === "ru" ? `Место #${rank} | ${division} | ${score}` : `Weekly #${rank} | ${division} | ${score}`;
 }
 
 function formatMenuWeeklyRaceBestLine(locale: Locale, division: string, score: string): string {
@@ -3604,7 +3617,7 @@ function formatMenuWeeklyRaceLaunchLine(locale: Locale, division: string, score:
 }
 
 function _formatMenuWeeklyRaceRewardLine(locale: Locale, reward: string, usingPlatformBoard: boolean): string {
-  if (locale === "ru") return usingPlatformBoard ? `Награда недели ${reward}` : `Local weekly | награда ${reward}`;
+  if (locale === "ru") return usingPlatformBoard ? `Награда недели ${reward}` : `Локально | награда ${reward}`;
   return usingPlatformBoard ? `Week payout ${reward}` : `Local weekly | payout ${reward}`;
 }
 
@@ -3721,7 +3734,7 @@ function _formatMenuWeeklyRaceLeaderRewardLine(
   usingPlatformBoard: boolean
 ): string {
   if (locale === "ru") {
-    return usingPlatformBoard ? `Награда ${reward} | лидер ${leaderName} ${leaderScore}` : `Local weekly | ${reward} | лучший ${leaderName} ${leaderScore}`;
+    return usingPlatformBoard ? `Награда ${reward} | лидер ${leaderName} ${leaderScore}` : `Локально | ${reward} | лучший ${leaderName} ${leaderScore}`;
   }
   return usingPlatformBoard ? `Payout ${reward} | leader ${leaderName} ${leaderScore}` : `Local weekly | ${reward} | best ${leaderName} ${leaderScore}`;
 }
@@ -3878,15 +3891,15 @@ function sanitizeCareerMilestoneIds(raw: unknown): LeaderboardCareerMilestoneId[
 }
 
 function getPortalBoardsTitle(locale: Locale): string {
-  return locale === "ru" ? "ПОРТАЛЬНЫЕ ДОСКИ" : "PORTAL BOARDS";
+  return locale === "ru" ? "РЕЙТИНГИ ПЛАТФОРМЫ" : "PORTAL BOARDS";
 }
 
 function getPortalBoardLoadingLabel(locale: Locale): string {
-  return locale === "ru" ? "Загрузка portal boards..." : "Loading portal boards...";
+  return locale === "ru" ? "Загрузка рейтингов платформы..." : "Loading portal boards...";
 }
 
 function getPortalBoardUnavailableLabel(locale: Locale): string {
-  return locale === "ru" ? "portal boards недоступны" : "portal boards unavailable";
+  return locale === "ru" ? "рейтинги платформы недоступны" : "portal boards unavailable";
 }
 
 function getPortalBoardUnrankedLabel(locale: Locale): string {
@@ -3894,7 +3907,7 @@ function getPortalBoardUnrankedLabel(locale: Locale): string {
 }
 
 function getPortalBoardFallbackLabel(locale: Locale): string {
-  return locale === "ru" ? "local fallback" : "local fallback";
+  return locale === "ru" ? "локально" : "local fallback";
 }
 
 function getPortalBoardTopLabel(locale: Locale): string {

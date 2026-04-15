@@ -210,4 +210,36 @@ describe("YandexGamesPlatformAdapter", () => {
       currentPlayerScore: 42000,
     });
   });
+
+  it("caches leaderboard snapshots between repeated reads and invalidates after submit", async () => {
+    const setLeaderboardScore = vi.fn(async () => undefined);
+    const getLeaderboardEntries = vi.fn(async () => ({
+      entries: [{ rank: 1, score: 35000, player: { publicName: "YOU" } }],
+      userRank: 1,
+      userScore: 35000,
+    }));
+
+    (globalThis as any).window = {
+      YaGames: {
+        init: vi.fn(async () => ({
+          getPlayer: vi.fn(async () => ({})),
+          getLeaderboards: vi.fn(async () => ({
+            setLeaderboardScore,
+            getLeaderboardEntries,
+          })),
+        })),
+      },
+    };
+
+    const adapter = new YandexGamesPlatformAdapter();
+    await adapter.init();
+
+    await adapter.getLeaderboard("magnet_caravan_weekly", "weekly");
+    await adapter.getLeaderboard("magnet_caravan_weekly", "weekly");
+    expect(getLeaderboardEntries).toHaveBeenCalledTimes(1);
+
+    await adapter.submitScore("magnet_caravan_weekly", 36000);
+    await adapter.getLeaderboard("magnet_caravan_weekly", "weekly");
+    expect(getLeaderboardEntries).toHaveBeenCalledTimes(2);
+  });
 });

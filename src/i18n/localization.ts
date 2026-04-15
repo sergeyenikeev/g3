@@ -5,6 +5,7 @@ export type LanguageSetting = "auto" | Locale;
 
 type MessageValue = string | ((params?: Record<string, unknown>) => string);
 type UpgradeCopy = { title: string; desc: string };
+type RotationCopy = UpgradeCopy & { badge: string };
 
 const INTL_LOCALES: Record<Locale, string> = {
   en: "en-US",
@@ -314,10 +315,10 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "toast.music": (p) => `Музыка: ${p?.value ?? "ВЫКЛ"}`,
     "toast.language": (p) => `Язык: ${p?.value ?? "Русский"}`,
     "toast.loginReward": (p) => `Награда за вход: день ${p?.day ?? 1} | ${p?.reward ?? ""}`,
-    "toast.noOpsReady": "Пока нечего забирать из liveops.",
-    "toast.opsClaimed": (p) => `Забраны liveops-награды: ${p?.reward ?? ""}`,
+    "toast.noOpsReady": "Пока нечего забирать из заданий.",
+    "toast.opsClaimed": (p) => `Награды за задания получены: ${p?.reward ?? ""}`,
     "toast.freeBoostApplied": (p) => `Бесплатный буст загружен: ${p?.reward ?? ""}`,
-    "toast.weeklyBoardReward": (p) => `Награда weekly board: ${p?.division ?? "Старатель"} | ${p?.reward ?? ""}`,
+    "toast.weeklyBoardReward": (p) => `Награда недельного рейтинга: ${p?.division ?? "Старатель"} | ${p?.reward ?? ""}`,
     "toast.comebackReady": (p) => `Камбэк-кеш готов: пауза ${p?.days ?? 0} дн.`,
     "language.auto": "Авто",
     "language.ru": "Русский",
@@ -506,10 +507,10 @@ Object.assign(MESSAGES.ru, {
   "results.weeklyBoard": (p?: Record<string, unknown>) =>
     `\u041d\u0435\u0434\u0435\u043b\u044c\u043d\u044b\u0439 \u0440\u0435\u0439\u0442\u0438\u043d\u0433: #${p?.rank ?? 0} | ${p?.division ?? "\u0421\u0442\u0430\u0440\u0430\u0442\u0435\u043b\u044c"}`,
   "results.weeklyDeltaUp": (p?: Record<string, unknown>) =>
-    `\u041f\u043e\u0434\u044a\u0451\u043c \u0432 weekly: +${p?.value ?? 0}`,
+    `\u041f\u043e\u0434\u044a\u0451\u043c \u0432 \u043d\u0435\u0434\u0435\u043b\u044c\u043d\u043e\u043c \u0440\u0435\u0439\u0442\u0438\u043d\u0433\u0435: +${p?.value ?? 0}`,
   "results.weeklyDeltaDown": (p?: Record<string, unknown>) =>
-    `\u041f\u0440\u043e\u0441\u0430\u0434\u043a\u0430 \u0432 weekly: ${p?.value ?? 0}`,
-  "results.weeklyDeltaNew": "\u0414\u0435\u0431\u044e\u0442 \u0432 weekly-\u0440\u0435\u0439\u0442\u0438\u043d\u0433\u0435",
+    `\u041f\u0440\u043e\u0441\u0430\u0434\u043a\u0430 \u0432 \u043d\u0435\u0434\u0435\u043b\u044c\u043d\u043e\u043c \u0440\u0435\u0439\u0442\u0438\u043d\u0433\u0435: ${p?.value ?? 0}`,
+  "results.weeklyDeltaNew": "\u0414\u0435\u0431\u044e\u0442 \u0432 \u043d\u0435\u0434\u0435\u043b\u044c\u043d\u043e\u043c \u0440\u0435\u0439\u0442\u0438\u043d\u0433\u0435",
   "results.nextMilestone": (p?: Record<string, unknown>) =>
     `\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439 \u0431\u0435\u0439\u0434\u0436: ${p?.title ?? "?"}`,
   "results.allMilestones": "\u0412\u0441\u0435 \u043a\u0430\u0440\u044c\u0435\u0440\u043d\u044b\u0435 \u0431\u0435\u0439\u0434\u0436\u0438 \u0441\u043e\u0431\u0440\u0430\u043d\u044b",
@@ -832,6 +833,76 @@ const EXTRA_DAILY_VARIANT_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   },
 };
 
+const DAILY_ROTATION_COPY: Record<Locale, Record<string, RotationCopy>> = {
+  en: {
+    salvage_week: {
+      badge: "SALVAGE WEEK",
+      title: "Salvage Week",
+      desc: "Heavy scrap, recycler bursts, and cash-out spikes all week long.",
+    },
+    flip_wave: {
+      badge: "FLIP WAVE",
+      title: "Flip Wave",
+      desc: "Faster pulses, shrapnel starts, and momentum-heavy routes rotate this week.",
+    },
+    caravan_week: {
+      badge: "CARAVAN WEEK",
+      title: "Caravan Week",
+      desc: "Longer chains, higher stakes, and score runs built around tail control.",
+    },
+    pressure_week: {
+      badge: "PRESSURE WEEK",
+      title: "Pressure Week",
+      desc: "Riskier starts and a faster pace for players chasing leaderboard jumps.",
+    },
+  },
+  ru: {
+    salvage_week: {
+      badge: "НЕДЕЛЯ ЛОМА",
+      title: "Неделя лома",
+      desc: "Тяжёлый лом, всплески сдачи и переработчик в центре внимания всю неделю.",
+    },
+    flip_wave: {
+      badge: "ВОЛНА ФЛИПА",
+      title: "Волна флипа",
+      desc: "Быстрые импульсы, осколочный старт и скоростные маршруты на всю неделю.",
+    },
+    caravan_week: {
+      badge: "НЕДЕЛЯ КАРАВАНА",
+      title: "Неделя каравана",
+      desc: "Длинные цепи, высокий риск и заезды, построенные вокруг контроля хвоста.",
+    },
+    pressure_week: {
+      badge: "НЕДЕЛЯ НАПРЯЖЕНИЯ",
+      title: "Неделя напряжения",
+      desc: "Более жёсткий старт и быстрый темп для тех, кто охотится за рывком в рейтинге.",
+    },
+  },
+};
+
+const LIVEOPS_EVENT_COPY: Record<Locale, Record<"comeback" | "tomorrow_offer", UpgradeCopy>> = {
+  en: {
+    comeback: {
+      title: "Welcome Back Salvage",
+      desc: "Return after a break to claim a comeback cache and jump back into the yard.",
+    },
+    tomorrow_offer: {
+      title: "Tomorrow's Yard Bonus",
+      desc: "Come back tomorrow for a fresh daily seed, streak reward, and extra mission cache.",
+    },
+  },
+  ru: {
+    comeback: {
+      title: "Возвращение в двор",
+      desc: "Вернись после паузы, чтобы забрать камбэк-кеш и снова выйти на маршрут.",
+    },
+    tomorrow_offer: {
+      title: "Завтрашний бонус двора",
+      desc: "Загляни завтра за новым дневным сидом, наградой серии и дополнительным кешем заданий.",
+    },
+  },
+};
+
 const LEVEL_MODIFIER_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   en: {
     salvage_surge: {
@@ -1138,6 +1209,34 @@ export function getDailyVariantCopy(locale: Locale, variantId: string, fallbackT
     DAILY_VARIANT_COPY.en[variantId];
   return {
     title: copy?.title ?? fallbackTitle ?? variantId,
+    desc: copy?.desc ?? fallbackDesc ?? "",
+  };
+}
+
+export function getDailyRotationCopy(
+  locale: Locale,
+  rotationId: string,
+  fallbackBadge = "",
+  fallbackTitle = "",
+  fallbackDesc = ""
+): RotationCopy {
+  const copy = DAILY_ROTATION_COPY[locale][rotationId] ?? DAILY_ROTATION_COPY.en[rotationId];
+  return {
+    badge: copy?.badge ?? fallbackBadge ?? rotationId,
+    title: copy?.title ?? fallbackTitle ?? rotationId,
+    desc: copy?.desc ?? fallbackDesc ?? "",
+  };
+}
+
+export function getLiveopsEventCopy(
+  locale: Locale,
+  eventId: "comeback" | "tomorrow_offer",
+  fallbackTitle = "",
+  fallbackDesc = ""
+): UpgradeCopy {
+  const copy = LIVEOPS_EVENT_COPY[locale][eventId] ?? LIVEOPS_EVENT_COPY.en[eventId];
+  return {
+    title: copy?.title ?? fallbackTitle ?? eventId,
     desc: copy?.desc ?? fallbackDesc ?? "",
   };
 }

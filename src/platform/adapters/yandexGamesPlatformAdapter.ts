@@ -68,6 +68,7 @@ type YandexSdk = {
 
 export class YandexGamesPlatformAdapter implements PlatformAdapter {
   readonly name = "yandex";
+  private static readonly LEADERBOARD_CACHE_TTL_MS = 15_000;
   private ysdk: YandexSdk | null = null;
   private player: YandexPlayer | null = null;
   private leaderboards:
@@ -91,6 +92,11 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
   private gameReadySent = false;
   private playerStorageScope: string | null = null;
   private accountSelectionOpen = false;
+  private leaderboardCache = new Map<
+    string,
+    { expiresAt: number; snapshot: PlatformLeaderboardSnapshot }
+  >();
+  private leaderboardRequests = new Map<string, Promise<PlatformLeaderboardSnapshot | null>>();
 
   async init(): Promise<void> {
     const api = (window as any)?.YaGames;
@@ -292,6 +298,7 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
     if (this.leaderboards?.setLeaderboardScore) {
       try {
         await this.leaderboards.setLeaderboardScore(boardId, safeScore);
+        this.invalidateLeaderboardCache(boardId);
         return;
       } catch {
         // fallback
@@ -300,46 +307,21 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
     const fallback = safeJsonParse(safeLocalStorageGet(this.getLeaderboardFallbackKey(boardId)));
     const nextScore = typeof fallback === "number" && Number.isFinite(fallback) ? Math.max(fallback, safeScore) : safeScore;
     safeLocalStorageSet(this.getLeaderboardFallbackKey(boardId), String(nextScore));
+    this.invalidateLeaderboardCache(boardId);
   }
 
   async getLeaderboard(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): Promise<PlatformLeaderboardSnapshot | null> {
-    if (this.leaderboards?.getLeaderboardEntries) {
-      try {
-        const res = await this.leaderboards.getLeaderboardEntries(boardId, {
-          includeUser: true,
-          quantityAround: 1,
-          quantityTop: 5,
-        });
-        const entries = Array.isArray(res?.entries)
-          ? res.entries.map((entry, index) => ({
-              rank: Math.max(1, Math.floor(entry?.rank ?? index + 1)),
-              score: Math.max(0, Math.floor(entry?.score ?? 0)),
-              playerName: entry?.player?.publicName || `Pilot ${index + 1}`,
-            }))
-          : [];
-        return {
-          boardId,
-          scope,
-          source: "platform",
-          entries,
-          currentPlayerRank: typeof res?.userRank === "number" ? Math.max(1, Math.floor(res.userRank)) : null,
-          currentPlayerScore: typeof res?.userScore === "number" ? Math.max(0, Math.floor(res.userScore)) : null,
-        };
-      } catch {
-        // fallback
-      }
-    }
+    const cacheKey = this.getLeaderboardCacheKey(boardId, scope);
+    const now = Date.now();
+    const cached = this.leaderboardCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) return cached.snapshot;
 
-    const raw = safeLocalStorageGet(this.getLeaderboardFallbackKey(boardId));
-    const score = raw ? Number.parseInt(raw, 10) : 0;
-    return {
-      boardId,
-      scope,
-      source: "local",
-      entries: score > 0 ? [{ rank: 1, score, playerName: "YOU", isCurrentPlayer: true }] : [],
-      currentPlayerRank: score > 0 ? 1 : null,
-      currentPlayerScore: score > 0 ? score : null,
-    };
+    const pending = this.leaderboardRequests.get(cacheKey);
+    if (pending) return pending;
+
+    const request = this.fetchLeaderboard(boardId, scope, cacheKey);
+    this.leaderboardRequests.set(cacheKey, request);
+    return request;
   }
 
   private async withAdBreak<T>(run: () => Promise<T>): Promise<T> {
@@ -354,6 +336,8 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
   }
 
   private async refreshPlayerContext(): Promise<void> {
+    this.leaderboardCache.clear();
+    this.leaderboardRequests.clear();
     const getPlayer = this.ysdk?.getPlayer;
     if (!getPlayer) {
       this.player = null;
@@ -382,6 +366,78 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
 
   private getLeaderboardFallbackKey(boardId: string): string {
     return getScopedKey(`${PLATFORM_SAVE_KEY}:leaderboards:${boardId}`, this.getStorageScope());
+  }
+
+  private async fetchLeaderboard(
+    boardId: string,
+    scope: PlatformLeaderboardSnapshot["scope"],
+    cacheKey: string
+  ): Promise<PlatformLeaderboardSnapshot | null> {
+    try {
+      let snapshot: PlatformLeaderboardSnapshot | null = null;
+
+      if (this.leaderboards?.getLeaderboardEntries) {
+        try {
+          const res = await this.leaderboards.getLeaderboardEntries(boardId, {
+            includeUser: true,
+            quantityAround: 1,
+            quantityTop: 5,
+          });
+          const entries = Array.isArray(res?.entries)
+            ? res.entries.map((entry, index) => ({
+                rank: Math.max(1, Math.floor(entry?.rank ?? index + 1)),
+                score: Math.max(0, Math.floor(entry?.score ?? 0)),
+                playerName: entry?.player?.publicName || `Pilot ${index + 1}`,
+              }))
+            : [];
+          snapshot = {
+            boardId,
+            scope,
+            source: "platform",
+            entries,
+            currentPlayerRank: typeof res?.userRank === "number" ? Math.max(1, Math.floor(res.userRank)) : null,
+            currentPlayerScore: typeof res?.userScore === "number" ? Math.max(0, Math.floor(res.userScore)) : null,
+          };
+        } catch {
+          snapshot = null;
+        }
+      }
+
+      if (!snapshot) {
+        const raw = safeLocalStorageGet(this.getLeaderboardFallbackKey(boardId));
+        const score = raw ? Number.parseInt(raw, 10) : 0;
+        snapshot = {
+          boardId,
+          scope,
+          source: "local",
+          entries: score > 0 ? [{ rank: 1, score, playerName: "YOU", isCurrentPlayer: true }] : [],
+          currentPlayerRank: score > 0 ? 1 : null,
+          currentPlayerScore: score > 0 ? score : null,
+        };
+      }
+
+      this.leaderboardCache.set(cacheKey, {
+        expiresAt: Date.now() + YandexGamesPlatformAdapter.LEADERBOARD_CACHE_TTL_MS,
+        snapshot,
+      });
+      return snapshot;
+    } finally {
+      this.leaderboardRequests.delete(cacheKey);
+    }
+  }
+
+  private invalidateLeaderboardCache(boardId: string): void {
+    const suffix = `:${boardId}`;
+    for (const key of [...this.leaderboardCache.keys()]) {
+      if (key.endsWith(suffix)) this.leaderboardCache.delete(key);
+    }
+    for (const key of [...this.leaderboardRequests.keys()]) {
+      if (key.endsWith(suffix)) this.leaderboardRequests.delete(key);
+    }
+  }
+
+  private getLeaderboardCacheKey(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): string {
+    return `${scope}:${boardId}`;
   }
 }
 
