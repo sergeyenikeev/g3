@@ -36,21 +36,56 @@ export async function ensurePlatformSdkLoaded(): Promise<void> {
   }
 }
 
-const loaded = new Set<string>();
+const loading = new Map<string, Promise<void>>();
 
 function loadScriptOnce(url: string): Promise<void> {
-  if (loaded.has(url)) return Promise.resolve();
-  loaded.add(url);
+  const existingPromise = loading.get(url);
+  if (existingPromise) return existingPromise;
 
-  return new Promise<void>((resolve, reject) => {
+  const existingScript = findScriptByUrl(url);
+  const promise = new Promise<void>((resolve, reject) => {
+    const handleLoad = () => resolve();
+    const handleError = () => reject(new Error(`Failed to load script: ${url}`));
+
+    if (existingScript) {
+      existingScript.addEventListener("load", handleLoad, { once: true });
+      existingScript.addEventListener("error", handleError, { once: true });
+      return;
+    }
+
     const s = document.createElement("script");
     s.src = url;
     s.async = true;
     s.crossOrigin = "anonymous";
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+    s.onload = handleLoad;
+    s.onerror = handleError;
     document.head.appendChild(s);
   });
+
+  loading.set(url, promise);
+  return promise.finally(() => {
+    loading.delete(url);
+  });
+}
+
+function findScriptByUrl(url: string): HTMLScriptElement | null {
+  const targetUrl = normalizeScriptUrl(url);
+  if (!targetUrl) return null;
+
+  for (const script of Array.from(document.scripts)) {
+    if (!(script instanceof HTMLScriptElement)) continue;
+    if (normalizeScriptUrl(script.src) === targetUrl) return script;
+  }
+
+  return null;
+}
+
+function normalizeScriptUrl(url: string): string | null {
+  try {
+    return new URL(url, document.baseURI).href;
+  } catch {
+    return null;
+  }
 }
 
 function withTimeout<T>(p: Promise<T>, timeoutMs: number): Promise<T> {

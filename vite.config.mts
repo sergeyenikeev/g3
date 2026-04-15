@@ -12,6 +12,13 @@ export default defineConfig(() => ({
   server: {
     port: 5173,
     strictPort: true,
+    proxy: {
+      "/sdk.js": {
+        target: "https://sdk.games.s3.yandex.net",
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
   build: {
     sourcemap: process.env.VITE_SOURCEMAP === "1",

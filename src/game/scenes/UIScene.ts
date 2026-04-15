@@ -87,8 +87,10 @@ export class UIScene extends Phaser.Scene {
   private tutorialActive = false;
   private tutorialStep: TutorialStep = 1;
   private tutorialScrap = 0;
+  private tutorialBg!: Phaser.GameObjects.Rectangle;
   private tutorialBox!: Phaser.GameObjects.Container;
   private tutorialText!: Phaser.GameObjects.Text;
+  private tutorialActionButton!: Phaser.GameObjects.Rectangle;
   private tutorialActionLabel!: Phaser.GameObjects.Text;
 
   private modalActive = false;
@@ -103,6 +105,8 @@ export class UIScene extends Phaser.Scene {
   private settingsVisible = false;
   private settingsDim!: Phaser.GameObjects.Rectangle;
   private settingsBox!: Phaser.GameObjects.Container;
+  private settingsPanel!: Phaser.GameObjects.Rectangle;
+  private settingsAccent!: Phaser.GameObjects.Rectangle;
   private settingsTitle!: Phaser.GameObjects.Text;
   private settingsHint!: Phaser.GameObjects.Text;
   private settingsQualityButton!: Phaser.GameObjects.Rectangle;
@@ -232,6 +236,12 @@ export class UIScene extends Phaser.Scene {
       pause: () => this.setExternalPause("platform", true),
       resume: () => this.setExternalPause("platform", false),
     });
+    const onAdBreakStart = () => this.setExternalPause("ad", true);
+    const onAdBreakEnd = () => this.setExternalPause("ad", false);
+    const onResize = () => this.layout();
+    this.game.events.on(GAME_EVENTS.AD_BREAK_START, onAdBreakStart, this);
+    this.game.events.on(GAME_EVENTS.AD_BREAK_END, onAdBreakEnd, this);
+    this.scale.on("resize", onResize);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.SCRAP_COLLECTED, this.onTutorialScrap, this);
@@ -255,13 +265,15 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.REVIVE_OFFER, this.onAnalyticsReviveOffer, this);
       this.game.events.off(GAME_EVENTS.REVIVE_ACCEPTED, this.onAnalyticsReviveAccept, this);
       this.game.events.off(GAME_EVENTS.REVIVE_DECLINED, this.onAnalyticsReviveDecline, this);
+      this.game.events.off(GAME_EVENTS.AD_BREAK_START, onAdBreakStart, this);
+      this.game.events.off(GAME_EVENTS.AD_BREAK_END, onAdBreakEnd, this);
       this.input.keyboard?.off("keydown-ESC", this.onEscapePressed, this);
+      this.scale.off("resize", onResize);
       releasePageLifecycle();
       releasePlatformLifecycle();
       this.suspendReasons.clear();
     });
 
-    this.scale.on("resize", () => this.layout());
     this.layout();
   }
 
@@ -572,6 +584,23 @@ export class UIScene extends Phaser.Scene {
   }
 
   private layout(): void {
+    if (
+      !this.overlayLight?.scene ||
+      !this.overlayVignette?.scene ||
+      !this.joyBase?.scene ||
+      !this.joyKnob?.scene ||
+      !this.btnFlip?.scene ||
+      !this.flipLabel?.scene ||
+      !this.pauseButton?.scene ||
+      !this.tutorialBox?.scene ||
+      !this.reviveBox?.scene ||
+      !this.settingsBox?.scene ||
+      !this.hudPanel?.scene ||
+      !this.levelProgressFrame?.scene
+    ) {
+      return;
+    }
+
     const { width, height } = this.scale;
     const margin = 16;
 
@@ -599,15 +628,108 @@ export class UIScene extends Phaser.Scene {
     this.pauseButton.setPosition(width - margin - 58, margin + 18);
     this.pauseLabel.setPosition(this.pauseButton.x, this.pauseButton.y);
 
-    this.tutorialBox.setPosition(width / 2, margin + 62);
-    this.levelBannerBaseY = this.tutorialBox.visible ? margin + 138 : margin + 84;
+    this.layoutHud();
+    this.layoutTutorialOverlay();
+
+    const compactOverlayLayout = width <= 720 || height <= 430;
+    const tutorialHeight = this.tutorialBg.height;
+    const tutorialCenterY = compactOverlayLayout
+      ? this.hudPanel.y + this.hudPanel.height + tutorialHeight / 2 + 14
+      : margin + 62;
+
+    this.tutorialBox.setPosition(width / 2, tutorialCenterY);
+    this.levelBannerBaseY = this.tutorialBox.visible ? tutorialCenterY + tutorialHeight / 2 + 18 : margin + 84;
     this.levelBanner.setPosition(width / 2, this.levelBannerBaseY);
+
     this.reviveBox.setPosition(width / 2, height / 2);
     this.reviveDim.setSize(width, height);
     this.settingsBox.setPosition(width / 2, height / 2);
     this.settingsDim.setSize(width, height);
+    this.layoutSettingsOverlay();
+  }
 
-    this.layoutHud();
+  private layoutTutorialOverlay(): void {
+    if (!this.tutorialBg?.scene || !this.tutorialText?.scene || !this.tutorialActionButton?.scene) return;
+
+    const compactLayout = this.scale.width <= 720 || this.scale.height <= 430;
+    const boxWidth = Math.max(320, Math.min(520, this.scale.width - (compactLayout ? 24 : 84)));
+    const buttonWidth = compactLayout ? 86 : 70;
+    const buttonHeight = compactLayout ? 36 : 34;
+    const textWidth = Math.max(190, boxWidth - buttonWidth - 44);
+
+    this.tutorialText.setStyle({
+      fontSize: compactLayout ? "12px" : "14px",
+      wordWrap: { width: textWidth },
+    });
+    this.tutorialActionLabel.setStyle({ fontSize: compactLayout ? "11px" : "12px" });
+
+    const boxHeight = Math.max(compactLayout ? 78 : 64, this.tutorialText.height + 24);
+    this.tutorialBg.setSize(boxWidth, boxHeight);
+    this.tutorialText.setPosition(-boxWidth / 2 + 14, -boxHeight / 2 + 10);
+    this.tutorialActionButton.setSize(buttonWidth, buttonHeight).setPosition(boxWidth / 2 - buttonWidth / 2 - 12, 0);
+    this.tutorialActionLabel.setPosition(this.tutorialActionButton.x, this.tutorialActionButton.y);
+    fitTextScaleToWidth(this.tutorialActionLabel, buttonWidth - 16, 0.8);
+  }
+
+  private layoutSettingsOverlay(): void {
+    if (!this.settingsPanel?.scene || !this.settingsAccent?.scene || !this.settingsTitle?.scene || !this.settingsHint?.scene) return;
+
+    const { width, height } = this.scale;
+    const compactLayout = width <= 720 || height <= 520;
+    const shortLayout = width <= 680 || height <= 400;
+    const panelWidth = Math.max(320, Math.min(468, width - (shortLayout ? 20 : 32)));
+    const panelHeight = Math.max(308, Math.min(shortLayout ? 352 : 410, height - (shortLayout ? 16 : 24)));
+    const titleY = -panelHeight / 2 + (shortLayout ? 28 : compactLayout ? 34 : 42);
+    const accentY = titleY + (shortLayout ? 24 : 28);
+    const hintY = accentY + (shortLayout ? 16 : 20);
+    const fieldWidth = Math.max(240, panelWidth - (shortLayout ? 46 : 108));
+    const fieldHeight = shortLayout ? 38 : compactLayout ? 42 : 46;
+    const rowGap = shortLayout ? 10 : compactLayout ? 12 : 14;
+
+    this.settingsPanel.setSize(panelWidth, panelHeight);
+    this.settingsAccent.setSize(Math.min(panelWidth - 44, 380), 2).setPosition(0, accentY);
+    this.settingsTitle
+      .setStyle({ fontSize: shortLayout ? "22px" : compactLayout ? "24px" : "28px" })
+      .setPosition(0, titleY)
+      .setWordWrapWidth(panelWidth - 36, true);
+    this.settingsHint
+      .setStyle({
+        fontSize: shortLayout ? "11px" : compactLayout ? "12px" : "13px",
+        wordWrap: { width: panelWidth - 48 },
+        align: "center",
+      })
+      .setPosition(0, hintY);
+
+    let cursorY = hintY + this.settingsHint.height / 2 + (shortLayout ? 22 : 28);
+    const controls = [
+      { button: this.settingsQualityButton, label: this.settingsQualityLabel },
+      { button: this.settingsSfxButton, label: this.settingsSfxLabel },
+      { button: this.settingsMusicButton, label: this.settingsMusicLabel },
+      { button: this.settingsLanguageButton, label: this.settingsLanguageLabel },
+    ];
+
+    for (const control of controls) {
+      control.button.setSize(fieldWidth, fieldHeight).setPosition(0, cursorY);
+      control.label.setStyle({ fontSize: shortLayout ? "14px" : "16px" }).setPosition(0, cursorY);
+      fitTextScaleToWidth(control.label, fieldWidth - 22, 0.78);
+      cursorY += fieldHeight + rowGap;
+    }
+
+    const actionWidth = Math.max(120, Math.min(172, Math.floor((fieldWidth - 12) / 2)));
+    const actionHeight = shortLayout ? 40 : 44;
+    const actionY = panelHeight / 2 - actionHeight / 2 - (shortLayout ? 12 : 18);
+
+    this.settingsResumeButton.setSize(actionWidth, actionHeight).setPosition(-(actionWidth / 2 + 6), actionY);
+    this.settingsResumeLabel
+      .setStyle({ fontSize: shortLayout ? "13px" : "14px" })
+      .setPosition(this.settingsResumeButton.x, this.settingsResumeButton.y);
+    fitTextScaleToWidth(this.settingsResumeLabel, actionWidth - 20, 0.8);
+
+    this.settingsMenuButton.setSize(actionWidth, actionHeight).setPosition(actionWidth / 2 + 6, actionY);
+    this.settingsMenuLabel
+      .setStyle({ fontSize: shortLayout ? "13px" : "14px" })
+      .setPosition(this.settingsMenuButton.x, this.settingsMenuButton.y);
+    fitTextScaleToWidth(this.settingsMenuLabel, actionWidth - 20, 0.8);
   }
 
   private layoutHud(): void {
@@ -713,6 +835,7 @@ export class UIScene extends Phaser.Scene {
     this.tutorialActive = tutorialMode || !(s?.tutorial?.completed || s?.tutorial?.skipped);
 
     const bg = this.add.rectangle(0, 0, 520, 64, 0x0f1720, 0.92).setStrokeStyle(2, 0x3aa4d4, 0.8);
+    this.tutorialBg = bg;
     this.tutorialText = this.add
       .text(-240, -18, "", { fontSize: "14px", color: "#d9f2ff", wordWrap: { width: 430 } })
       .setOrigin(0, 0);
@@ -720,6 +843,7 @@ export class UIScene extends Phaser.Scene {
       .rectangle(220, 0, 70, 34, 0x1b2635, 0.95)
       .setStrokeStyle(2, 0x5cc8ff, 0.8)
       .setInteractive({ useHandCursor: true });
+    this.tutorialActionButton = btn;
     this.tutorialActionLabel = this.add
       .text(220, 0, tutorialMode ? t(this.locale, "tutorial.exit") : t(this.locale, "tutorial.skip"), {
         fontSize: "12px",
@@ -748,6 +872,7 @@ export class UIScene extends Phaser.Scene {
     }
     if (this.tutorialStep === 2) this.tutorialText.setText(`${label} 2/3: ${t(this.locale, "tutorial.step2")}`);
     if (this.tutorialStep === 3) this.tutorialText.setText(`${label} 3/3: ${t(this.locale, "tutorial.step3")}`);
+    if (this.tutorialBg?.scene) this.layoutTutorialOverlay();
   }
 
   private bindTutorialEvents(): void {
@@ -849,6 +974,8 @@ export class UIScene extends Phaser.Scene {
 
     const panel = this.add.rectangle(0, 0, 468, 410, 0x0f1720, 0.97).setStrokeStyle(2, 0xffd166, 0.82);
     const accent = this.add.rectangle(0, -150, 380, 2, 0x5cc8ff, 0.85);
+    this.settingsPanel = panel;
+    this.settingsAccent = accent;
     this.settingsTitle = this.add
       .text(0, -178, t(this.locale, "pause.title"), { fontSize: "28px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
@@ -1186,6 +1313,7 @@ export class UIScene extends Phaser.Scene {
     this.reviveDeclineLabel.setText(t(this.locale, "revive.decline"));
     this.refreshLevelBannerCopy();
     this.refreshTutorialText();
+    if (this.settingsPanel?.scene) this.layoutSettingsOverlay();
   }
 
   private setExternalPause(reason: string, paused: boolean): void {
@@ -1326,6 +1454,12 @@ function clamp(v: number, min: number, max: number): number {
 
 function toCssHex(color: number): string {
   return `#${Math.max(0, Math.min(0xffffff, color >>> 0)).toString(16).padStart(6, "0")}`;
+}
+
+function fitTextScaleToWidth(text: Phaser.GameObjects.Text, maxWidth: number, minScale = 0.72): void {
+  text.setScale(1);
+  if (text.width <= 0 || text.width <= maxWidth) return;
+  text.setScale(Phaser.Math.Clamp(maxWidth / text.width, minScale, 1));
 }
 
 function formatCooldown(locale: Locale, seconds: number): string {

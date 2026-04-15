@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -45,6 +45,7 @@ export async function buildReleaseTarget(targetId, dirs, rootDir = process.cwd()
     },
     rootDir
   );
+  await injectPlatformSdkMarkup(outDir, target.id);
   await zipDist(outDir, zipPath);
 
   return {
@@ -90,6 +91,18 @@ function escapeForCmd(arg) {
   if (text.length === 0) return '""';
   if (!/[\s"&<>|^%]/.test(text)) return text;
   return `"${text.replace(/[%"]/g, (m) => (m === "%" ? "%%" : '\\"'))}"`;
+}
+
+async function injectPlatformSdkMarkup(outDir, targetId) {
+  if (targetId !== "yandex") return;
+
+  const indexPath = join(outDir, "index.html");
+  const sdkTag = '<!-- Yandex Games SDK -->\n    <script async src="/sdk.js"></script>';
+  let html = await readFile(indexPath, "utf8");
+
+  if (html.includes('src="/sdk.js"')) return;
+  html = html.replace('<script type="module"', `${sdkTag}\n    <script type="module"`);
+  await writeFile(indexPath, html, "utf8");
 }
 
 function zipDist(distDir, zipPath) {

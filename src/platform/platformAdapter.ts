@@ -27,6 +27,7 @@ export type PlatformLeaderboardSnapshot = {
 export interface PlatformAdapter {
   readonly name: string;
   init(): Promise<void>;
+  getStorageScope?(): string | null;
   getPreferredLanguage?(): string | null;
   getServerTimeMs?(): Promise<number | null>;
   signalGameReady?(): Promise<void>;

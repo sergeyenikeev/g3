@@ -13,6 +13,8 @@ export const GAME_EVENTS = {
   WAVE_START: "wave_start",
   WAVE_COMPLETE: "wave_complete",
   RUN_END: "run_end",
+  AD_BREAK_START: "ad_break_start",
+  AD_BREAK_END: "ad_break_end",
   UPGRADE_OFFER_SHOWN: "upgrade_offer_shown",
   UPGRADE_PICKED: "upgrade_picked",
   UPGRADE_REROLL: "upgrade_reroll",

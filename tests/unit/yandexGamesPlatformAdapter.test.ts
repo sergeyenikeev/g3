@@ -14,6 +14,7 @@ describe("YandexGamesPlatformAdapter", () => {
     const ready = vi.fn();
     const start = vi.fn();
     const stop = vi.fn();
+    const setData = vi.fn(async () => undefined);
 
     (globalThis as any).window = {
       YaGames: {
@@ -23,7 +24,10 @@ describe("YandexGamesPlatformAdapter", () => {
             LoadingAPI: { ready },
             GameplayAPI: { start, stop },
           },
-          getPlayer: vi.fn(async () => ({})),
+          getPlayer: vi.fn(async () => ({
+            getUniqueID: () => "player-a",
+            setData,
+          })),
           serverTime: () => 12_345,
         })),
       },
@@ -34,6 +38,7 @@ describe("YandexGamesPlatformAdapter", () => {
 
     expect(adapter.getPreferredLanguage()).toBe("ru");
     expect(await adapter.getServerTimeMs()).toBe(12_345);
+    expect(adapter.getStorageScope()).toBe("yandex:player-a");
 
     await adapter.signalGameReady();
     await adapter.signalGameReady();
@@ -46,6 +51,9 @@ describe("YandexGamesPlatformAdapter", () => {
     await adapter.signalGameplayStop();
     await adapter.signalGameplayStop();
     expect(stop).toHaveBeenCalledTimes(1);
+
+    await adapter.save({ progress: 1 });
+    expect(setData).toHaveBeenCalledWith({ progress: 1 }, true);
   });
 
   it("subscribes and unsubscribes SDK lifecycle events", async () => {
@@ -79,6 +87,48 @@ describe("YandexGamesPlatformAdapter", () => {
     expect(resume).toHaveBeenCalledTimes(1);
     expect(off).toHaveBeenCalledWith("game_api_pause", handlers.get("game_api_pause"));
     expect(off).toHaveBeenCalledWith("game_api_resume", handlers.get("game_api_resume"));
+  });
+
+  it("reloads the page after account selection changes the active player", async () => {
+    const handlers = new Map<string, () => void | Promise<void>>();
+    const off = vi.fn();
+    const reload = vi.fn();
+    const getPlayer = vi
+      .fn()
+      .mockResolvedValueOnce({ getUniqueID: () => "player-a" })
+      .mockResolvedValueOnce({ getUniqueID: () => "player-b" });
+
+    (globalThis as any).window = {
+      location: { reload },
+      YaGames: {
+        init: vi.fn(async () => ({
+          EVENTS: {
+            ACCOUNT_SELECTION_DIALOG_OPENED: "ACCOUNT_SELECTION_DIALOG_OPENED",
+            ACCOUNT_SELECTION_DIALOG_CLOSED: "ACCOUNT_SELECTION_DIALOG_CLOSED",
+          },
+          on: vi.fn((eventName: string, callback: () => void | Promise<void>) => {
+            handlers.set(eventName, callback);
+          }),
+          off,
+          getPlayer,
+        })),
+      },
+    };
+
+    const adapter = new YandexGamesPlatformAdapter();
+    await adapter.init();
+
+    const pause = vi.fn();
+    const resume = vi.fn();
+    adapter.addLifecycleListener({ pause, resume });
+
+    await handlers.get("ACCOUNT_SELECTION_DIALOG_OPENED")?.();
+    await handlers.get("ACCOUNT_SELECTION_DIALOG_CLOSED")?.();
+
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(resume).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(adapter.getStorageScope()).toBe("yandex:player-b");
   });
 
   it("wraps ads with gameplay stop/start and respects Yandex callback payloads", async () => {

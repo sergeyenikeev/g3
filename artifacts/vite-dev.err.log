@@ -1,0 +1,16 @@
+=mock : Имя "=mock" не распознано как имя командлета, функции, файла сценария или выполняемой программы. Проверьте прав
+ильность написания имени, а также наличие и правильность пути, после чего повторите попытку.
+строка:1 знак:25
++ Set-Location 'D:\p\g3'; ='mock'; ='1'; npm run dev -- --host 127.0.0. ...
++                         ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=mock:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=1 : Имя "=1" не распознано как имя командлета, функции, файла сценария или выполняемой программы. Проверьте правильнос
+ть написания имени, а также наличие и правильность пути, после чего повторите попытку.
+строка:1 знак:34
++ Set-Location 'D:\p\g3'; ='mock'; ='1'; npm run dev -- --host 127.0.0. ...
++                                  ~~~~
+    + CategoryInfo          : ObjectNotFound: (=1:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 

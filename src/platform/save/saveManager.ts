@@ -192,26 +192,27 @@ export class SaveManager {
   }
 
   async load(): Promise<SaveData> {
+    const storageScope = this.getStorageScope();
     const raw = await this.adapter.load();
     const parsed = sanitize(raw);
     if (parsed) {
       this.cache = parsed;
-      writeMirror(parsed);
+      writeMirror(parsed, storageScope);
       return this.cache;
     }
 
-    const mirror = sanitize(readMirror());
+    const mirror = sanitize(readMirror(storageScope));
     if (mirror) {
       this.cache = mirror;
-      writeMirror(mirror);
+      writeMirror(mirror, storageScope);
       void this.adapter.save(mirror).catch(() => {});
       return this.cache;
     }
 
-    const backup = sanitize(readBackup());
+    const backup = sanitize(readBackup(storageScope));
     if (backup) {
       this.cache = backup;
-      writeMirror(backup);
+      writeMirror(backup, storageScope);
       void this.adapter.save(backup).catch(() => {});
       return this.cache;
     }
@@ -221,10 +222,20 @@ export class SaveManager {
   }
 
   async save(next: SaveData): Promise<void> {
-    rotateBackup();
-    writeMirror(next);
+    const storageScope = this.getStorageScope();
+    rotateBackup(storageScope);
+    writeMirror(next, storageScope);
     this.cache = next;
     await this.adapter.save(next);
+  }
+
+  private getStorageScope(): string | null {
+    try {
+      const value = this.adapter.getStorageScope?.();
+      return typeof value === "string" && value.length > 0 ? value : null;
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -561,21 +572,27 @@ const LEADERBOARD_CAREER_MILESTONE_ORDER: LeaderboardCareerMilestoneId[] = [
   "legend_league",
 ];
 
-function readMirror(): unknown | null {
-  return safeJsonParse(safeLocalStorageGet(LOCAL_SAVE_MIRROR_KEY));
+function readMirror(scope: string | null): unknown | null {
+  return safeJsonParse(safeLocalStorageGet(getScopedStorageKey(LOCAL_SAVE_MIRROR_KEY, scope)));
 }
 
-function readBackup(): unknown | null {
-  return safeJsonParse(safeLocalStorageGet(LOCAL_SAVE_BACKUP_KEY));
+function readBackup(scope: string | null): unknown | null {
+  return safeJsonParse(safeLocalStorageGet(getScopedStorageKey(LOCAL_SAVE_BACKUP_KEY, scope)));
 }
 
-function rotateBackup(): void {
-  const mirrorRaw = safeLocalStorageGet(LOCAL_SAVE_MIRROR_KEY);
-  if (mirrorRaw) safeLocalStorageSet(LOCAL_SAVE_BACKUP_KEY, mirrorRaw);
+function rotateBackup(scope: string | null): void {
+  const mirrorKey = getScopedStorageKey(LOCAL_SAVE_MIRROR_KEY, scope);
+  const backupKey = getScopedStorageKey(LOCAL_SAVE_BACKUP_KEY, scope);
+  const mirrorRaw = safeLocalStorageGet(mirrorKey);
+  if (mirrorRaw) safeLocalStorageSet(backupKey, mirrorRaw);
 }
 
-function writeMirror(data: unknown): void {
+function writeMirror(data: unknown, scope: string | null): void {
   const raw = safeJsonStringify(data);
   if (!raw) return;
-  safeLocalStorageSet(LOCAL_SAVE_MIRROR_KEY, raw);
+  safeLocalStorageSet(getScopedStorageKey(LOCAL_SAVE_MIRROR_KEY, scope), raw);
+}
+
+function getScopedStorageKey(baseKey: string, scope: string | null): string {
+  return scope ? `${baseKey}:${scope}` : baseKey;
 }

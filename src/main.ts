@@ -4,6 +4,14 @@ import { ensurePlatformSdkLoaded } from "./platform/sdk/loadPlatformSdk";
 // Phaser source builds still touch `global` in some code paths.
 (globalThis as typeof globalThis & { global?: typeof globalThis }).global ??= globalThis;
 
+const preventBrowserUi = (event: Event) => {
+  event.preventDefault();
+};
+
+for (const eventName of ["contextmenu", "selectstart", "dragstart"] as const) {
+  window.addEventListener(eventName, preventBrowserUi, { capture: true });
+}
+
 void (async () => {
   try {
     await ensurePlatformSdkLoaded();

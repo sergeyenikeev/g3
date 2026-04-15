@@ -51,6 +51,14 @@ class CaptureAnalytics implements AnalyticsAdapter {
   }
 }
 
+class CaptureEvents {
+  readonly events: Array<{ name: string; payload?: unknown }> = [];
+
+  emit(eventName: string, payload?: unknown): void {
+    this.events.push({ name: eventName, payload });
+  }
+}
+
 const ADS_CFG: Balances["ads"] = {
   interstitialCooldownSec: 0,
   disableInterstitialUntilTutorialDone: false,
@@ -79,7 +87,8 @@ describe("ads manager (integration)", () => {
     const saveManager = new SaveManager(adapter);
     await saveManager.load();
     const analytics = new CaptureAnalytics();
-    const ads = new AdsManager(adapter, analytics, saveManager);
+    const events = new CaptureEvents();
+    const ads = new AdsManager(adapter, analytics, saveManager, events);
 
     vi.spyOn(Date, "now").mockReturnValue(1111);
     adapter.showRewardedResult = { ok: true, rewarded: true };
@@ -93,6 +102,7 @@ describe("ads manager (integration)", () => {
       ANALYTICS_EVENTS.AD_REWARDED_START,
       ANALYTICS_EVENTS.AD_REWARDED_COMPLETE,
     ]);
+    expect(events.events.map((e) => e.name)).toEqual(["ad_break_start", "ad_break_end"]);
     expect(adapter.rewardedCalls).toEqual(["test_rewarded"]);
   });
 
@@ -128,7 +138,8 @@ describe("ads manager (integration)", () => {
     const saveManager = new SaveManager(adapter);
     await saveManager.load();
     const analytics = new CaptureAnalytics();
-    const ads = new AdsManager(adapter, analytics, saveManager);
+    const events = new CaptureEvents();
+    const ads = new AdsManager(adapter, analytics, saveManager, events);
 
     vi.spyOn(Date, "now").mockReturnValue(3333);
     adapter.showInterstitialResult = true;
@@ -145,6 +156,7 @@ describe("ads manager (integration)", () => {
       ANALYTICS_EVENTS.AD_INTERSTITIAL_START,
       ANALYTICS_EVENTS.AD_INTERSTITIAL_COMPLETE,
     ]);
+    expect(events.events.map((e) => e.name)).toEqual(["ad_break_start", "ad_break_end"]);
   });
 
   it("tracks guard failures without calling adapter", async () => {

@@ -5,6 +5,8 @@ import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorage
 type YandexPlayer = {
   getData?: () => Promise<unknown>;
   setData?: (data: unknown, flush?: boolean) => Promise<unknown>;
+  getUniqueID?: () => string;
+  getID?: () => string;
 };
 
 type YandexSdk = {
@@ -61,6 +63,7 @@ type YandexSdk = {
   on?: (eventName: string, listener: () => void) => (() => void) | void;
   off?: (eventName: string, listener: () => void) => void;
   serverTime?: () => number;
+  EVENTS?: Record<string, string | undefined>;
 };
 
 export class YandexGamesPlatformAdapter implements PlatformAdapter {
@@ -86,6 +89,8 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
     | null = null;
   private gameplayActive = false;
   private gameReadySent = false;
+  private playerStorageScope: string | null = null;
+  private accountSelectionOpen = false;
 
   async init(): Promise<void> {
     const api = (window as any)?.YaGames;
@@ -98,20 +103,11 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
       return;
     }
 
-    const getPlayer = this.ysdk?.getPlayer;
-    if (!getPlayer) return;
+    await this.refreshPlayerContext();
+  }
 
-    try {
-      this.player = (await getPlayer({ scopes: false, signed: false })) ?? null;
-    } catch {
-      this.player = null;
-    }
-
-    try {
-      this.leaderboards = (await this.ysdk?.getLeaderboards?.()) ?? null;
-    } catch {
-      this.leaderboards = null;
-    }
+  getStorageScope(): string | null {
+    return this.playerStorageScope ? `yandex:${this.playerStorageScope}` : null;
   }
 
   getPreferredLanguage(): string | null {
@@ -166,11 +162,13 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
     if (!ysdk?.on) return () => {};
 
     const disposers: Array<() => void> = [];
-    const bind = (eventName: string, callback?: () => void) => {
+    const bind = (eventName: string | null, callback?: () => void | Promise<void>) => {
       if (!callback) return;
+      if (!eventName) return;
 
       try {
-        const maybeDispose = ysdk.on?.(eventName, callback);
+        const wrapped = () => callback();
+        const maybeDispose = ysdk.on?.(eventName, wrapped);
         if (typeof maybeDispose === "function") {
           disposers.push(maybeDispose);
           return;
@@ -179,7 +177,7 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
         if (ysdk.off) {
           disposers.push(() => {
             try {
-              ysdk.off?.(eventName, callback);
+              ysdk.off?.(eventName, wrapped);
             } catch {
               // ignore
             }
@@ -192,6 +190,24 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
 
     bind("game_api_pause", listener.pause);
     bind("game_api_resume", listener.resume);
+    bind(resolveSdkEventName(ysdk, "ACCOUNT_SELECTION_DIALOG_OPENED", "ACCOUNT_SELECTION_DIALOG_OPEN"), async () => {
+      this.accountSelectionOpen = true;
+      listener.pause?.();
+    });
+    bind(resolveSdkEventName(ysdk, "ACCOUNT_SELECTION_DIALOG_CLOSED", "ACCOUNT_SELECTION_DIALOG_CLOSE"), async () => {
+      const previousScope = this.getStorageScope();
+      await this.refreshPlayerContext();
+      this.accountSelectionOpen = false;
+      if (previousScope !== this.getStorageScope()) {
+        try {
+          window.location.reload();
+          return;
+        } catch {
+          // ignore
+        }
+      }
+      listener.resume?.();
+    });
 
     return () => {
       for (const dispose of disposers.splice(0)) dispose();
@@ -244,9 +260,9 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
   }
 
   async save(data: unknown): Promise<void> {
-    if (this.player?.setData) {
+    if (!this.accountSelectionOpen && this.player?.setData) {
       try {
-        await this.player.setData(data);
+        await this.player.setData(data, true);
         return;
       } catch {
         // fallback
@@ -255,7 +271,7 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
 
     const raw = safeJsonStringify(data);
     if (!raw) return;
-    safeLocalStorageSet(PLATFORM_SAVE_KEY, raw);
+    safeLocalStorageSet(this.getSaveFallbackKey(), raw);
   }
 
   async load(): Promise<unknown | null> {
@@ -268,7 +284,7 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
       }
     }
 
-    return safeJsonParse(safeLocalStorageGet(PLATFORM_SAVE_KEY));
+    return safeJsonParse(safeLocalStorageGet(this.getSaveFallbackKey()));
   }
 
   async submitScore(boardId: string, score: number): Promise<void> {
@@ -281,9 +297,9 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
         // fallback
       }
     }
-    const fallback = safeJsonParse(safeLocalStorageGet(`${PLATFORM_SAVE_KEY}:leaderboards:${boardId}`));
+    const fallback = safeJsonParse(safeLocalStorageGet(this.getLeaderboardFallbackKey(boardId)));
     const nextScore = typeof fallback === "number" && Number.isFinite(fallback) ? Math.max(fallback, safeScore) : safeScore;
-    safeLocalStorageSet(`${PLATFORM_SAVE_KEY}:leaderboards:${boardId}`, String(nextScore));
+    safeLocalStorageSet(this.getLeaderboardFallbackKey(boardId), String(nextScore));
   }
 
   async getLeaderboard(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): Promise<PlatformLeaderboardSnapshot | null> {
@@ -314,7 +330,7 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
       }
     }
 
-    const raw = safeLocalStorageGet(`${PLATFORM_SAVE_KEY}:leaderboards:${boardId}`);
+    const raw = safeLocalStorageGet(this.getLeaderboardFallbackKey(boardId));
     const score = raw ? Number.parseInt(raw, 10) : 0;
     return {
       boardId,
@@ -336,8 +352,70 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
       if (shouldResume) await this.signalGameplayStart();
     }
   }
+
+  private async refreshPlayerContext(): Promise<void> {
+    const getPlayer = this.ysdk?.getPlayer;
+    if (!getPlayer) {
+      this.player = null;
+      this.playerStorageScope = null;
+      this.leaderboards = null;
+      return;
+    }
+
+    try {
+      this.player = (await getPlayer({ scopes: false, signed: false })) ?? null;
+    } catch {
+      this.player = null;
+    }
+    this.playerStorageScope = resolvePlayerStorageScope(this.player);
+
+    try {
+      this.leaderboards = (await this.ysdk?.getLeaderboards?.()) ?? null;
+    } catch {
+      this.leaderboards = null;
+    }
+  }
+
+  private getSaveFallbackKey(): string {
+    return getScopedKey(PLATFORM_SAVE_KEY, this.getStorageScope());
+  }
+
+  private getLeaderboardFallbackKey(boardId: string): string {
+    return getScopedKey(`${PLATFORM_SAVE_KEY}:leaderboards:${boardId}`, this.getStorageScope());
+  }
 }
 
 function normalizeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function resolvePlayerStorageScope(player: YandexPlayer | null): string | null {
+  try {
+    const uniqueId = player?.getUniqueID?.();
+    if (typeof uniqueId === "string" && uniqueId.length > 0) return uniqueId;
+  } catch {
+    // ignore
+  }
+
+  try {
+    const fallbackId = player?.getID?.();
+    if (typeof fallbackId === "string" && fallbackId.length > 0) return fallbackId;
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
+function resolveSdkEventName(ysdk: YandexSdk, ...names: string[]): string | null {
+  for (const name of names) {
+    const resolved = ysdk.EVENTS?.[name];
+    if (typeof resolved === "string" && resolved.length > 0) return resolved;
+  }
+
+  return names[0] ?? null;
+}
+
+function getScopedKey(baseKey: string, scope: string | null): string {
+  return scope ? `${baseKey}:${scope}` : baseKey;
 }

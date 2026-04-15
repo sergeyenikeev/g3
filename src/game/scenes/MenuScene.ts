@@ -3,6 +3,7 @@ import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
 import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { MissionObjectiveType } from "../../data/types";
 import type { StaticGameData } from "../../data/staticGameData";
+import { GAME_EVENTS } from "../events";
 import { getUtcYyyymmdd, pickDailyVariant } from "../daily/daily";
 import { consumeDailyAttempt, getDailyAttemptsInfo, normalizeDailySave, planDailyStart, type DailyAttemptsInfo } from "../daily/dailyAttempts";
 import { claimLoginReward, getLoginRewardStatus, LOGIN_REWARD_DAY_COUNT } from "../daily/loginRewards";
@@ -75,8 +76,10 @@ const MENU_LAYOUT_BREAKPOINTS = {
   minimalWidth: 1100,
   minimalHeight: 760,
 } as const;
+const GAME_TITLE = "Magnet Caravan";
 
 type MenuLayoutMode = "full" | "compact" | "minimal";
+type StartBoosterPreview = { tailSegments: number; bolts: number; cores: number };
 
 export class MenuScene extends Phaser.Scene {
   private staticData!: StaticGameData;
@@ -200,6 +203,10 @@ export class MenuScene extends Phaser.Scene {
       pause: () => this.setExternalPause("platform", true),
       resume: () => this.setExternalPause("platform", false),
     });
+    const onAdBreakStart = () => this.setExternalPause("ad", true);
+    const onAdBreakEnd = () => this.setExternalPause("ad", false);
+    this.game.events.on(GAME_EVENTS.AD_BREAK_START, onAdBreakStart);
+    this.game.events.on(GAME_EVENTS.AD_BREAK_END, onAdBreakEnd);
     const boosterCfg = this.staticData.balances.ads?.rewarded?.startBooster;
     const boosterEnabled = Boolean(boosterCfg?.enabled);
     let rewardBoostEnabled = false;
@@ -208,7 +215,7 @@ export class MenuScene extends Phaser.Scene {
     let currentLayoutMode: MenuLayoutMode = getMenuLayoutMode(this.scale.width, this.scale.height);
 
     const title = this.add
-      .text(0, 0, t(this.locale, "app.title"), {
+      .text(0, 0, GAME_TITLE, {
         fontSize: "52px",
         color: "#d9f2ff",
         fontStyle: "700",
@@ -808,19 +815,39 @@ export class MenuScene extends Phaser.Scene {
       button.setFillStyle(active ? 0x121a24 : 0x0d131b, active ? 0.95 : 0.9);
     };
 
+    const getRewardedBoosterPreview = (): StartBoosterPreview => ({
+      tailSegments: Math.max(0, Math.floor(boosterCfg?.addTailSegments ?? 0)),
+      bolts: Math.max(0, Math.floor(boosterCfg?.addBolts ?? 0)),
+      cores: Math.max(0, Math.floor(boosterCfg?.addCores ?? 0)),
+    });
+
     const refreshDailyButtons = (info: DailyAttemptsInfo) => {
       const regularPlan = planDailyStart(info, { boosted: false, boosterEnabled });
-
-      labelDaily.setText(
-        regularPlan.canStart
-          ? regularPlan.kind === "free"
-            ? t(this.locale, "menu.dailyFree")
-            : t(this.locale, "menu.dailyRewarded")
-          : t(this.locale, "menu.dailyLocked")
-      );
-      applyDailyButtonState(btnDaily, labelDaily, regularPlan.canStart, regularPlan.kind === "rewarded" ? 0x57c27d : 0x3aa4d4);
+      const boostedPlan = planDailyStart(info, { boosted: true, boosterEnabled });
       const onboarding = getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops);
       const boostVisible = boosterEnabled && !onboarding.eligible;
+      const compactRewardCopy = currentLayoutMode === "minimal" || this.scale.height <= 430;
+      const rewardPreview = getRewardedBoosterPreview();
+      const usingRewardedBooster = boostVisible && rewardBoostEnabled;
+
+      labelDaily.setText(
+        usingRewardedBooster
+          ? boostedPlan.canStart
+            ? getRewardedDailyCtaLabel(this.locale, rewardPreview, compactRewardCopy)
+            : t(this.locale, "menu.dailyBoostLocked")
+          : regularPlan.canStart
+            ? regularPlan.kind === "free"
+              ? t(this.locale, "menu.dailyFree")
+              : t(this.locale, "menu.dailyRewarded")
+            : t(this.locale, "menu.dailyLocked")
+      );
+      labelDaily.setLineSpacing(usingRewardedBooster ? 2 : 0);
+      applyDailyButtonState(
+        btnDaily,
+        labelDaily,
+        usingRewardedBooster ? boostedPlan.canStart : regularPlan.canStart,
+        usingRewardedBooster || regularPlan.kind === "rewarded" ? 0x57c27d : 0x3aa4d4
+      );
       if (!boostVisible) rewardBoostEnabled = false;
       boostToggleBg.setVisible(boostVisible);
       boostToggleTrack.setVisible(boostVisible);
@@ -834,6 +861,8 @@ export class MenuScene extends Phaser.Scene {
       labelDailyBoost.setVisible(false);
       if (!boostVisible) return;
 
+      boostToggleTitle.setText(getStartBoosterToggleTitle(this.locale));
+      boostToggleHint.setText(getStartBoosterToggleHint(this.locale, rewardPreview, compactRewardCopy));
       boostToggleBg.setStrokeStyle(2, rewardBoostEnabled ? 0x57c27d : 0x38566f, rewardBoostEnabled ? 0.84 : 0.56);
       boostToggleBg.setFillStyle(rewardBoostEnabled ? 0x13261d : 0x101922, 0.96);
       boostToggleTrack.setStrokeStyle(2, rewardBoostEnabled ? 0x57c27d : 0x38566f, rewardBoostEnabled ? 0.82 : 0.7);
@@ -894,7 +923,9 @@ export class MenuScene extends Phaser.Scene {
       });
     };
     let liveopsClaimPulse: Phaser.Tweens.Tween | null = null;
+    let liveopsReadyCount = 0;
     const updateReadyBadge = (readyClaims: number) => {
+      liveopsReadyCount = readyClaims;
       const hasReady = readyClaims > 0;
       liveopsReadyBadgeBg.setVisible(hasReady);
       liveopsReadyBadgeText.setVisible(hasReady);
@@ -1207,6 +1238,8 @@ export class MenuScene extends Phaser.Scene {
     let liveopsClaimBusy = false;
     const refreshPlayButton = () => {
       const onboarding = getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops);
+      const boostedStart = boosterEnabled && rewardBoostEnabled && !onboarding.eligible;
+      const compactRewardCopy = currentLayoutMode === "minimal" || this.scale.height <= 430;
       if (onboarding.eligible) {
         labelPlay.setText(
           t(this.locale, "menu.playFreeBoost", {
@@ -1214,11 +1247,18 @@ export class MenuScene extends Phaser.Scene {
           })
         );
         btnPlay.setStrokeStyle(2, 0x57c27d, 0.94).setFillStyle(0x153325, 0.98);
+      } else if (boostedStart) {
+        labelPlay.setText(getRewardedPlayCtaLabel(this.locale, getRewardedBoosterPreview(), compactRewardCopy));
+        btnPlay.setStrokeStyle(2, 0x57c27d, 0.94).setFillStyle(0x153325, 0.98);
       } else {
         labelPlay.setText(t(this.locale, "menu.play"));
         btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
       }
-      labelPlay.setStyle({ fontSize: onboarding.eligible ? "18px" : "24px", align: "center" });
+      labelPlay.setStyle({
+        fontSize: onboarding.eligible ? "18px" : boostedStart ? (compactRewardCopy ? "14px" : "16px") : "24px",
+        align: "center",
+      });
+      labelPlay.setLineSpacing(boostedStart ? 2 : 0);
       labelPlay.setWordWrapWidth(Math.max(180, btnPlay.width - 28), true);
       fitTextScaleToWidth(labelPlay, Math.max(180, btnPlay.width - 28), 0.68);
     };
@@ -1494,6 +1534,8 @@ export class MenuScene extends Phaser.Scene {
       currentLayoutMode = mode;
       const compact = mode !== "full";
       const minimal = mode === "minimal";
+      const compressedMenu = s.height <= 520;
+      const hideSummaryPanel = !missionsExpanded && s.height <= 430;
       const topInset = minimal ? 14 : 18;
       const topGap = 10;
       const topButtonHeight = 34;
@@ -1503,9 +1545,9 @@ export class MenuScene extends Phaser.Scene {
       const showPreview = !missionsExpanded && mode === "full";
       const leftX = showPreview ? Math.round(s.width * 0.31) : s.width / 2;
       const titleY = minimal
-        ? contentTop + 18
+        ? contentTop + (compressedMenu ? 10 : 18)
         : compact
-          ? Math.max(contentTop + 16, Math.round(s.height * 0.14))
+          ? Math.max(contentTop + (compressedMenu ? 8 : 16), Math.round(s.height * (compressedMenu ? 0.12 : 0.14)))
           : Math.max(contentTop + 22, Math.round(s.height * 0.2));
 
       this.walletText?.setPosition(topInset, topInset).setStyle({ fontSize: minimal ? "13px" : "14px" });
@@ -1542,7 +1584,7 @@ export class MenuScene extends Phaser.Scene {
       navCursorX = placeTopButton(btnUtility, labelUtility, btnUtility.width, navCursorX, !missionsExpanded);
       navCursorX = placeTopButton(btnLeaderboard, labelLeaderboard, btnLeaderboard.width, navCursorX, !missionsExpanded && !utilityVisible && !minimal);
       navCursorX = placeTopButton(btnWorkshop, labelWorkshop, btnWorkshop.width, navCursorX, !missionsExpanded && !utilityVisible && !minimal);
-      navCursorX = placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, !missionsExpanded);
+      placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, !missionsExpanded);
 
       setUtilityVisible(utilityVisible);
       if (utilityVisible) {
@@ -1590,14 +1632,14 @@ export class MenuScene extends Phaser.Scene {
       const menuPanelWidth = Math.min(showPreview ? 520 : minimal ? s.width - 28 : 560, s.width - 24);
       this.menuPanel.setSize(menuPanelWidth, this.menuPanel.height);
       const menuInnerWidth = Math.max(280, this.menuPanel.width - 42);
-      title.setStyle({ fontSize: minimal ? "36px" : shortDesktop ? "40px" : "52px" });
+      title.setStyle({ fontSize: minimal ? (compressedMenu ? "30px" : "36px") : compressedMenu ? "34px" : shortDesktop ? "40px" : "52px" });
       title.setScale(1);
       fitTextScaleToWidth(title, menuInnerWidth, minimal ? 0.78 : compact ? 0.72 : shortDesktop ? 0.76 : 0.84);
-      taglineText.setStyle({ fontSize: minimal ? "14px" : compact ? "16px" : shortDesktop ? "13px" : "18px" });
+      taglineText.setStyle({ fontSize: compressedMenu ? "12px" : minimal ? "14px" : compact ? "16px" : shortDesktop ? "13px" : "18px" });
       taglineText.setWordWrapWidth(menuInnerWidth, true);
-      bestText.setStyle({ fontSize: minimal ? "12px" : compact ? "13px" : shortDesktop ? "12px" : "15px" });
+      bestText.setStyle({ fontSize: compressedMenu ? "11px" : minimal ? "12px" : compact ? "13px" : shortDesktop ? "12px" : "15px" });
       bestText.setWordWrapWidth(menuInnerWidth, true);
-      controlsText.setStyle({ fontSize: compact ? "14px" : "15px", align: "center" });
+      controlsText.setStyle({ fontSize: compressedMenu ? "12px" : compact ? "14px" : "15px", align: "center" });
       controlsText.setWordWrapWidth(Math.max(260, this.dailyPanel.width - 28), true);
       this.heroCaptionText.setStyle({ fontSize: "16px", align: "center" });
       this.heroCaptionText.setWordWrapWidth(this.heroPanel.width - 42, true);
@@ -1614,30 +1656,30 @@ export class MenuScene extends Phaser.Scene {
       const liveopsPanel = getLiveopsPanelMetrics(s.width, compact, s.height);
       const stackedMissions = liveopsPanel.stacked;
       const summaryWidth = Math.min(minimal ? s.width - 24 : showPreview ? 560 : liveopsPanel.width, s.width - 24);
-      const summaryHeight = minimal ? 168 : compact ? 132 : 140;
-      const summaryBottom = s.height - (minimal ? 12 : 18);
+      const summaryHeight = hideSummaryPanel ? 0 : minimal ? 168 : compact ? 132 : 140;
+      const summaryBottom = s.height - (hideSummaryPanel ? 14 : minimal ? 12 : 18);
       const summaryTop = summaryBottom - summaryHeight;
       const summaryCenterY = summaryTop + summaryHeight / 2;
-      const ctaBottomLimit = summaryTop - (minimal ? 14 : 20);
+      const ctaBottomLimit = hideSummaryPanel ? s.height - (minimal ? 14 : 18) : summaryTop - (minimal ? 14 : 20);
       btnPlayBoost.setVisible(false);
       labelPlayBoost.setVisible(false);
       btnDailyBoost.setVisible(false);
       labelDailyBoost.setVisible(false);
 
       const ctaWidth = Math.min(this.menuPanel.width - 48, minimal ? 320 : compact ? 336 : 352);
-      btnPlay.setSize(ctaWidth, minimal ? 52 : shortDesktop ? 50 : 56);
-      btnTraining.setSize(ctaWidth, minimal ? 36 : shortDesktop ? 38 : 40);
-      btnDaily.setSize(ctaWidth, minimal ? 40 : shortDesktop ? 42 : 46);
-      btnMissions.setSize(ctaWidth, minimal ? 36 : shortDesktop ? 38 : 40);
-      labelTraining.setStyle({ fontSize: minimal ? "15px" : "16px", align: "center" });
+      btnPlay.setSize(ctaWidth, compressedMenu ? 46 : minimal ? 52 : shortDesktop ? 50 : 56);
+      btnTraining.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : shortDesktop ? 38 : 40);
+      btnDaily.setSize(ctaWidth, compressedMenu ? 38 : minimal ? 40 : shortDesktop ? 42 : 46);
+      btnMissions.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : shortDesktop ? 38 : 40);
+      labelTraining.setStyle({ fontSize: compressedMenu ? "14px" : minimal ? "15px" : "16px", align: "center" });
       fitTextScaleToWidth(labelTraining, btnTraining.width - 22, 0.76);
-      labelDaily.setStyle({ fontSize: minimal ? "14px" : "15px", align: "center" });
+      labelDaily.setStyle({ fontSize: compressedMenu ? "13px" : minimal ? "14px" : "15px", align: "center" });
       labelDaily.setWordWrapWidth(btnDaily.width - 24, true);
       fitTextScaleToWidth(labelDaily, btnDaily.width - 24, 0.76);
-      labelMissions.setStyle({ fontSize: minimal ? "15px" : "16px", align: "center" });
+      labelMissions.setStyle({ fontSize: compressedMenu ? "14px" : minimal ? "15px" : "16px", align: "center" });
       fitTextScaleToWidth(labelMissions, btnMissions.width - 22, 0.76);
-      boostToggleTitle.setStyle({ fontSize: minimal ? "11px" : "12px", align: "left" });
-      boostToggleHint.setStyle({ fontSize: minimal ? "9px" : "10px", align: "left" });
+      boostToggleTitle.setStyle({ fontSize: compressedMenu ? "10px" : minimal ? "11px" : "12px", align: "left" });
+      boostToggleHint.setStyle({ fontSize: compressedMenu ? "9px" : minimal ? "9px" : "10px", align: "left" });
       const showBoostToggle = boosterEnabled && !getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops).eligible && !missionsExpanded;
       title.setVisible(!missionsExpanded);
       taglineText.setVisible(!missionsExpanded);
@@ -1663,7 +1705,7 @@ export class MenuScene extends Phaser.Scene {
         { kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height },
         { kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height },
       ];
-      const ctaGap = minimal ? 6 : compact ? 6 : 8;
+      const ctaGap = compressedMenu ? 4 : minimal ? 6 : compact ? 6 : 8;
       const ctaStackHeight =
         ctaEntries.reduce((sum, entry) => sum + entry.height, 0) + Math.max(0, ctaEntries.length - 1) * ctaGap;
       const titleBottom = titleY + title.displayHeight / 2;
@@ -1671,7 +1713,7 @@ export class MenuScene extends Phaser.Scene {
       taglineText.setPosition(leftX, desiredTaglineY);
       const taglineBottom = taglineText.y + taglineText.displayHeight / 2;
       bestText.setVisible(false);
-      if (!minimal) {
+      if (!minimal && !compressedMenu) {
         const bestTargetY = Math.round(taglineBottom + (shortDesktop ? 8 : 12) + bestText.displayHeight / 2);
         const maxSummaryEntries = shortDesktop ? 1 : 3;
         const maxBestBottom = ctaBottomLimit - ctaStackHeight - 10;
@@ -1685,7 +1727,7 @@ export class MenuScene extends Phaser.Scene {
         }
       }
       const bestBottom = bestText.visible ? bestText.y + bestText.displayHeight / 2 : taglineBottom;
-      const preferredCtaTop = minimal ? Math.round(s.height * 0.29) : compact ? Math.round(s.height * 0.34) : Math.round(s.height * 0.39);
+      const preferredCtaTop = compressedMenu ? Math.round(s.height * 0.28) : minimal ? Math.round(s.height * 0.29) : compact ? Math.round(s.height * 0.34) : Math.round(s.height * 0.39);
       const minCtaTop = bestBottom + (minimal ? 12 : 16);
       const maxCtaTop = ctaBottomLimit - ctaStackHeight;
       const ctaTop = Phaser.Math.Clamp(preferredCtaTop, minCtaTop, Math.max(minCtaTop, maxCtaTop));
@@ -1709,10 +1751,66 @@ export class MenuScene extends Phaser.Scene {
       }
       const ctaBottom = ctaCursor - ctaGap;
       const menuPanelTop = Math.max(contentTop - 20, titleY - title.displayHeight / 2 - 18);
-      const menuPanelBottom = Math.min(summaryTop - 12, ctaBottom + 18);
+      const menuPanelBottom = Math.min(hideSummaryPanel ? s.height - 16 : summaryTop - 12, ctaBottom + 18);
       this.menuPanel.setPosition(leftX, (menuPanelTop + menuPanelBottom) / 2).setSize(this.menuPanel.width, Math.max(180, menuPanelBottom - menuPanelTop));
       refreshPlayButton();
       if (!missionsExpanded) {
+        this.dailyPanel.setVisible(!hideSummaryPanel);
+        if (hideSummaryPanel) {
+          liveopsTitle.setVisible(false);
+          btnClaimOps.setVisible(false);
+          labelClaimOps.setVisible(false);
+          claimOpsHalo.setVisible(false);
+          liveopsReadyBadgeBg.setVisible(false);
+          liveopsReadyBadgeText.setVisible(false);
+          liveopsCardBg.setVisible(false);
+          liveopsInfo.setVisible(false);
+          btnCloseMissions.setVisible(false);
+          labelCloseMissions.setVisible(false);
+          summaryRewardsCardBg.setVisible(false);
+          summaryDailyCardBg.setVisible(false);
+          summaryWeeklyCardBg.setVisible(false);
+          summaryRewardsTitle.setVisible(false);
+          summaryRewardsValue.setVisible(false);
+          summaryDailyTitle.setVisible(false);
+          summaryDailyValue.setVisible(false);
+          summaryWeeklyTitle.setVisible(false);
+          summaryWeeklyValue.setVisible(false);
+          dailyInfoCardBg.setVisible(false);
+          dailyInfoTitle.setVisible(false);
+          dailyInfo.setVisible(false);
+          weeklyRaceCardBg.setVisible(false);
+          weeklyRaceTitle.setVisible(false);
+          weeklyRaceInfo.setVisible(false);
+          weeklyRaceBadgeBg.setVisible(false);
+          weeklyRaceBadgeText.setVisible(false);
+          weeklyRaceJumpBadgeBg.setVisible(false);
+          weeklyRaceJumpBadgeText.setVisible(false);
+          weeklyRaceResetBadgeBg.setVisible(false);
+          weeklyRaceResetBadgeText.setVisible(false);
+          weeklyRaceRewardBadgeBg.setVisible(false);
+          weeklyRaceRewardBadgeText.setVisible(false);
+          weeklyRaceRiskBadgeBg.setVisible(false);
+          weeklyRaceRiskBadgeText.setVisible(false);
+          weeklyRaceProgressTrack.setVisible(false);
+          weeklyRaceProgressFill.setVisible(false);
+          weeklyRaceProgressText.setVisible(false);
+          dailyMissionsTitle.setVisible(false);
+          weeklyMissionsTitle.setVisible(false);
+          dailyMissionRows.forEach((row) => {
+            row.bg.setVisible(false);
+            row.text.setVisible(false);
+          });
+          weeklyMissionRows.forEach((row) => {
+            row.bg.setVisible(false);
+            row.text.setVisible(false);
+          });
+          controlsText.setVisible(false);
+          if (this.toastText) this.toastText.setPosition(s.width / 2, Math.min(s.height - 20, ctaBottom + 26));
+          this.layoutWorkshop();
+          this.layoutLeaderboard();
+          return;
+        }
         const summaryLeft = leftX - summaryWidth / 2;
 
         this.dailyPanel.setPosition(leftX, summaryCenterY).setSize(summaryWidth, summaryHeight);
@@ -1720,6 +1818,8 @@ export class MenuScene extends Phaser.Scene {
         liveopsTitle.setPosition(summaryLeft + 16, summaryTop + 18).setVisible(true);
         btnCloseMissions.setVisible(false);
         labelCloseMissions.setVisible(false);
+        btnClaimOps.setVisible(true);
+        labelClaimOps.setVisible(true);
 
         btnClaimOps.setSize(minimal ? 104 : 116, 30).setPosition(summaryLeft + summaryWidth - 14, summaryTop + 12).setOrigin(1, 0);
         labelClaimOps.setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
@@ -1729,6 +1829,7 @@ export class MenuScene extends Phaser.Scene {
           .setSize(btnClaimOps.width + 12, btnClaimOps.height + 10);
         liveopsReadyBadgeBg.setPosition(btnClaimOps.x - btnClaimOps.width - 12 - liveopsReadyBadgeBg.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
         liveopsReadyBadgeText.setPosition(liveopsReadyBadgeBg.x, liveopsReadyBadgeBg.y);
+        updateReadyBadge(liveopsReadyCount);
 
         liveopsCardBg.setVisible(false);
         liveopsInfo.setVisible(false);
@@ -1846,7 +1947,11 @@ export class MenuScene extends Phaser.Scene {
       summaryWeeklyTitle.setVisible(false);
       summaryWeeklyValue.setVisible(false);
       controlsText.setVisible(false);
-      this.dailyPanel.setPosition(s.width / 2, s.height / 2).setSize(Math.min(s.width - 28, MISSIONS_PANEL_WIDTH), Math.min(s.height - 28, MISSIONS_PANEL_HEIGHT));
+      this.dailyPanel.setVisible(true).setPosition(s.width / 2, s.height / 2).setSize(Math.min(s.width - 28, MISSIONS_PANEL_WIDTH), Math.min(s.height - 28, MISSIONS_PANEL_HEIGHT));
+      btnClaimOps.setVisible(true);
+      labelClaimOps.setVisible(true);
+      liveopsTitle.setVisible(true);
+      updateReadyBadge(liveopsReadyCount);
       const detailCenterX = this.dailyPanel.x;
       const detailPanelTop = this.dailyPanel.y - this.dailyPanel.height / 2;
       const panelLeft = detailCenterX - this.dailyPanel.width / 2;
@@ -2111,6 +2216,8 @@ export class MenuScene extends Phaser.Scene {
       weeklyRaceResetTicker = null;
       weeklyRaceResetPulse?.stop();
       weeklyRaceResetPulse = null;
+      this.game.events.off(GAME_EVENTS.AD_BREAK_START, onAdBreakStart);
+      this.game.events.off(GAME_EVENTS.AD_BREAK_END, onAdBreakEnd);
       releasePageLifecycle();
       releasePlatformLifecycle();
       this.suspendReasons.clear();
@@ -2803,7 +2910,9 @@ export class MenuScene extends Phaser.Scene {
     const activeMetaEntries = this.staticData.metaTree.nodes
       .map((node) => ({ node, level: Math.max(0, Math.floor(save.meta.nodeLevels[node.id] ?? 0)) }))
       .filter((entry) => entry.level > 0);
-    this.workshopHintText.setText(activeMetaEntries.length > 0 ? t(this.locale, "menu.installedBuild") : t(this.locale, "menu.installedNone"));
+    this.workshopHintText
+      .setText(activeMetaEntries.length > 0 ? t(this.locale, "menu.installedBuild") : t(this.locale, "menu.installedNone"))
+      .setVisible(true);
 
     for (const chip of this.workshopBuildChips) chip.destroy();
     this.workshopBuildChips = [];
@@ -2840,7 +2949,14 @@ export class MenuScene extends Phaser.Scene {
     const desiredCardsStartY = this.workshopBuildChips.length > 0 ? chipCursorY + 44 : -184;
     const maxCardsBottom = this.workshopFooterText.y - 22;
     const maxCardsStartY = maxCardsBottom - cardHeight / 2 - Math.max(0, cardRows - 1) * (cardHeight + cardGapY);
-    const cardsStartY = Math.min(desiredCardsStartY, maxCardsStartY);
+    let cardsStartY = Math.min(desiredCardsStartY, maxCardsStartY);
+    const showBuildSummary = cardsStartY >= desiredCardsStartY;
+    if (!showBuildSummary) {
+      this.workshopHintText.setVisible(false);
+      for (const chip of this.workshopBuildChips) chip.destroy();
+      this.workshopBuildChips = [];
+      cardsStartY = maxCardsStartY;
+    }
 
     this.staticData.metaTree.nodes.forEach((node, idx) => {
       const level = getMetaNodeLevel(save, node.id);
@@ -2855,12 +2971,20 @@ export class MenuScene extends Phaser.Scene {
       const x = column === 0 ? leftCardX : rightCardX;
       const y = cardsStartY + row * (cardHeight + cardGapY);
       const accentColor = maxed ? 0x57c27d : badge?.stroke ?? (cost?.currency === "cores" ? 0xffd166 : idx % 2 === 0 ? 0x5cc8ff : 0x3aa4d4);
-      const textLeft = -cardWidth / 2 + 18;
+      const textLeft = -cardWidth / 2 + 32;
       const buttonCenterX = cardWidth / 2 - 58;
       const buttonWidth = 108;
       const buttonY = 6;
       const buttonLeft = buttonCenterX - buttonWidth / 2;
       const textWrapWidth = Math.max(120, Math.floor(buttonLeft - textLeft - 14));
+      const badgeNode = badge ? createMenuBadge(this, 0, -24, badge.label, badge.fill, badge.stroke, badge.textColor) : null;
+      const badgeBg = badgeNode?.list[0] as Phaser.GameObjects.Rectangle | undefined;
+      const badgeWidth = badgeBg?.width ?? 0;
+      const badgeX = badgeNode ? cardWidth / 2 - 18 - badgeWidth / 2 : 0;
+      const titleMaxWidth = Math.max(
+        96,
+        Math.floor((badgeNode ? badgeX - badgeWidth / 2 - 10 : buttonLeft - 14) - textLeft)
+      );
 
       const bg = this.add.rectangle(0, 0, cardWidth, cardHeight, 0x121a24, 0.97).setStrokeStyle(2, accentColor, maxed ? 0.72 : 0.58);
       const accent = this.add.rectangle(-cardWidth / 2 + 4, 0, 6, cardHeight, accentColor, 0.92);
@@ -2869,10 +2993,9 @@ export class MenuScene extends Phaser.Scene {
           fontSize: "14px",
           color: "#d9f2ff",
           fontStyle: "700",
-          wordWrap: { width: Math.min(140, textWrapWidth) },
         })
         .setOrigin(0, 0);
-      const badgeNode = badge ? createMenuBadge(this, 0, -24, badge.label, badge.fill, badge.stroke, badge.textColor) : null;
+      fitTextScaleToWidth(title, titleMaxWidth, 0.56);
       const desc = this.add
         .text(textLeft, -10, getMetaNodeDescription(this.locale, node.id), {
           fontSize: "9px",
@@ -2930,7 +3053,7 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(btnLabel, buttonWidth - 18, 0.76);
       fitTextScaleToWidth(costLabel, buttonWidth - 16, 0.76);
       if (badgeNode) {
-        badgeNode.setPosition(buttonCenterX, -22);
+        badgeNode.setPosition(badgeX, -22);
       }
 
       if (!maxed && affordable) {
@@ -3190,6 +3313,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private async editPilotName(): Promise<void> {
+    if (this.platformAdapter?.name === "yandex") {
+      this.toast(t(this.locale, "menu.pilotUnsupported"));
+      return;
+    }
+
     const promptFn = typeof window !== "undefined" && typeof window.prompt === "function" ? window.prompt.bind(window) : null;
     if (!promptFn) {
       this.toast(t(this.locale, "menu.pilotUnsupported"));
@@ -3491,6 +3619,46 @@ function formatCompactRewardLabel(locale: Locale, reward: { bolts: number; cores
   return parts.join(" | ");
 }
 
+function formatStartBoosterRewardLabel(locale: Locale, reward: StartBoosterPreview, compact = false): string {
+  const parts: string[] = [];
+  if (reward.tailSegments > 0) {
+    parts.push(
+      locale === "ru"
+        ? `+${formatNumber(locale, reward.tailSegments)} ${compact ? "сегм." : "сегмента"}`
+        : `+${formatNumber(locale, reward.tailSegments)} ${compact ? "tail" : "tail segments"}`
+    );
+  }
+  if (reward.bolts > 0) {
+    parts.push(locale === "ru" ? `+${formatNumber(locale, reward.bolts)} болт.` : `+${formatNumber(locale, reward.bolts)} bolts`);
+  }
+  if (reward.cores > 0) {
+    parts.push(locale === "ru" ? `+${formatNumber(locale, reward.cores)} яд.` : `+${formatNumber(locale, reward.cores)} cores`);
+  }
+  return parts.length > 0 ? parts.join(" | ") : locale === "ru" ? "без бонуса" : "no bonus";
+}
+
+function getRewardedPlayCtaLabel(locale: Locale, reward: StartBoosterPreview, compact = false): string {
+  const rewardLabel = formatStartBoosterRewardLabel(locale, reward, compact);
+  return locale === "ru" ? `СМОТРЕТЬ РЕКЛАМУ\nИГРА: ${rewardLabel}` : `WATCH AD\nPLAY: ${rewardLabel}`;
+}
+
+function getRewardedDailyCtaLabel(locale: Locale, reward: StartBoosterPreview, compact = false): string {
+  const rewardLabel = formatStartBoosterRewardLabel(locale, reward, compact);
+  return locale === "ru" ? `СМОТРЕТЬ РЕКЛАМУ\nДЕЙЛИК: ${rewardLabel}` : `WATCH AD\nDAILY: ${rewardLabel}`;
+}
+
+function getStartBoosterToggleTitle(locale: Locale): string {
+  return locale === "ru" ? "СТАРТОВЫЙ БУСТ ЗА РЕКЛАМУ" : "START BOOST FOR AD";
+}
+
+function getStartBoosterToggleHint(locale: Locale, reward: StartBoosterPreview, compact = false): string {
+  const rewardLabel = formatStartBoosterRewardLabel(locale, reward, true);
+  if (locale === "ru") {
+    return compact ? `Награда: ${rewardLabel}` : `Награда для игры и дейлика: ${rewardLabel}`;
+  }
+  return compact ? `Reward: ${rewardLabel}` : `Reward for Play and Daily: ${rewardLabel}`;
+}
+
 function getMenuWeeklyRaceNoRewardCompactLabel(locale: Locale): string {
   return locale === "ru" ? "0Б" : "0";
 }
@@ -3721,10 +3889,6 @@ function getPortalBoardUnavailableLabel(locale: Locale): string {
   return locale === "ru" ? "portal boards недоступны" : "portal boards unavailable";
 }
 
-function getPortalBoardEmptyLabel(locale: Locale): string {
-  return locale === "ru" ? "топ пуст" : "top empty";
-}
-
 function getPortalBoardUnrankedLabel(locale: Locale): string {
   return locale === "ru" ? "без места" : "unranked";
 }
@@ -3735,14 +3899,6 @@ function getPortalBoardFallbackLabel(locale: Locale): string {
 
 function getPortalBoardTopLabel(locale: Locale): string {
   return locale === "ru" ? "верхняя лига" : "top division";
-}
-
-function getPortalBoardTargetLabel(locale: Locale, division: string, score: string): string {
-  return locale === "ru" ? `цель ${division} на ${score}` : `target ${division} at ${score}`;
-}
-
-function getPortalBoardLeaderLabel(locale: Locale, playerName: string, score: string): string {
-  return locale === "ru" ? `лидер ${playerName} ${score}` : `leader ${playerName} ${score}`;
 }
 
 function getPortalBoardLabel(locale: Locale, key: "daily" | "weekly" | "all_time"): string {

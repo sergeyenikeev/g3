@@ -387,7 +387,7 @@ async function renderCardAssets(cardDir) {
         <div class="cover">
           <div class="grain"></div>
           <div class="copy">
-            <h1>MAGNET<br/>CARAVAN</h1>
+            <h1>Magnet Caravan</h1>
             <p class="lead">Переверни поле. Сдай лом. Переживи натиск.</p>
             <div class="badge">Аркадное выживание с daily-режимом</div>
           </div>

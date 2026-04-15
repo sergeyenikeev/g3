@@ -13,7 +13,7 @@ const INTL_LOCALES: Record<Locale, string> = {
 
 const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
   en: {
-    "app.title": "MAGNET CARAVAN",
+    "app.title": "Magnet Caravan",
     "menu.workshop": "WORKSHOP",
     "menu.play": "PLAY",
     "menu.playBoost": "PLAY + BOOST (Rewarded)",
@@ -232,7 +232,7 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "rarity.epic": "EPIC",
   },
   ru: {
-    "app.title": "МАГНИТНЫЙ КАРАВАН",
+    "app.title": "Magnet Caravan",
     "menu.workshop": "МАСТЕРСКАЯ",
     "menu.play": "ИГРАТЬ",
     "menu.playBoost": "ИГРАТЬ + БУСТ (за рекламу)",

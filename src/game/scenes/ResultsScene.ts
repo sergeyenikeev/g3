@@ -223,6 +223,8 @@ export class ResultsScene extends Phaser.Scene {
     const rewardPreview = this.computeCurrentRunRewards(save);
     const currentEntry = buildLeaderboardEntry(this.state, this.getLeaderboardEntryId(), save?.settings?.pilotName);
     const score = computeRunScore(this.state);
+    const compactLayout = this.scale.height <= 430 || this.scale.width <= 720;
+    const ultraCompactLayout = this.scale.height <= 380 || this.scale.width <= 680;
     const division = getLeaderboardDivision(score);
     const nextDivision = getLeaderboardNextDivision(score);
     const careerProgress = getLeaderboardCareerProgress({
@@ -236,71 +238,75 @@ export class ResultsScene extends Phaser.Scene {
     const nextMilestone = getNextLeaderboardCareerMilestone(careerProgress, [...claimedMilestones]);
     const leaderboardEntries = filterLeaderboardEntries(save?.leaderboard?.entries ?? [], this.latestLeaderboardFilter);
     const rank = this.latestLeaderboardRank ?? getLeaderboardRank(leaderboardEntries, this.getLeaderboardEntryId());
-    const topLines = leaderboardEntries.slice(0, 3).map((entry, index) =>
+    const topLines = leaderboardEntries.slice(0, ultraCompactLayout ? 1 : compactLayout ? 1 : 3).map((entry, index) =>
       `${index + 1}. ${entry.pilot} [${entry.mode === "daily" ? t(this.locale, "leaderboard.mode.daily") : t(this.locale, "leaderboard.mode.run")} | ${t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`)}] | ${formatNumber(this.locale, entry.score)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`
     );
     const bestDelta =
       this.latestLeaderboardPreviousBest === null ? null : score - this.latestLeaderboardPreviousBest;
-    this.summaryText.setText(
-      [
-        `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
-        `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)} | ${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)}`,
-        `${t(this.locale, "hud.bolts")}: ${formatNumber(this.locale, this.state.bolts)} | ${t(this.locale, "results.cores")}: ${formatNumber(this.locale, this.state.cores)} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)}`,
-        t(this.locale, "results.workshop", {
-          bolts: formatNumber(this.locale, rewardPreview.bolts),
-          cores: formatNumber(this.locale, rewardPreview.cores),
-        }),
-      ].join("\n")
-    );
-    this.progressText.setText(
-      [
-        rank ? t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) }) : "",
-        this.latestLeaderboardIsRecord ? t(this.locale, "results.newRecord") : "",
-        this.latestPromotionDivision
-          ? t(this.locale, "results.promotion", {
-              division: t(this.locale, `leaderboard.division.${this.latestPromotionDivision}`),
-              reward: formatLeaderboardReward(this.locale, this.latestPromotionReward),
-            })
-          : "",
-        this.latestCareerMilestones.length > 0
-          ? t(this.locale, "results.milestoneUnlock", {
-              titles: formatCareerMilestoneTitles(this.locale, this.latestCareerMilestones),
-              reward: formatLeaderboardReward(this.locale, this.latestCareerMilestoneReward),
-            })
-          : "",
-        bestDelta === null
-          ? t(this.locale, "results.bestDeltaNone")
-          : t(this.locale, "results.bestDelta", {
-              value: `${bestDelta >= 0 ? "+" : ""}${formatNumber(this.locale, bestDelta)}`,
-            }),
-        nextDivision
-          ? t(this.locale, "results.nextDivision", {
-              division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
-              score: formatNumber(this.locale, nextDivision.minScore),
-            })
-          : t(this.locale, "results.topDivision"),
-        nextMilestone
-          ? t(this.locale, "results.nextMilestone", {
-              title: t(this.locale, `leaderboard.milestone.${nextMilestone.id}`),
-            })
-          : t(this.locale, "results.allMilestones"),
-        this.latestWeeklyRank
-          ? t(this.locale, "results.weeklyBoard", {
-              rank: formatNumber(this.locale, this.latestWeeklyRank),
-              division: t(this.locale, `leaderboard.division.${division.id}`),
-            })
-          : "",
-        this.latestWeeklyBoardDebut
-          ? t(this.locale, "results.weeklyDeltaNew")
-          : this.latestWeeklyRankDelta && this.latestWeeklyRankDelta > 0
-            ? t(this.locale, "results.weeklyDeltaUp", { value: formatNumber(this.locale, this.latestWeeklyRankDelta) })
-            : this.latestWeeklyRankDelta && this.latestWeeklyRankDelta < 0
-              ? t(this.locale, "results.weeklyDeltaDown", { value: formatNumber(this.locale, Math.abs(this.latestWeeklyRankDelta)) })
-              : "",
-      ]
-        .filter(Boolean)
-        .join("\n")
-    );
+    const summaryLines = compactLayout
+      ? [
+          `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
+          `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)} | ${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)} | ${t(this.locale, "results.workshop", {
+            bolts: formatNumber(this.locale, rewardPreview.bolts),
+            cores: formatNumber(this.locale, rewardPreview.cores),
+          })}`,
+        ]
+      : [
+          `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
+          `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)} | ${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)}`,
+          `${t(this.locale, "hud.bolts")}: ${formatNumber(this.locale, this.state.bolts)} | ${t(this.locale, "results.cores")}: ${formatNumber(this.locale, this.state.cores)} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)}`,
+          t(this.locale, "results.workshop", {
+            bolts: formatNumber(this.locale, rewardPreview.bolts),
+            cores: formatNumber(this.locale, rewardPreview.cores),
+          }),
+        ];
+    const progressLines = [
+      rank ? t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) }) : "",
+      this.latestLeaderboardIsRecord ? t(this.locale, "results.newRecord") : "",
+      this.latestPromotionDivision
+        ? t(this.locale, "results.promotion", {
+            division: t(this.locale, `leaderboard.division.${this.latestPromotionDivision}`),
+            reward: formatLeaderboardReward(this.locale, this.latestPromotionReward),
+          })
+        : "",
+      this.latestCareerMilestones.length > 0
+        ? t(this.locale, "results.milestoneUnlock", {
+            titles: formatCareerMilestoneTitles(this.locale, this.latestCareerMilestones),
+            reward: formatLeaderboardReward(this.locale, this.latestCareerMilestoneReward),
+          })
+        : "",
+      bestDelta === null
+        ? t(this.locale, "results.bestDeltaNone")
+        : t(this.locale, "results.bestDelta", {
+            value: `${bestDelta >= 0 ? "+" : ""}${formatNumber(this.locale, bestDelta)}`,
+          }),
+      nextDivision
+        ? t(this.locale, "results.nextDivision", {
+            division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
+            score: formatNumber(this.locale, nextDivision.minScore),
+          })
+        : t(this.locale, "results.topDivision"),
+      nextMilestone
+        ? t(this.locale, "results.nextMilestone", {
+            title: t(this.locale, `leaderboard.milestone.${nextMilestone.id}`),
+          })
+        : t(this.locale, "results.allMilestones"),
+      this.latestWeeklyRank
+        ? t(this.locale, "results.weeklyBoard", {
+            rank: formatNumber(this.locale, this.latestWeeklyRank),
+            division: t(this.locale, `leaderboard.division.${division.id}`),
+          })
+        : "",
+      this.latestWeeklyBoardDebut
+        ? t(this.locale, "results.weeklyDeltaNew")
+        : this.latestWeeklyRankDelta && this.latestWeeklyRankDelta > 0
+          ? t(this.locale, "results.weeklyDeltaUp", { value: formatNumber(this.locale, this.latestWeeklyRankDelta) })
+          : this.latestWeeklyRankDelta && this.latestWeeklyRankDelta < 0
+            ? t(this.locale, "results.weeklyDeltaDown", { value: formatNumber(this.locale, Math.abs(this.latestWeeklyRankDelta)) })
+            : "",
+    ].filter(Boolean);
+    this.summaryText.setText(summaryLines.join("\n"));
+    this.progressText.setText(progressLines.slice(0, ultraCompactLayout ? 2 : compactLayout ? 2 : progressLines.length).join("\n"));
     this.leaderboardText.setText(
       [
         `${t(this.locale, "results.leaderboardTitle")} (${t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`)})`,
@@ -313,33 +319,47 @@ export class ResultsScene extends Phaser.Scene {
   private layoutResults(): void {
     if (!this.resultsPanel || !this.titleText || !this.summaryText || !this.progressText || !this.leaderboardText || !this.restartBtn || !this.menuBtn) return;
     const { width, height } = this.scale;
-    const panelWidth = Math.min(720, width - 28);
-    const panelHeight = Math.min(820, height - 28);
+    const compactLayout = height <= 520 || width <= 720;
+    const ultraCompactLayout = height <= 430 || width <= 680;
+    const panelWidth = Math.min(720, width - (ultraCompactLayout ? 16 : 28));
+    const panelHeight = Math.min(820, height - (ultraCompactLayout ? 16 : 28));
     const panelTop = height / 2 - panelHeight / 2;
     const panelBottom = panelTop + panelHeight;
     const contentWidth = panelWidth - 56;
-    const titleFont = height < 680 ? 34 : height < 760 ? 38 : 44;
+    const titleFont = ultraCompactLayout ? 28 : compactLayout ? 32 : height < 680 ? 34 : height < 760 ? 38 : 44;
     const x2Visible = Boolean(this.x2Btn?.visible && this.x2Label?.visible);
-    const x2Height = x2Visible ? (height < 700 ? 46 : 52) : 0;
-    const restartHeight = height < 700 ? 56 : 64;
-    const menuHeight = height < 700 ? 46 : 52;
-    const buttonGap = height < 700 ? 14 : 20;
-    const sectionGap = height < 700 ? 10 : 14;
-    const titleGap = height < 700 ? 14 : 18;
+    const x2Height = x2Visible ? (ultraCompactLayout ? 32 : compactLayout ? 40 : height < 700 ? 46 : 52) : 0;
+    const restartHeight = ultraCompactLayout ? 38 : compactLayout ? 48 : height < 700 ? 56 : 64;
+    const menuHeight = ultraCompactLayout ? 32 : compactLayout ? 40 : height < 700 ? 46 : 52;
+    const buttonGap = ultraCompactLayout ? 6 : compactLayout ? 10 : height < 700 ? 14 : 20;
+    const sectionGap = ultraCompactLayout ? 4 : compactLayout ? 8 : height < 700 ? 10 : 14;
+    const titleGap = ultraCompactLayout ? 6 : compactLayout ? 10 : height < 700 ? 14 : 18;
     const reservedButtonsHeight = (x2Visible ? x2Height + buttonGap : 0) + restartHeight + buttonGap + menuHeight;
 
     this.resultsPanel.setPosition(width / 2, height / 2).setSize(panelWidth, panelHeight);
-    this.titleText.setStyle({ fontSize: `${titleFont}px` }).setPosition(width / 2, panelTop + 42);
+    this.titleText.setStyle({ fontSize: `${titleFont}px` }).setPosition(width / 2, panelTop + (ultraCompactLayout ? 30 : 42));
     const contentLeft = width / 2 - panelWidth / 2 + 28;
     const textLeft = contentLeft + 16;
     const textWrapWidth = Math.max(240, contentWidth - 32);
     const sectionsTop = this.titleText.y + this.titleText.displayHeight / 2 + titleGap;
-    const availableSectionHeight = Math.max(200, panelBottom - 24 - reservedButtonsHeight - sectionGap - sectionsTop);
-    const fontPresets = [
-      { summary: 16, progress: 13, leaderboard: 13 },
-      { summary: 15, progress: 12, leaderboard: 12 },
-      { summary: 14, progress: 11, leaderboard: 11 },
-    ];
+    const availableSectionHeight = Math.max(140, panelBottom - 20 - reservedButtonsHeight - sectionGap - sectionsTop);
+    const fontPresets = ultraCompactLayout
+      ? [
+          { summary: 12, progress: 9, leaderboard: 9 },
+          { summary: 11, progress: 8, leaderboard: 8 },
+          { summary: 10, progress: 8, leaderboard: 8 },
+        ]
+      : compactLayout
+        ? [
+            { summary: 13, progress: 10, leaderboard: 10 },
+            { summary: 12, progress: 9, leaderboard: 9 },
+            { summary: 11, progress: 8, leaderboard: 8 },
+          ]
+        : [
+            { summary: 16, progress: 13, leaderboard: 13 },
+            { summary: 15, progress: 12, leaderboard: 12 },
+            { summary: 14, progress: 11, leaderboard: 11 },
+          ];
     let summaryHeight = 0;
     let progressHeight = 0;
     let leaderboardHeight = 0;
@@ -352,9 +372,9 @@ export class ResultsScene extends Phaser.Scene {
       this.leaderboardText.setStyle({ fontSize: `${preset.leaderboard}px`, wordWrap: { width: textWrapWidth }, align: "left" });
       this.leaderboardText.setLineSpacing(preset.leaderboard <= 11 ? 3 : 4);
 
-      summaryHeight = this.summaryText.height + 28;
-      progressHeight = this.progressText.height + 24;
-      leaderboardHeight = this.leaderboardText.height + 24;
+      summaryHeight = this.summaryText.height + (ultraCompactLayout ? 10 : compactLayout ? 18 : 28);
+      progressHeight = this.progressText.height + (ultraCompactLayout ? 10 : compactLayout ? 18 : 24);
+      leaderboardHeight = this.leaderboardText.height + (ultraCompactLayout ? 10 : compactLayout ? 18 : 24);
       const totalHeight = summaryHeight + progressHeight + leaderboardHeight + sectionGap * 2;
       if (totalHeight <= availableSectionHeight || preset === fontPresets[fontPresets.length - 1]) break;
     }
@@ -372,23 +392,23 @@ export class ResultsScene extends Phaser.Scene {
     this.leaderboardText.setPosition(textLeft, cursorTop + 12);
 
     const statsBottom = cursorTop + leaderboardHeight;
-    const buttonWidth = Math.min(320, panelWidth - 140);
-    let nextTop = Math.min(panelBottom - 24 - reservedButtonsHeight, statsBottom + sectionGap);
+    const buttonWidth = Math.min(320, panelWidth - (ultraCompactLayout ? 56 : 140));
+    let nextTop = Math.max(statsBottom + sectionGap, panelBottom - 24 - reservedButtonsHeight);
 
     if (x2Visible && this.x2Btn && this.x2Label) {
       this.x2Btn.setSize(buttonWidth, x2Height).setPosition(width / 2, nextTop + x2Height / 2);
-      this.x2Label.setPosition(this.x2Btn.x, this.x2Btn.y);
+      this.x2Label.setStyle({ fontSize: ultraCompactLayout ? "12px" : height < 700 ? "14px" : "16px" }).setPosition(this.x2Btn.x, this.x2Btn.y);
       fitTextScaleToWidth(this.x2Label, buttonWidth - 20, 0.76);
       nextTop += x2Height + buttonGap;
     }
 
     this.restartBtn.setSize(buttonWidth, restartHeight).setPosition(width / 2, nextTop + restartHeight / 2);
-    this.restartLabel.setStyle({ fontSize: height < 700 ? "22px" : "24px" }).setPosition(this.restartBtn.x, this.restartBtn.y);
+    this.restartLabel.setStyle({ fontSize: ultraCompactLayout ? "18px" : height < 700 ? "22px" : "24px" }).setPosition(this.restartBtn.x, this.restartBtn.y);
     fitTextScaleToWidth(this.restartLabel, buttonWidth - 20, 0.76);
     nextTop += restartHeight + buttonGap;
 
     this.menuBtn.setSize(buttonWidth, menuHeight).setPosition(width / 2, nextTop + menuHeight / 2);
-    this.menuLabel.setStyle({ fontSize: height < 700 ? "18px" : "20px" }).setPosition(this.menuBtn.x, this.menuBtn.y);
+    this.menuLabel.setStyle({ fontSize: ultraCompactLayout ? "15px" : height < 700 ? "18px" : "20px" }).setPosition(this.menuBtn.x, this.menuBtn.y);
     fitTextScaleToWidth(this.menuLabel, buttonWidth - 20, 0.76);
   }
 

@@ -123,7 +123,7 @@ export class BootScene extends Phaser.Scene {
 
     const analytics = createAnalyticsAdapter();
     await analytics.init();
-    const adsManager = new AdsManager(adapter, analytics, saveManager);
+    const adsManager = new AdsManager(adapter, analytics, saveManager, this.game.events);
     const locale = resolveLocale(save.settings.language, platformLanguageHint ? [platformLanguageHint] : null);
 
     this.registry.set("platformAdapter", adapter);

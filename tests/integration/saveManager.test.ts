@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { PlatformAdapter, RewardedResult } from "../../src/platform/platformAdapter";
 import { SaveManager } from "../../src/platform/save/saveManager";
+
+const originalLocalStorage = (globalThis as any).localStorage;
+
+afterEach(() => {
+  if (originalLocalStorage === undefined) delete (globalThis as any).localStorage;
+  else (globalThis as any).localStorage = originalLocalStorage;
+});
 
 class MemoryAdapter implements PlatformAdapter {
   readonly name = "memory";
@@ -22,6 +29,44 @@ class MemoryAdapter implements PlatformAdapter {
 
   async load(): Promise<unknown | null> {
     return this.store;
+  }
+}
+
+class ScopedMemoryAdapter extends MemoryAdapter {
+  constructor(private readonly scope: string) {
+    super();
+  }
+
+  getStorageScope(): string {
+    return this.scope;
+  }
+}
+
+class MemoryStorage implements Storage {
+  private data = new Map<string, string>();
+
+  get length(): number {
+    return this.data.size;
+  }
+
+  clear(): void {
+    this.data.clear();
+  }
+
+  getItem(key: string): string | null {
+    return this.data.get(key) ?? null;
+  }
+
+  key(index: number): string | null {
+    return [...this.data.keys()][index] ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.data.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.data.set(key, value);
   }
 }
 
@@ -110,5 +155,22 @@ describe("SaveManager (integration)", () => {
     const sm = new SaveManager(adapter);
     const s = await sm.load();
     expect(s.v).toBe(1);
+  });
+
+  it("isolates local mirrors by storage scope", async () => {
+    (globalThis as any).localStorage = new MemoryStorage();
+
+    const first = new ScopedMemoryAdapter("yandex:player-a");
+    const firstManager = new SaveManager(first);
+    const firstSave = await firstManager.load();
+    firstSave.stats.bestWave = 12;
+    await firstManager.save(firstSave);
+
+    const second = new ScopedMemoryAdapter("yandex:player-b");
+    const secondManager = new SaveManager(second);
+    const secondSave = await secondManager.load();
+
+    expect(secondSave.stats.bestWave).toBe(0);
+    await expect(second.load()).resolves.toBeNull();
   });
 });
