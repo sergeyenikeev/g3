@@ -532,7 +532,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
     const boostToggleHint = this.add
       .text(0, 0, t(this.locale, "menu.boostToggleHint"), {
-        fontSize: "10px",
+        fontSize: "11px",
         color: "#98b7c7",
       })
       .setOrigin(0, 0.5);
@@ -542,14 +542,14 @@ export class MenuScene extends Phaser.Scene {
     const summaryWeeklyCardBg = this.add.rectangle(0, 0, 10, 10, 0x101922, 0.96).setStrokeStyle(2, 0x5cc8ff, 0.28);
     const summaryRewardsTitle = this.add
       .text(0, 0, t(this.locale, "menu.summaryRewards"), {
-        fontSize: "11px",
+        fontSize: "12px",
         color: "#ffd78a",
         fontStyle: "700",
       })
       .setOrigin(0, 0.5);
     const summaryRewardsValue = this.add
       .text(0, 0, "", {
-        fontSize: "12px",
+        fontSize: "13px",
         color: "#f7fbff",
         fontStyle: "700",
         align: "left",
@@ -557,14 +557,14 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
     const summaryDailyTitle = this.add
       .text(0, 0, t(this.locale, "menu.summaryDaily"), {
-        fontSize: "11px",
+        fontSize: "12px",
         color: "#8be3bc",
         fontStyle: "700",
       })
       .setOrigin(0, 0.5);
     const summaryDailyValue = this.add
       .text(0, 0, "", {
-        fontSize: "12px",
+        fontSize: "13px",
         color: "#f7fbff",
         fontStyle: "700",
         align: "left",
@@ -572,14 +572,14 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
     const summaryWeeklyTitle = this.add
       .text(0, 0, t(this.locale, "menu.summaryWeekly"), {
-        fontSize: "11px",
+        fontSize: "12px",
         color: "#8fd5ff",
         fontStyle: "700",
       })
       .setOrigin(0, 0.5);
     const summaryWeeklyValue = this.add
       .text(0, 0, "", {
-        fontSize: "12px",
+        fontSize: "13px",
         color: "#f7fbff",
         fontStyle: "700",
         align: "left",
@@ -592,7 +592,7 @@ export class MenuScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     const labelCloseMissions = this.add
       .text(0, 0, t(this.locale, "menu.close"), {
-        fontSize: "12px",
+        fontSize: "13px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -606,12 +606,12 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5);
     const dailyInfo = this.add
-      .text(0, 0, "", { fontSize: "10px", color: "#d6e6ef", align: "left", wordWrap: { width: 420 } })
+      .text(0, 0, "", { fontSize: "12px", color: "#d6e6ef", align: "left", wordWrap: { width: 420 } })
       .setOrigin(0, 0)
       .setLineSpacing(2);
 
     const liveopsInfo = this.add
-      .text(0, 0, "", { fontSize: "11px", color: "#b7e2f5", align: "center", wordWrap: { width: 420 } })
+      .text(0, 0, "", { fontSize: "12px", color: "#b7e2f5", align: "center", wordWrap: { width: 420 } })
       .setOrigin(0.5)
       .setLineSpacing(2);
 
@@ -628,7 +628,7 @@ export class MenuScene extends Phaser.Scene {
       .setVisible(false);
     const liveopsReadyBadgeText = this.add
       .text(0, 0, "", {
-        fontSize: "10px",
+        fontSize: "11px",
         color: "#ffe5a8",
         fontStyle: "700",
       })
@@ -661,7 +661,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x5cc8ff, 0.62);
     const weeklyRaceBadgeText = this.add
       .text(0, 0, "", {
-        fontSize: "9px",
+        fontSize: "11px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -672,7 +672,7 @@ export class MenuScene extends Phaser.Scene {
       .setVisible(false);
     const weeklyRaceJumpBadgeText = this.add
       .text(0, 0, "", {
-        fontSize: "9px",
+        fontSize: "11px",
         color: "#ecfff4",
         fontStyle: "700",
       })
@@ -683,7 +683,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x5cc8ff, 0.6);
     const weeklyRaceResetBadgeText = this.add
       .text(0, 0, "", {
-        fontSize: "9px",
+        fontSize: "11px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -693,7 +693,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x57c27d, 0.66);
     const weeklyRaceRewardBadgeText = this.add
       .text(0, 0, "", {
-        fontSize: "9px",
+        fontSize: "11px",
         color: "#ecfff4",
         fontStyle: "700",
       })
@@ -703,7 +703,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0xffd166, 0.66);
     const weeklyRaceRiskBadgeText = this.add
       .text(0, 0, "", {
-        fontSize: "9px",
+        fontSize: "11px",
         color: "#fff0d4",
         fontStyle: "700",
       })
@@ -712,7 +712,7 @@ export class MenuScene extends Phaser.Scene {
     const weeklyRaceProgressFill = this.add.rectangle(0, 0, 10, 8, 0x5cc8ff, 0.98).setOrigin(0, 0.5);
     const weeklyRaceProgressText = this.add
       .text(0, 0, "", {
-        fontSize: "9px",
+        fontSize: "11px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -736,7 +736,7 @@ export class MenuScene extends Phaser.Scene {
       const bg = this.add.rectangle(0, 0, 10, 10, 0x10161e, 0.96).setStrokeStyle(2, accent, 0.25);
       const text = this.add
         .text(0, 0, "", {
-          fontSize: "10px",
+          fontSize: "11px",
           color: "#d9f2ff",
           align: "center",
           wordWrap: { width: 140 },
@@ -757,7 +757,7 @@ export class MenuScene extends Phaser.Scene {
       .setStrokeStyle(2, 0xffd166, 0.38)
       .setVisible(false);
     const labelClaimOps = this.add
-      .text(0, 0, t(this.locale, "menu.claimOpsIdle"), { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "menu.claimOpsIdle"), { fontSize: "13px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
     btnClaimOps.on("pointerdown", () => void claimOpsRewards());
     const liveopsLayerBase = 12;
@@ -1097,6 +1097,7 @@ export class MenuScene extends Phaser.Scene {
       );
       weeklyRaceCardBg.setFillStyle(raceState === "hot_run" ? (usingPlatformBoard ? 0x22180b : 0x1c150f) : usingPlatformBoard ? 0x18140b : 0x101922, 0.96);
       weeklyRaceBadgeText.setText(getMenuWeeklyRaceStateBadgeLabel(this.locale, raceState));
+      fitTextScaleToWidth(weeklyRaceBadgeText, 88, 0.78);
       weeklyRaceBadgeBg.setSize(Math.max(62, weeklyRaceBadgeText.width + 16), 20);
       weeklyRaceBadgeBg.setFillStyle(stateStyle.fill, raceState === "top" ? 0.92 : 0.96);
       weeklyRaceBadgeBg.setStrokeStyle(2, stateStyle.stroke, 0.78);
@@ -1136,6 +1137,7 @@ export class MenuScene extends Phaser.Scene {
             weeklyJumpState === "debut" ? freshWeeklyRank : Math.abs(freshWeeklyDelta ?? 0)
           )
         );
+        fitTextScaleToWidth(weeklyRaceJumpBadgeText, 90, 0.78);
         weeklyRaceJumpBadgeBg.setSize(Math.max(70, weeklyRaceJumpBadgeText.width + 16), 20);
         weeklyRaceJumpBadgeBg.setFillStyle(jumpStyle.fill, weeklyJumpState === "down" ? 0.18 : 0.2);
         weeklyRaceJumpBadgeBg.setStrokeStyle(2, jumpStyle.stroke, weeklyJumpState === "down" ? 0.44 : 0.74);
@@ -1182,6 +1184,7 @@ export class MenuScene extends Phaser.Scene {
               )
           : getMenuWeeklyRaceProgressTopLabel(this.locale)
       );
+      fitTextScaleToWidth(weeklyRaceProgressText, Math.max(86, weeklyRaceProgressTrack.width - 18), 0.76);
       if (raceState === "hot_run") {
         if (!weeklyRaceHotPulse) {
           weeklyRaceHotPulse = this.tweens.add({
@@ -2066,7 +2069,7 @@ export class MenuScene extends Phaser.Scene {
       labelCloseMissions.setVisible(true).setPosition(btnCloseMissions.x - btnCloseMissions.width / 2, btnCloseMissions.y + btnCloseMissions.height / 2);
       btnClaimOps.setPosition(btnCloseMissions.x - btnCloseMissions.width - 12, headerButtonY).setOrigin(1, 0);
       labelClaimOps.setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
-      labelClaimOps.setStyle({ fontSize: stackedMissions ? "11px" : "12px" });
+      labelClaimOps.setStyle({ fontSize: stackedMissions ? "12px" : "13px" });
       claimOpsHalo
         .setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2)
         .setSize(btnClaimOps.width + 14, btnClaimOps.height + 12);
@@ -2080,11 +2083,11 @@ export class MenuScene extends Phaser.Scene {
       liveopsCardBg.setPosition(detailCenterX, liveopsCardY).setSize(innerWidth, liveopsCardHeight).setFillStyle(0x162330, 0.98);
       liveopsInfo.setText(detailSummaryLine);
       liveopsInfo.setOrigin(0, 0.5).setPosition(panelLeft + 16, liveopsCardY);
-      liveopsInfo.setStyle({ fontSize: stackedMissions ? "11px" : denseDesktop ? "10px" : "12px", align: "left" });
+      liveopsInfo.setStyle({ fontSize: stackedMissions ? "12px" : denseDesktop ? "11px" : "12px", align: "left" });
       liveopsInfo.setWordWrapWidth(innerWidth - 32, true);
       liveopsInfo.setColor("#d9f2ff");
-      dailyMissionsTitle.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
-      weeklyMissionsTitle.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
+      dailyMissionsTitle.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
+      weeklyMissionsTitle.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
       fitTextScaleToWidth(dailyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.82);
       fitTextScaleToWidth(weeklyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.72);
 
@@ -2093,14 +2096,14 @@ export class MenuScene extends Phaser.Scene {
         dailyInfoCardBg.setPosition(detailCenterX, detailPanelTop + 148).setSize(innerWidth, 84).setFillStyle(0x14222d, 0.98);
         dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + 118);
         dailyInfo.setPosition(panelLeft + 16, detailPanelTop + 134);
-        dailyInfo.setStyle({ fontSize: "11px" });
+        dailyInfo.setStyle({ fontSize: "12px" });
         dailyInfo.setWordWrapWidth(innerWidth - 24, true);
         dailyInfo.setColor("#d6e6ef");
 
         weeklyRaceCardBg.setPosition(detailCenterX, detailPanelTop + 258).setSize(innerWidth, 128);
         weeklyRaceTitle.setPosition(panelLeft + 16, detailPanelTop + 210);
         weeklyRaceInfo.setPosition(panelLeft + 16, detailPanelTop + 248);
-        weeklyRaceInfo.setStyle({ fontSize: "11px" });
+        weeklyRaceInfo.setStyle({ fontSize: "12px" });
         weeklyRaceInfo.setWordWrapWidth(innerWidth - 24, true);
         weeklyRaceBadgeBg.setPosition(innerLeft + innerWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 210);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
@@ -2173,14 +2176,14 @@ export class MenuScene extends Phaser.Scene {
           .setFillStyle(0x14222d, 0.98);
         dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 116 : 124));
         dailyInfo.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 130 : 140));
-        dailyInfo.setStyle({ fontSize: denseDesktop ? "10px" : "11px" });
+        dailyInfo.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
         dailyInfo.setWordWrapWidth(columnWidth - 24, true);
         dailyInfo.setColor("#d6e6ef");
 
         weeklyRaceCardBg.setPosition(rightColumnCenter, detailPanelTop + (denseDesktop ? 166 : 176)).setSize(columnWidth, denseDesktop ? 120 : 130);
         weeklyRaceTitle.setPosition(rightColumnLeft + 4, detailPanelTop + 126);
         weeklyRaceInfo.setPosition(rightColumnLeft + 4, detailPanelTop + (denseDesktop ? 158 : 166));
-        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "10px" : "11px" });
+        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
         weeklyRaceInfo.setWordWrapWidth(columnWidth - 24, true);
         weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 126);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
@@ -2205,7 +2208,7 @@ export class MenuScene extends Phaser.Scene {
           weeklyRaceProgressTrack.setPosition(rightColumnLeft + 4, progressY).setSize(columnWidth - 24, 10);
           weeklyRaceProgressFill.setPosition(weeklyRaceProgressTrack.x, weeklyRaceProgressTrack.y).setSize(weeklyRaceProgressFill.width, 10);
           weeklyRaceProgressText.setPosition(weeklyRaceProgressTrack.x + weeklyRaceProgressTrack.width / 2, weeklyRaceProgressTrack.y);
-          weeklyRaceProgressText.setStyle({ fontSize: denseDesktop ? "8px" : "9px" });
+          weeklyRaceProgressText.setStyle({ fontSize: denseDesktop ? "10px" : "11px" });
           const cardBottom = progressY + 12;
           weeklyRaceCardBg.setPosition(rightColumnCenter, (weeklyCardTop + cardBottom) / 2).setSize(columnWidth, cardBottom - weeklyCardTop);
 
@@ -2215,7 +2218,7 @@ export class MenuScene extends Phaser.Scene {
           dailyMissionRows.forEach((row, index) => {
             row.bg.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 34 : 40);
             row.text.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]);
-            row.text.setStyle({ fontSize: denseDesktop ? "9px" : "10px" });
+            row.text.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
             row.text.setWordWrapWidth(columnWidth - 16, true);
           });
           dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? missionTitleY + (denseDesktop ? 30 : 36)) - (denseDesktop ? 30 : 38));
@@ -2224,7 +2227,7 @@ export class MenuScene extends Phaser.Scene {
           weeklyMissionRows.forEach((row, index) => {
             row.bg.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 34 : 40);
             row.text.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]);
-            row.text.setStyle({ fontSize: denseDesktop ? "9px" : "10px" });
+            row.text.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
             row.text.setWordWrapWidth(columnWidth - 16, true);
           });
           weeklyMissionsTitle.setPosition(
@@ -2284,6 +2287,7 @@ export class MenuScene extends Phaser.Scene {
     this.time.delayedCall(0, () => {
       void signalPlatformGameReady(this.platformAdapter, this.registry);
     });
+    const allowMenuSessionToast = getUiProgressSnapshot(this.saveManager.get()).stage === "advanced";
     const sessionSummary =
       (this.registry.get("liveopsSessionSummary") as
         | {
@@ -2291,14 +2295,14 @@ export class MenuScene extends Phaser.Scene {
             comebackEligible?: boolean;
           }
         | undefined) ?? null;
-    if (sessionSummary?.weeklyRewardGranted) {
+    if (allowMenuSessionToast && sessionSummary?.weeklyRewardGranted) {
       this.toast(
         t(this.locale, "toast.weeklyBoardReward", {
           reward: formatLeaderboardReward(this.locale, sessionSummary.weeklyRewardGranted.reward),
         })
       );
     }
-    if (sessionSummary?.comebackEligible) {
+    if (allowMenuSessionToast && sessionSummary?.comebackEligible) {
       const comeback = getComebackStatus(this.saveManager.get(), this.staticData.liveops);
       if (comeback.eligible) {
         this.toast(
@@ -2663,7 +2667,7 @@ export class MenuScene extends Phaser.Scene {
       .setLineSpacing(4);
     this.leaderboardPlatformText = this.add
       .text(0, 392, "", {
-        fontSize: "10px",
+        fontSize: "11px",
         color: "#a9d7ee",
         align: "center",
         wordWrap: { width: 520 },
@@ -2710,6 +2714,11 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
+  private shouldShowExpandedLeaderboardMeta(): boolean {
+    const metrics = this.getLeaderboardPanelMetrics();
+    return getUiProgressSnapshot(this.saveManager.get()).stage === "advanced" && !metrics.compact && this.scale.width >= 1440 && this.scale.height >= 960;
+  }
+
   private layoutWorkshop(): void {
     if (!this.workshopDim || !this.workshopBox) return;
     const { width, height } = this.scale;
@@ -2728,16 +2737,16 @@ export class MenuScene extends Phaser.Scene {
     title?.setPosition(0, -halfHeight + 22).setStyle({ fontSize: metrics.compact ? "24px" : "28px" });
     this.workshopWalletText
       .setPosition(-halfWidth + 40, -halfHeight + 60)
-      .setStyle({ fontSize: metrics.compact ? "15px" : "16px", wordWrap: { width: metrics.width - 96 } });
+      .setStyle({ fontSize: metrics.compact ? "16px" : "18px", wordWrap: { width: metrics.width - 96 } });
     this.workshopRecommendationText
       .setPosition(-halfWidth + 40, -halfHeight + 90)
-      .setStyle({ fontSize: metrics.compact ? "14px" : "15px", wordWrap: { width: metrics.width - 96 } });
+      .setStyle({ fontSize: metrics.compact ? "15px" : "17px", wordWrap: { width: metrics.width - 96 } });
     this.workshopHintText
       .setPosition(-halfWidth + 40, -halfHeight + 118)
-      .setStyle({ fontSize: metrics.compact ? "11px" : "12px", wordWrap: { width: metrics.width - 96 } });
+      .setStyle({ fontSize: metrics.compact ? "12px" : "13px", wordWrap: { width: metrics.width - 96 } });
     this.workshopFooterText
       .setPosition(-halfWidth + 40, halfHeight - 48)
-      .setStyle({ fontSize: metrics.compact ? "11px" : "12px", wordWrap: { width: metrics.width - 96 } });
+      .setStyle({ fontSize: metrics.compact ? "12px" : "13px", wordWrap: { width: metrics.width - 96 } });
     btnClose?.setPosition(halfWidth - 52, -halfHeight + 22);
     labelClose?.setPosition(halfWidth - 52, -halfHeight + 22);
     fitTextScaleToWidth(this.workshopWalletText, metrics.width - 96, 0.78);
@@ -2764,6 +2773,7 @@ export class MenuScene extends Phaser.Scene {
     const rowHeight = metrics.compact ? 42 : 46;
     const rowTextX = -rowWidth / 2 + 20;
     const rowTextTop = metrics.compact ? 14 : 16;
+    const expandedMeta = this.shouldShowExpandedLeaderboardMeta();
     const panel = this.leaderboardBox.list[0] as Phaser.GameObjects.Rectangle | undefined;
     const accent = this.leaderboardBox.list[1] as Phaser.GameObjects.Rectangle | undefined;
     const title = this.leaderboardBox.list[2] as Phaser.GameObjects.Text | undefined;
@@ -2775,7 +2785,7 @@ export class MenuScene extends Phaser.Scene {
     accent?.setPosition(0, headerAccentY).setSize(metrics.width - 108, 2);
     title?.setPosition(0, headerTitleY).setStyle({ fontSize: metrics.compact ? "24px" : "28px" });
     this.leaderboardHintText.setPosition(0, headerHintY).setStyle({
-      fontSize: metrics.compact ? "11px" : "12px",
+      fontSize: metrics.compact ? "12px" : expandedMeta ? "13px" : "14px",
       wordWrap: { width: metrics.width - 140 },
     });
     btnClose?.setPosition(halfWidth - 58, headerTitleY);
@@ -2797,22 +2807,28 @@ export class MenuScene extends Phaser.Scene {
 
     this.leaderboardEmptyPanel.setPosition(0, metrics.compact ? -32 : -86).setSize(rowWidth, metrics.compact ? 140 : 172);
     this.leaderboardEmptyText.setPosition(0, metrics.compact ? -32 : -86).setStyle({
-      fontSize: metrics.compact ? "13px" : "14px",
+      fontSize: metrics.compact ? "13px" : "15px",
       wordWrap: { width: rowWidth - 48 },
     });
-    this.leaderboardFooterText.setPosition(0, metrics.compact ? halfHeight - 104 : 316).setStyle({
-      fontSize: metrics.compact ? "11px" : "12px",
+    this.leaderboardFooterText.setPosition(0, metrics.compact ? halfHeight - 104 : expandedMeta ? 316 : 278).setStyle({
+      fontSize: metrics.compact ? "11px" : expandedMeta ? "12px" : "13px",
       wordWrap: { width: metrics.width - 140 },
     });
-    this.leaderboardCareerTitleText.setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 184 : 170);
-    this.leaderboardCareerText.setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 158 : 196).setStyle({
-      fontSize: metrics.compact ? "11px" : "12px",
-      wordWrap: { width: rowWidth - 40 },
-    });
-    this.leaderboardPlatformText.setPosition(0, metrics.compact ? halfHeight - 56 : 392).setStyle({
-      fontSize: metrics.compact ? "9px" : "10px",
-      wordWrap: { width: metrics.width - 180 },
-    });
+    this.leaderboardCareerTitleText.setVisible(expandedMeta).setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 184 : 170);
+    this.leaderboardCareerText
+      .setVisible(expandedMeta)
+      .setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 158 : 196)
+      .setStyle({
+        fontSize: metrics.compact ? "11px" : "12px",
+        wordWrap: { width: rowWidth - 40 },
+      });
+    this.leaderboardPlatformText
+      .setVisible(expandedMeta)
+      .setPosition(0, metrics.compact ? halfHeight - 56 : 392)
+      .setStyle({
+        fontSize: metrics.compact ? "9px" : "10px",
+        wordWrap: { width: metrics.width - 180 },
+      });
 
     const scale = Math.min(1, (width - 28) / metrics.width, (height - 28) / metrics.height);
     this.leaderboardBox.setScale(scale).setPosition(width / 2, height / 2);
@@ -2861,6 +2877,7 @@ export class MenuScene extends Phaser.Scene {
     const uiStage = getUiProgressSnapshot(save).stage;
     const compactLeaderboard = this.getLeaderboardPanelMetrics().compact;
     const fullLeaderboard = uiStage === "advanced" && !compactLeaderboard;
+    const expandedMeta = fullLeaderboard && this.shouldShowExpandedLeaderboardMeta();
 
     const hasDaily = save.leaderboard.entries.some((entry) => entry.mode === "daily");
     const hasRun = save.leaderboard.entries.some((entry) => entry.mode === "run");
@@ -2896,7 +2913,7 @@ export class MenuScene extends Phaser.Scene {
 
     const rank = this.latestLeaderboardRank ?? getLeaderboardRank(filtered, this.latestLeaderboardEntryId ?? "");
     this.leaderboardHintText.setText(
-      fullLeaderboard
+      expandedMeta
         ? [
             t(this.locale, "menu.leaderboardHint", {
               mode: t(this.locale, `leaderboard.filter.${effectiveFilter}`),
@@ -2910,9 +2927,21 @@ export class MenuScene extends Phaser.Scene {
                 })
               : t(this.locale, "menu.leaderboardCareerComplete", {
                   count: formatNumber(this.locale, claimedMilestones.size),
-                  total: formatNumber(this.locale, careerMilestones.length),
-                }),
+              total: formatNumber(this.locale, careerMilestones.length),
+            }),
           ].join("\n")
+        : fullLeaderboard
+          ? [
+              rank
+                ? `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, bestScore)}`
+                : t(this.locale, "menu.leaderboardScoring"),
+              nextDivision
+                ? t(this.locale, "results.nextDivision", {
+                    division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
+                    score: formatNumber(this.locale, nextDivision.minScore),
+                  })
+                : t(this.locale, "results.topDivision"),
+            ].join("\n")
         : [
             rank
               ? `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, bestScore)}`
@@ -2925,9 +2954,9 @@ export class MenuScene extends Phaser.Scene {
               : t(this.locale, "results.topDivision"),
           ].join("\n")
     );
-    this.leaderboardHintText.setStyle({ fontSize: compactLeaderboard ? "11px" : fullLeaderboard ? "12px" : "14px" });
-    if (fullLeaderboard && !compactLeaderboard && this.leaderboardHintText.height > 42) {
-      this.leaderboardHintText.setStyle({ fontSize: "11px" });
+    this.leaderboardHintText.setStyle({ fontSize: compactLeaderboard ? "12px" : expandedMeta ? "13px" : "14px" });
+    if (expandedMeta && this.leaderboardHintText.height > 46) {
+      this.leaderboardHintText.setStyle({ fontSize: "12px" });
     }
     this.leaderboardPlatformText.setText(getPortalBoardLoadingLabel(this.locale));
     const hasVisibleEntries = filtered.length > 0;
@@ -2978,7 +3007,7 @@ export class MenuScene extends Phaser.Scene {
             ? `${rank}. ${entry.pilot} [${modeLabel} | ${divisionLabel}]  ${formatNumber(this.locale, entry.score)}\n${secondary} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)} | ${t(this.locale, "hud.bolts")} ${formatNumber(this.locale, entry.bolts)} | ${t(this.locale, "results.cores")} ${formatNumber(this.locale, entry.cores)}${badge ? ` | ${badge}` : ""}`
             : `${rank}. ${entry.pilot} | ${formatNumber(this.locale, entry.score)}\n${divisionLabel} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}${badge ? ` | ${badge}` : ""}`
         )
-        .setStyle({ fontSize: compactLeaderboard ? "12px" : fullLeaderboard ? "13px" : "14px" });
+        .setStyle({ fontSize: compactLeaderboard ? "12px" : fullLeaderboard && !expandedMeta ? "14px" : fullLeaderboard ? "13px" : "14px" });
     }
 
     this.leaderboardCareerTitleText.setText(t(this.locale, "menu.careerMilestonesTitle"));
@@ -2995,12 +3024,12 @@ export class MenuScene extends Phaser.Scene {
         )
         .join("\n")
     );
-    this.leaderboardCareerTitleText.setVisible(fullLeaderboard);
-    this.leaderboardCareerText.setVisible(fullLeaderboard);
-    this.leaderboardPlatformText.setVisible(fullLeaderboard);
+    this.leaderboardCareerTitleText.setVisible(expandedMeta);
+    this.leaderboardCareerText.setVisible(expandedMeta);
+    this.leaderboardPlatformText.setVisible(expandedMeta);
     this.leaderboardFooterText
-      .setPosition(0, compactLeaderboard ? 206 : fullLeaderboard ? 316 : 148)
-      .setStyle({ fontSize: compactLeaderboard ? "11px" : "12px" });
+      .setPosition(0, compactLeaderboard ? 206 : expandedMeta ? 316 : 278)
+      .setStyle({ fontSize: compactLeaderboard ? "11px" : expandedMeta ? "12px" : "13px" });
 
     this.leaderboardFooterText.setText(
       this.latestPromotionDivision && (this.latestPromotionReward.bolts > 0 || this.latestPromotionReward.cores > 0)
@@ -3036,7 +3065,7 @@ export class MenuScene extends Phaser.Scene {
         : t(this.locale, "menu.leaderboardScoring")
     );
 
-    if (fullLeaderboard) {
+    if (expandedMeta) {
       await this.refreshPlatformLeaderboardSummary(requestNonce);
     } else {
       this.leaderboardPlatformText.setText("");
@@ -3303,15 +3332,20 @@ export class MenuScene extends Phaser.Scene {
         })
         .setOrigin(0, 0);
       fitTextScaleToWidth(title, titleMaxWidth, 0.62);
+      const descriptionPreview = buildWorkshopDescriptionPreview(
+        getMetaNodeDescription(this.locale, node.id),
+        uiSnapshot.stage,
+        compactWorkshop
+      );
       const desc = this.add
-        .text(textLeft, -workshopLayout.cardHeight / 2 + (uiSnapshot.stage === "advanced" ? 36 : 40), getMetaNodeDescription(this.locale, node.id), {
-          fontSize: compactWorkshop ? "11px" : uiSnapshot.stage === "starter" ? "12px" : uiSnapshot.stage === "growing" ? "11px" : "10px",
+        .text(textLeft, -workshopLayout.cardHeight / 2 + (uiSnapshot.stage === "advanced" ? 36 : 40), descriptionPreview, {
+          fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "13px" : uiSnapshot.stage === "growing" ? "12px" : "11px",
           color: "#98b7c7",
           wordWrap: { width: Math.max(70, textWrapWidth + 6) },
         })
         .setOrigin(0, 0);
       desc.setLineSpacing(1);
-      const descHeightCap = compactWorkshop ? 22 : uiSnapshot.stage === "starter" ? 34 : 24;
+      const descHeightCap = compactWorkshop ? 30 : uiSnapshot.stage === "starter" ? 40 : uiSnapshot.stage === "growing" ? 32 : 28;
       if (desc.displayHeight > descHeightCap) {
         desc.setScale(Phaser.Math.Clamp(descHeightCap / desc.displayHeight, 0.82, 1));
       }
@@ -3319,7 +3353,7 @@ export class MenuScene extends Phaser.Scene {
       const progressY = Math.min(workshopLayout.cardHeight / 2 - 12, levelY + 16);
       const levelText = this.add
         .text(textLeft, levelY, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
-          fontSize: compactWorkshop ? "11px" : uiSnapshot.stage === "starter" ? "12px" : "11px",
+          fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "12px" : "11px",
           color: maxed ? "#57c27d" : "#7fdfff",
           fontStyle: "700",
         })
@@ -3354,12 +3388,12 @@ export class MenuScene extends Phaser.Scene {
           buttonCenterX,
           (uiSnapshot.stage === "advanced" ? 2 : 4) - 6,
           maxed ? t(this.locale, "menu.installedButton") : affordable ? t(this.locale, "menu.buy") : t(this.locale, "menu.locked"),
-          { fontSize: compactWorkshop ? "11px" : uiSnapshot.stage === "starter" ? "13px" : "12px", color: "#d9f2ff", fontStyle: "700" }
+          { fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "13px" : "12px", color: "#d9f2ff", fontStyle: "700" }
         )
         .setOrigin(0.5);
       const costLabel = this.add
         .text(buttonCenterX, (uiSnapshot.stage === "advanced" ? 2 : 4) + 10, priceLabel, {
-          fontSize: compactWorkshop ? "10px" : uiSnapshot.stage === "starter" ? "11px" : "10px",
+          fontSize: compactWorkshop ? "11px" : uiSnapshot.stage === "starter" ? "11px" : "10px",
           color: maxed ? "#57c27d" : affordable || isRecommended ? "#ffd166" : "#98b7c7",
           fontStyle: "700",
           align: "center",
@@ -4155,6 +4189,25 @@ function fitTextScaleToWidth(text: Phaser.GameObjects.Text, maxWidth: number, mi
   text.setScale(Phaser.Math.Clamp(maxWidth / text.width, minScale, 1));
 }
 
+function buildWorkshopDescriptionPreview(
+  value: string,
+  stage: "starter" | "growing" | "advanced",
+  compact: boolean
+): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+
+  const maxLength = compact ? 48 : stage === "starter" ? 88 : stage === "growing" ? 62 : 50;
+  const firstSentenceMatch = normalized.match(/^(.+?[.!?])(?:\s|$)/);
+  const firstSentence = firstSentenceMatch?.[1]?.trim() ?? normalized;
+  if (firstSentence.length <= maxLength) return firstSentence;
+  if (normalized.length <= maxLength) return normalized;
+
+  const clipped = normalized.slice(0, Math.max(0, maxLength - 1));
+  const safe = clipped.includes(" ") ? clipped.slice(0, clipped.lastIndexOf(" ")) : clipped;
+  return `${safe.trim()}…`;
+}
+
 function getLiveopsPanelMetrics(width: number, compact: boolean, height = 1080): { width: number; height: number; stacked: boolean } {
   const panelWidth = compact ? Math.max(332, Math.min(width - 44, 540)) : 468;
   const stacked = compact && panelWidth <= 430;
@@ -4266,7 +4319,7 @@ function createMenuBadge(
 ): Phaser.GameObjects.Container {
   const text = scene.add
     .text(0, 0, label, {
-      fontSize: "10px",
+      fontSize: "11px",
       color: textColor,
       fontStyle: "700",
     })

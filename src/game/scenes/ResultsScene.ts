@@ -142,7 +142,7 @@ export class ResultsScene extends Phaser.Scene {
       .setDepth(2001);
     this.progressText = this.add
       .text(0, 0, "", {
-        fontSize: "13px",
+        fontSize: "14px",
         color: "#a9d7ee",
         align: "left",
         wordWrap: { width: Math.min(540, width * 0.84) },
@@ -152,7 +152,7 @@ export class ResultsScene extends Phaser.Scene {
       .setDepth(2001);
     this.leaderboardText = this.add
       .text(0, 0, "", {
-        fontSize: "13px",
+        fontSize: "14px",
         color: "#d9f2ff",
         align: "left",
         wordWrap: { width: Math.min(540, width * 0.84) },
@@ -240,20 +240,33 @@ export class ResultsScene extends Phaser.Scene {
     const nextMilestone = getNextLeaderboardCareerMilestone(careerProgress, [...claimedMilestones]);
     const leaderboardEntries = filterLeaderboardEntries(save?.leaderboard?.entries ?? [], this.latestLeaderboardFilter);
     const rank = this.latestLeaderboardRank ?? getLeaderboardRank(leaderboardEntries, this.getLeaderboardEntryId());
-    const topLines = leaderboardEntries.slice(0, ultraCompactLayout ? 1 : compactLayout ? 1 : 3).map((entry, index) =>
-      `${index + 1}. ${entry.pilot} [${entry.mode === "daily" ? t(this.locale, "leaderboard.mode.daily") : t(this.locale, "leaderboard.mode.run")} | ${t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`)}] | ${formatNumber(this.locale, entry.score)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`
-    );
+    const topLines = leaderboardEntries.slice(0, ultraCompactLayout ? 1 : compactLayout ? 1 : 3).map((entry, index) => {
+      const rankLabel = `${index + 1}. ${entry.pilot}`;
+      const scoreLabel = formatNumber(this.locale, entry.score);
+      if (ultraCompactLayout) return `${rankLabel} | ${scoreLabel}`;
+      if (compactLayout) return `${rankLabel} | ${scoreLabel} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`;
+      return `${rankLabel} [${entry.mode === "daily" ? t(this.locale, "leaderboard.mode.daily") : t(this.locale, "leaderboard.mode.run")} | ${t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`)}] | ${scoreLabel} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`;
+    });
     const bestDelta =
       this.latestLeaderboardPreviousBest === null ? null : score - this.latestLeaderboardPreviousBest;
-    const summaryLines = compactLayout
+    const summaryLines = ultraCompactLayout
       ? [
           `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
-          `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)} | ${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)} | ${t(this.locale, "results.workshop", {
+          `${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)} | ${t(this.locale, "results.workshop", {
             bolts: formatNumber(this.locale, rewardPreview.bolts),
             cores: formatNumber(this.locale, rewardPreview.cores),
           })}`,
         ]
-      : [
+      : compactLayout
+        ? [
+            `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
+            `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)} | ${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)}`,
+            t(this.locale, "results.workshop", {
+              bolts: formatNumber(this.locale, rewardPreview.bolts),
+              cores: formatNumber(this.locale, rewardPreview.cores),
+            }),
+          ]
+        : [
           `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
           `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)} | ${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)}`,
           `${t(this.locale, "hud.bolts")}: ${formatNumber(this.locale, this.state.bolts)} | ${t(this.locale, "results.cores")}: ${formatNumber(this.locale, this.state.cores)} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)}`,
@@ -308,7 +321,7 @@ export class ResultsScene extends Phaser.Scene {
             : "",
     ].filter(Boolean);
     this.summaryText.setText(summaryLines.join("\n"));
-    this.progressText.setText(progressLines.slice(0, ultraCompactLayout ? 2 : compactLayout ? 2 : progressLines.length).join("\n"));
+    this.progressText.setText(progressLines.slice(0, ultraCompactLayout ? 1 : compactLayout ? 2 : progressLines.length).join("\n"));
     this.leaderboardText.setText(
       [
         `${t(this.locale, "results.leaderboardTitle")} (${t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`)})`,
@@ -330,10 +343,10 @@ export class ResultsScene extends Phaser.Scene {
     const contentWidth = panelWidth - 56;
     const titleFont = ultraCompactLayout ? 28 : compactLayout ? 32 : height < 680 ? 34 : height < 760 ? 38 : 44;
     const x2Visible = Boolean(this.x2Btn?.visible && this.x2Label?.visible);
-    const x2Height = x2Visible ? (ultraCompactLayout ? 32 : compactLayout ? 40 : height < 700 ? 46 : 52) : 0;
-    const restartHeight = ultraCompactLayout ? 38 : compactLayout ? 48 : height < 700 ? 56 : 64;
-    const menuHeight = ultraCompactLayout ? 32 : compactLayout ? 40 : height < 700 ? 46 : 52;
-    const buttonGap = ultraCompactLayout ? 6 : compactLayout ? 10 : height < 700 ? 14 : 20;
+    const x2Height = x2Visible ? (ultraCompactLayout ? 42 : compactLayout ? 48 : height < 700 ? 50 : 54) : 0;
+    const restartHeight = ultraCompactLayout ? 42 : compactLayout ? 50 : height < 700 ? 56 : 64;
+    const menuHeight = ultraCompactLayout ? 36 : compactLayout ? 44 : height < 700 ? 48 : 52;
+    const buttonGap = ultraCompactLayout ? 8 : compactLayout ? 10 : height < 700 ? 14 : 20;
     const sectionGap = ultraCompactLayout ? 4 : compactLayout ? 8 : height < 700 ? 10 : 14;
     const titleGap = ultraCompactLayout ? 6 : compactLayout ? 10 : height < 700 ? 14 : 18;
     const reservedButtonsHeight = (x2Visible ? x2Height + buttonGap : 0) + restartHeight + buttonGap + menuHeight;
@@ -347,20 +360,18 @@ export class ResultsScene extends Phaser.Scene {
     const availableSectionHeight = Math.max(140, panelBottom - 20 - reservedButtonsHeight - sectionGap - sectionsTop);
     const fontPresets = ultraCompactLayout
       ? [
-          { summary: 12, progress: 9, leaderboard: 9 },
-          { summary: 11, progress: 8, leaderboard: 8 },
-          { summary: 10, progress: 8, leaderboard: 8 },
+          { summary: 14, progress: 12, leaderboard: 12 },
+          { summary: 13, progress: 12, leaderboard: 12 },
         ]
       : compactLayout
         ? [
-            { summary: 13, progress: 10, leaderboard: 10 },
-            { summary: 12, progress: 9, leaderboard: 9 },
-            { summary: 11, progress: 8, leaderboard: 8 },
+            { summary: 15, progress: 13, leaderboard: 13 },
+            { summary: 14, progress: 12, leaderboard: 12 },
           ]
         : [
-            { summary: 16, progress: 13, leaderboard: 13 },
-            { summary: 15, progress: 12, leaderboard: 12 },
-            { summary: 14, progress: 11, leaderboard: 11 },
+            { summary: 16, progress: 14, leaderboard: 14 },
+            { summary: 15, progress: 13, leaderboard: 13 },
+            { summary: 14, progress: 12, leaderboard: 12 },
           ];
     let summaryHeight = 0;
     let progressHeight = 0;
@@ -394,24 +405,42 @@ export class ResultsScene extends Phaser.Scene {
     this.leaderboardText.setPosition(textLeft, cursorTop + 12);
 
     const statsBottom = cursorTop + leaderboardHeight;
-    const buttonWidth = Math.min(320, panelWidth - (ultraCompactLayout ? 56 : 140));
+    const buttonWidth = Math.min(336, panelWidth - (ultraCompactLayout ? 40 : 140));
     let nextTop = Math.max(statsBottom + sectionGap, panelBottom - 24 - reservedButtonsHeight);
 
     if (x2Visible && this.x2Btn && this.x2Label) {
       this.x2Btn.setSize(buttonWidth, x2Height).setPosition(width / 2, nextTop + x2Height / 2);
-      this.x2Label.setStyle({ fontSize: ultraCompactLayout ? "12px" : height < 700 ? "14px" : "16px" }).setPosition(this.x2Btn.x, this.x2Btn.y);
-      fitTextScaleToWidth(this.x2Label, buttonWidth - 20, 0.76);
+      this.x2Label
+        .setStyle({
+          fontSize: ultraCompactLayout ? "14px" : height < 700 ? "15px" : "16px",
+          align: "center",
+          wordWrap: { width: buttonWidth - 24 },
+        })
+        .setPosition(this.x2Btn.x, this.x2Btn.y);
+      fitTextScaleToWidth(this.x2Label, buttonWidth - 24, 0.88);
       nextTop += x2Height + buttonGap;
     }
 
     this.restartBtn.setSize(buttonWidth, restartHeight).setPosition(width / 2, nextTop + restartHeight / 2);
-    this.restartLabel.setStyle({ fontSize: ultraCompactLayout ? "18px" : height < 700 ? "22px" : "24px" }).setPosition(this.restartBtn.x, this.restartBtn.y);
-    fitTextScaleToWidth(this.restartLabel, buttonWidth - 20, 0.76);
+    this.restartLabel
+      .setStyle({
+        fontSize: ultraCompactLayout ? "18px" : height < 700 ? "22px" : "24px",
+        align: "center",
+        wordWrap: { width: buttonWidth - 20 },
+      })
+      .setPosition(this.restartBtn.x, this.restartBtn.y);
+    fitTextScaleToWidth(this.restartLabel, buttonWidth - 20, 0.88);
     nextTop += restartHeight + buttonGap;
 
     this.menuBtn.setSize(buttonWidth, menuHeight).setPosition(width / 2, nextTop + menuHeight / 2);
-    this.menuLabel.setStyle({ fontSize: ultraCompactLayout ? "15px" : height < 700 ? "18px" : "20px" }).setPosition(this.menuBtn.x, this.menuBtn.y);
-    fitTextScaleToWidth(this.menuLabel, buttonWidth - 20, 0.76);
+    this.menuLabel
+      .setStyle({
+        fontSize: ultraCompactLayout ? "15px" : height < 700 ? "18px" : "20px",
+        align: "center",
+        wordWrap: { width: buttonWidth - 20 },
+      })
+      .setPosition(this.menuBtn.x, this.menuBtn.y);
+    fitTextScaleToWidth(this.menuLabel, buttonWidth - 20, 0.88);
   }
 
   private async handleX2(): Promise<void> {

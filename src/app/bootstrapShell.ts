@@ -1,4 +1,6 @@
-type BootstrapLocale = "en" | "ru";
+import { type Locale, t } from "../i18n/localization";
+
+type BootstrapLocale = Locale;
 
 type FatalOverlayCopy = {
   title: string;
@@ -7,18 +9,6 @@ type FatalOverlayCopy = {
 };
 
 const FATAL_OVERLAY_ID = "mc-fatal-overlay";
-const FATAL_COPY: Record<BootstrapLocale, FatalOverlayCopy> = {
-  en: {
-    title: "Magnet Caravan needs a quick restart",
-    body: "The game hit an unexpected issue. Reload to continue cleanly.",
-    action: "Reload",
-  },
-  ru: {
-    title: "Magnet Caravan нужно быстро перезапустить",
-    body: "Игра столкнулась с неожиданной ошибкой. Перезагрузите страницу, чтобы продолжить.",
-    action: "Перезагрузить",
-  },
-};
 
 let browserInteractionGuardsInstalled = false;
 
@@ -46,7 +36,7 @@ function renderFatalOverlay(locale: BootstrapLocale): void {
   const host = document.getElementById("app") ?? document.body;
   if (!host) return;
 
-  const copy = FATAL_COPY[locale];
+  const copy = getFatalOverlayCopy(locale);
   const overlay = ensureOverlay(host);
   overlay.lang = locale;
 
@@ -129,6 +119,14 @@ function ensureOverlay(host: HTMLElement): HTMLElement {
   overlay.append(panel);
   host.append(overlay);
   return overlay;
+}
+
+function getFatalOverlayCopy(locale: BootstrapLocale): FatalOverlayCopy {
+  return {
+    title: t(locale, "bootstrap.fatal.title"),
+    body: t(locale, "bootstrap.fatal.body"),
+    action: t(locale, "bootstrap.fatal.action"),
+  };
 }
 
 function detectBootstrapLocale(): BootstrapLocale {

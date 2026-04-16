@@ -101,7 +101,9 @@ export class UIScene extends Phaser.Scene {
   private revivePanel!: Phaser.GameObjects.Rectangle;
   private reviveTitle!: Phaser.GameObjects.Text;
   private reviveHint!: Phaser.GameObjects.Text;
+  private reviveAcceptButton!: Phaser.GameObjects.Rectangle;
   private reviveAcceptLabel!: Phaser.GameObjects.Text;
+  private reviveDeclineButton!: Phaser.GameObjects.Rectangle;
   private reviveDeclineLabel!: Phaser.GameObjects.Text;
   private settingsVisible = false;
   private settingsDim!: Phaser.GameObjects.Rectangle;
@@ -210,9 +212,9 @@ export class UIScene extends Phaser.Scene {
     this.hudText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
     this.boltsText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
     this.dailyText = this.add.text(16, 12, "", hudStyle).setDepth(1000).setScrollFactor(0);
-    this.waveText = this.add.text(16, 36, "", { fontSize: "14px", color: "#98b7c7", fontStyle: "700" }).setDepth(1000).setScrollFactor(0);
+    this.waveText = this.add.text(16, 36, "", { fontSize: "15px", color: "#98b7c7", fontStyle: "700" }).setDepth(1000).setScrollFactor(0);
     this.statusText = this.add
-      .text(16, 56, "", { fontSize: "13px", color: "#7fdfff", fontStyle: "700", wordWrap: { width: 520 } })
+      .text(16, 56, "", { fontSize: "14px", color: "#7fdfff", fontStyle: "700", wordWrap: { width: 520 } })
       .setDepth(1000)
       .setScrollFactor(0);
     this.createLevelProgressUi();
@@ -416,19 +418,19 @@ export class UIScene extends Phaser.Scene {
       inputState.dashPressed = true;
     });
     this.dashLabel = this.add
-      .text(0, 0, t(this.locale, "hud.dash"), { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "hud.dash"), { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(1001)
       .setScrollFactor(0);
     this.dashBadgePrimary = this.add
-      .text(0, 0, "", { fontSize: "10px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, "", { fontSize: "13px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(1002)
       .setScrollFactor(0)
       .setPadding(6, 2, 6, 2)
       .setVisible(false);
     this.dashBadgeSecondary = this.add
-      .text(0, 0, "", { fontSize: "10px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, "", { fontSize: "13px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(1002)
       .setScrollFactor(0)
@@ -449,7 +451,7 @@ export class UIScene extends Phaser.Scene {
       else this.openSettings();
     });
     this.pauseLabel = this.add
-      .text(0, 0, t(this.locale, "pause.open"), { fontSize: "13px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 0, t(this.locale, "pause.open"), { fontSize: "15px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5)
       .setDepth(1001)
       .setScrollFactor(0);
@@ -644,6 +646,7 @@ export class UIScene extends Phaser.Scene {
 
     this.reviveBox.setPosition(width / 2, height / 2);
     this.reviveDim.setSize(width, height);
+    this.layoutReviveOverlay();
     this.settingsBox.setPosition(width / 2, height / 2);
     this.settingsDim.setSize(width, height);
     this.layoutSettingsOverlay();
@@ -654,22 +657,72 @@ export class UIScene extends Phaser.Scene {
 
     const compactLayout = this.scale.width <= 720 || this.scale.height <= 430;
     const boxWidth = Math.max(320, Math.min(520, this.scale.width - (compactLayout ? 24 : 84)));
-    const buttonWidth = compactLayout ? 86 : 70;
+    const buttonWidth = compactLayout ? 96 : 80;
     const buttonHeight = compactLayout ? 36 : 34;
     const textWidth = Math.max(190, boxWidth - buttonWidth - 44);
 
     this.tutorialText.setStyle({
-      fontSize: compactLayout ? "12px" : "14px",
+      fontSize: compactLayout ? "14px" : "15px",
       wordWrap: { width: textWidth },
     });
-    this.tutorialActionLabel.setStyle({ fontSize: compactLayout ? "11px" : "12px" });
+    this.tutorialActionLabel.setStyle({ fontSize: compactLayout ? "13px" : "14px" });
 
     const boxHeight = Math.max(compactLayout ? 78 : 64, this.tutorialText.height + 24);
     this.tutorialBg.setSize(boxWidth, boxHeight);
     this.tutorialText.setPosition(-boxWidth / 2 + 14, -boxHeight / 2 + 10);
     this.tutorialActionButton.setSize(buttonWidth, buttonHeight).setPosition(boxWidth / 2 - buttonWidth / 2 - 12, 0);
     this.tutorialActionLabel.setPosition(this.tutorialActionButton.x, this.tutorialActionButton.y);
-    fitTextScaleToWidth(this.tutorialActionLabel, buttonWidth - 16, 0.8);
+    fitTextScaleToWidth(this.tutorialActionLabel, buttonWidth - 16, 0.9);
+  }
+
+  private layoutReviveOverlay(): void {
+    if (
+      !this.revivePanel?.scene ||
+      !this.reviveTitle?.scene ||
+      !this.reviveHint?.scene ||
+      !this.reviveAcceptButton?.scene ||
+      !this.reviveAcceptLabel?.scene ||
+      !this.reviveDeclineButton?.scene ||
+      !this.reviveDeclineLabel?.scene
+    ) {
+      return;
+    }
+
+    const { width, height } = this.scale;
+    const compactLayout = width <= 760 || height <= 460;
+    const shortLayout = width <= 540 || height <= 380;
+    const panelWidth = Math.max(300, Math.min(420, width - (shortLayout ? 20 : 32)));
+    const panelHeight = Math.max(212, Math.min(shortLayout ? 228 : compactLayout ? 244 : 260, height - (shortLayout ? 20 : 32)));
+    const titleY = -panelHeight / 2 + (shortLayout ? 34 : compactLayout ? 38 : 42);
+    const hintY = titleY + (shortLayout ? 34 : 40);
+    const primaryY = hintY + (shortLayout ? 56 : compactLayout ? 62 : 70);
+    const secondaryY = primaryY + (shortLayout ? 52 : 60);
+    const buttonWidth = Math.max(220, Math.min(panelWidth - 40, shortLayout ? 252 : 280));
+
+    this.revivePanel.setSize(panelWidth, panelHeight);
+    this.reviveTitle
+      .setStyle({ fontSize: shortLayout ? "24px" : compactLayout ? "26px" : "28px" })
+      .setPosition(0, titleY)
+      .setWordWrapWidth(panelWidth - 36, true);
+    this.reviveHint
+      .setStyle({
+        fontSize: shortLayout ? "14px" : compactLayout ? "15px" : "16px",
+        align: "center",
+        wordWrap: { width: panelWidth - 44 },
+      })
+      .setPosition(0, hintY);
+    this.reviveAcceptButton.setSize(buttonWidth, shortLayout ? 46 : compactLayout ? 50 : 54).setPosition(0, primaryY);
+    this.reviveAcceptLabel
+      .setStyle({ fontSize: shortLayout ? "16px" : compactLayout ? "17px" : "18px" })
+      .setPosition(this.reviveAcceptButton.x, this.reviveAcceptButton.y)
+      .setWordWrapWidth(buttonWidth - 24, true);
+    fitTextScaleToWidth(this.reviveAcceptLabel, buttonWidth - 24, 0.88);
+    this.reviveDeclineButton.setSize(buttonWidth, shortLayout ? 40 : compactLayout ? 42 : 46).setPosition(0, secondaryY);
+    this.reviveDeclineLabel
+      .setStyle({ fontSize: shortLayout ? "15px" : compactLayout ? "15px" : "16px" })
+      .setPosition(this.reviveDeclineButton.x, this.reviveDeclineButton.y)
+      .setWordWrapWidth(buttonWidth - 24, true);
+    fitTextScaleToWidth(this.reviveDeclineLabel, buttonWidth - 24, 0.88);
   }
 
   private layoutSettingsOverlay(): void {
@@ -679,7 +732,7 @@ export class UIScene extends Phaser.Scene {
     const compactLayout = width <= 720 || height <= 520;
     const shortLayout = width <= 680 || height <= 400;
     const panelWidth = Math.max(320, Math.min(468, width - (shortLayout ? 20 : 32)));
-    const panelHeight = Math.max(308, Math.min(shortLayout ? 352 : 410, height - (shortLayout ? 16 : 24)));
+    const panelHeight = Math.max(324, Math.min(shortLayout ? 372 : 420, height - (shortLayout ? 16 : 24)));
     const titleY = -panelHeight / 2 + (shortLayout ? 28 : compactLayout ? 34 : 42);
     const accentY = titleY + (shortLayout ? 24 : 28);
     const hintY = accentY + (shortLayout ? 16 : 20);
@@ -695,7 +748,7 @@ export class UIScene extends Phaser.Scene {
       .setWordWrapWidth(panelWidth - 36, true);
     this.settingsHint
       .setStyle({
-        fontSize: shortLayout ? "11px" : compactLayout ? "12px" : "13px",
+        fontSize: shortLayout ? "13px" : compactLayout ? "14px" : "15px",
         wordWrap: { width: panelWidth - 48 },
         align: "center",
       })
@@ -711,8 +764,8 @@ export class UIScene extends Phaser.Scene {
 
     for (const control of controls) {
       control.button.setSize(fieldWidth, fieldHeight).setPosition(0, cursorY);
-      control.label.setStyle({ fontSize: shortLayout ? "14px" : "16px" }).setPosition(0, cursorY);
-      fitTextScaleToWidth(control.label, fieldWidth - 22, 0.78);
+      control.label.setStyle({ fontSize: shortLayout ? "15px" : "16px" }).setPosition(0, cursorY);
+      fitTextScaleToWidth(control.label, fieldWidth - 22, 0.86);
       cursorY += fieldHeight + rowGap;
     }
 
@@ -722,15 +775,15 @@ export class UIScene extends Phaser.Scene {
 
     this.settingsResumeButton.setSize(actionWidth, actionHeight).setPosition(-(actionWidth / 2 + 6), actionY);
     this.settingsResumeLabel
-      .setStyle({ fontSize: shortLayout ? "13px" : "14px" })
+      .setStyle({ fontSize: shortLayout ? "15px" : "16px" })
       .setPosition(this.settingsResumeButton.x, this.settingsResumeButton.y);
-    fitTextScaleToWidth(this.settingsResumeLabel, actionWidth - 20, 0.8);
+    fitTextScaleToWidth(this.settingsResumeLabel, actionWidth - 20, 0.88);
 
     this.settingsMenuButton.setSize(actionWidth, actionHeight).setPosition(actionWidth / 2 + 6, actionY);
     this.settingsMenuLabel
-      .setStyle({ fontSize: shortLayout ? "13px" : "14px" })
+      .setStyle({ fontSize: shortLayout ? "15px" : "16px" })
       .setPosition(this.settingsMenuButton.x, this.settingsMenuButton.y);
-    fitTextScaleToWidth(this.settingsMenuLabel, actionWidth - 20, 0.8);
+    fitTextScaleToWidth(this.settingsMenuLabel, actionWidth - 20, 0.88);
   }
 
   private layoutHud(): void {
@@ -739,21 +792,28 @@ export class UIScene extends Phaser.Scene {
     const panelPaddingX = 12;
     const panelPaddingY = 10;
     const rowGap = 6;
-    const panelWidth = Math.round(Math.min(Math.max(320, this.scale.width * 0.34), 388));
+    const compactHud = this.scale.width <= 720 || this.scale.height <= 430;
+    const panelWidth = Math.max(
+      300,
+      Math.min(
+        Math.round(Math.min(Math.max(compactHud ? 328 : 332, this.scale.width * (compactHud ? 0.42 : 0.34)), compactHud ? 396 : 408)),
+        this.scale.width - 24
+      )
+    );
     const contentLeft = x + panelPaddingX;
     const contentTop = y + panelPaddingY;
     const contentWidth = panelWidth - panelPaddingX * 2;
 
-    this.hudText.setStyle({ fontSize: this.scale.height < 700 ? "15px" : "16px" });
-    this.boltsText.setStyle({ fontSize: this.scale.height < 700 ? "15px" : "16px" });
-    this.waveText.setStyle({ fontSize: this.scale.height < 700 ? "13px" : "14px", wordWrap: { width: contentWidth } });
-    this.dailyText.setStyle({ fontSize: this.scale.height < 700 ? "13px" : "14px", wordWrap: { width: contentWidth } });
-    this.statusText.setStyle({ fontSize: this.scale.height < 700 ? "12px" : "13px", wordWrap: { width: contentWidth } });
+    this.hudText.setStyle({ fontSize: compactHud ? "15px" : "16px" });
+    this.boltsText.setStyle({ fontSize: compactHud ? "15px" : "16px" });
+    this.waveText.setStyle({ fontSize: compactHud ? "14px" : "15px", wordWrap: { width: contentWidth } });
+    this.dailyText.setStyle({ fontSize: compactHud ? "14px" : "15px", wordWrap: { width: contentWidth } });
+    this.statusText.setStyle({ fontSize: compactHud ? "13px" : "14px", wordWrap: { width: contentWidth } });
 
     let nextY = contentTop;
     this.hudText.setPosition(contentLeft, nextY);
     this.boltsText.setPosition(contentLeft + this.hudText.width + 10, nextY);
-    if (this.boltsText.x + this.boltsText.width > x + panelWidth - panelPaddingX) {
+    if (compactHud || this.boltsText.x + this.boltsText.width > x + panelWidth - panelPaddingX) {
       this.boltsText.setPosition(contentLeft, nextY + this.hudText.height + rowGap);
       nextY += this.hudText.height + this.boltsText.height + rowGap;
     } else {
@@ -838,7 +898,7 @@ export class UIScene extends Phaser.Scene {
     const bg = this.add.rectangle(0, 0, 520, 64, 0x0f1720, 0.92).setStrokeStyle(2, 0x3aa4d4, 0.8);
     this.tutorialBg = bg;
     this.tutorialText = this.add
-      .text(-240, -18, "", { fontSize: "14px", color: "#d9f2ff", wordWrap: { width: 430 } })
+      .text(-240, -18, "", { fontSize: "15px", color: "#d9f2ff", wordWrap: { width: 430 } })
       .setOrigin(0, 0);
     const btn = this.add
       .rectangle(220, 0, 70, 34, 0x1b2635, 0.95)
@@ -847,7 +907,7 @@ export class UIScene extends Phaser.Scene {
     this.tutorialActionButton = btn;
     this.tutorialActionLabel = this.add
       .text(220, 0, tutorialMode ? t(this.locale, "tutorial.exit") : t(this.locale, "tutorial.skip"), {
-        fontSize: "12px",
+        fontSize: "14px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -936,23 +996,25 @@ export class UIScene extends Phaser.Scene {
       .text(0, -70, t(this.locale, "revive.title"), { fontSize: "26px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
     this.reviveHint = this.add
-      .text(0, -32, t(this.locale, "revive.hint"), { fontSize: "14px", color: "#98b7c7", align: "center" })
+      .text(0, -32, t(this.locale, "revive.hint"), { fontSize: "15px", color: "#98b7c7", align: "center" })
       .setOrigin(0.5);
 
     const btnYes = this.add
       .rectangle(0, 42, 260, 54, 0x1b2635, 0.95)
       .setStrokeStyle(2, 0x57c27d, 0.9)
       .setInteractive({ useHandCursor: true });
+    this.reviveAcceptButton = btnYes;
     this.reviveAcceptLabel = this.add
-      .text(0, 42, t(this.locale, "revive.accept"), { fontSize: "16px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 42, t(this.locale, "revive.accept"), { fontSize: "18px", color: "#d9f2ff", fontStyle: "700", align: "center" })
       .setOrigin(0.5);
 
     const btnNo = this.add
       .rectangle(0, 104, 260, 46, 0x121a24, 0.95)
       .setStrokeStyle(2, 0x3aa4d4, 0.8)
       .setInteractive({ useHandCursor: true });
+    this.reviveDeclineButton = btnNo;
     this.reviveDeclineLabel = this.add
-      .text(0, 104, t(this.locale, "revive.decline"), { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" })
+      .text(0, 104, t(this.locale, "revive.decline"), { fontSize: "16px", color: "#d9f2ff", fontStyle: "700", align: "center" })
       .setOrigin(0.5);
 
     btnYes.on("pointerdown", () => void this.handleRevive(true));
@@ -982,7 +1044,7 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0.5);
     this.settingsHint = this.add
       .text(0, -132, t(this.locale, "pause.hint"), {
-        fontSize: "13px",
+        fontSize: "14px",
         color: "#98b7c7",
         align: "center",
         wordWrap: { width: 380 },
@@ -1031,7 +1093,7 @@ export class UIScene extends Phaser.Scene {
       this.closeSettings();
     });
     this.settingsResumeLabel = this.add
-      .text(-92, 172, t(this.locale, "pause.resume"), { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" })
+      .text(-92, 172, t(this.locale, "pause.resume"), { fontSize: "15px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
 
     this.settingsMenuButton = this.add
@@ -1044,7 +1106,7 @@ export class UIScene extends Phaser.Scene {
       this.returnToMenu();
     });
     this.settingsMenuLabel = this.add
-      .text(92, 172, t(this.locale, "pause.menu"), { fontSize: "14px", color: "#d9f2ff", fontStyle: "700" })
+      .text(92, 172, t(this.locale, "pause.menu"), { fontSize: "15px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
 
     this.settingsBox = this.add

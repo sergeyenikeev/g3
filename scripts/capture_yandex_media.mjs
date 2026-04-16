@@ -68,10 +68,9 @@ async function captureDesktop(url, desktopDir, cardDir) {
   await clickMenuEntry(page, ["daily", "ежеднев"]);
   await page.waitForFunction(() => {
     const s = globalThis.__MC_GAME__?.registry?.get("runState");
-    return s?.mode === "daily";
+    return s?.mode === "run";
   });
   await page.waitForFunction(() => globalThis.__MC_GAME__?.scene?.isActive("ui") === true);
-  await page.mouse.click(metrics.width / 2 + 220, 78);
   await page.waitForTimeout(1800);
   await page.keyboard.press("Space");
   await page.waitForTimeout(350);
@@ -683,9 +682,8 @@ async function captureMobile(url, mobileDir) {
   await clickMenuEntry(page, ["daily", "ежеднев"]);
   await page.waitForFunction(() => {
     const s = globalThis.__MC_GAME__?.registry?.get("runState");
-    return s?.mode === "daily";
+    return s?.mode === "run";
   });
-  await page.mouse.click(metrics.width / 2 + 220, 78);
   await page.waitForTimeout(1600);
   await page.keyboard.press("Space");
   await page.waitForTimeout(300);
@@ -723,20 +721,26 @@ async function moveToUpgrade(page) {
 }
 
 async function clickMenuEntry(page, fragments) {
-  const target = await page.evaluate((parts) => {
-    const menu = globalThis.__MC_GAME__?.scene?.keys?.menu;
-    if (!menu) return null;
-    const normalizedParts = parts.map((part) => part.toLowerCase());
-    const texts = menu.children.list
-      .filter((obj) => obj?.type === "Text" && obj.visible)
-      .map((obj) => ({
-        text: String(obj.text ?? ""),
-        x: Number(obj.x ?? 0),
-        y: Number(obj.y ?? 0),
-      }));
+  const findTarget = async (parts) =>
+    await page.evaluate((menuParts) => {
+      const menu = globalThis.__MC_GAME__?.scene?.keys?.menu;
+      if (!menu) return null;
+      const normalizedParts = menuParts.map((part) => part.toLowerCase());
+      const texts = menu.children.list
+        .filter((obj) => obj?.type === "Text" && obj.visible)
+        .map((obj) => ({
+          text: String(obj.text ?? ""),
+          x: Number(obj.x ?? 0),
+          y: Number(obj.y ?? 0),
+        }));
 
-    return texts.find((entry) => normalizedParts.some((part) => entry.text.toLowerCase().includes(part))) ?? null;
-  }, fragments);
+      return texts.find((entry) => normalizedParts.some((part) => entry.text.toLowerCase().includes(part))) ?? null;
+    }, parts);
+
+  let target = await findTarget(fragments);
+  if (!target && fragments.some((part) => `${part}`.toLowerCase().includes("daily") || `${part}`.toLowerCase().includes("ежед"))) {
+    target = await findTarget(["play", "играт"]);
+  }
 
   if (!target) {
     throw new Error(`Menu entry not found for fragments: ${fragments.join(", ")}`);

@@ -7,7 +7,7 @@ import { AdsManager } from "../../platform/ads/adsManager";
 import { createPlatformAdapter } from "../../platform/platformFactory";
 import { getPlatformLanguageHint, resolvePlatformTimeOffsetMs } from "../../platform/platformRuntime";
 import { SaveManager } from "../../platform/save/saveManager";
-import { resolveLocale } from "../../i18n/localization";
+import { resolveLocale, t } from "../../i18n/localization";
 import { getUtcYyyymmdd } from "../daily/daily";
 import { normalizeLiveopsSave } from "../liveops/liveops";
 
@@ -17,6 +17,49 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
+    const bootLocale = resolveLocale("auto");
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const panelWidth = Math.min(620, w * 0.84);
+    const panelHeight = Math.min(210, h * 0.34);
+    const titleSize = Math.max(28, Math.min(42, w * 0.05));
+    const bodySize = Math.max(14, Math.min(20, w * 0.022));
+    const progressSize = Math.max(14, Math.min(18, w * 0.02));
+
+    this.cameras.main.setBackgroundColor(0x07111b);
+    this.add.ellipse(w / 2, h / 2 - panelHeight * 0.35, panelWidth * 0.92, panelHeight * 0.95, 0x123048, 0.24);
+
+    const panel = this.add.rectangle(w / 2, h / 2, panelWidth, panelHeight, 0x102030, 0.96);
+    panel.setStrokeStyle(2, 0x29445f, 0.9);
+    this.add.rectangle(w / 2, panel.y - panelHeight / 2 + 18, panelWidth - 32, 4, 0x5cc8ff, 0.92);
+
+    this.add
+      .text(w / 2, panel.y - 48, t(bootLocale, "bootstrap.loading.title"), {
+        fontSize: `${titleSize}px`,
+        color: "#f5fbff",
+        fontStyle: "700",
+        align: "center",
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(w / 2, panel.y - 8, t(bootLocale, "bootstrap.loading.body"), {
+        fontSize: `${bodySize}px`,
+        color: "#b8d3e8",
+        align: "center",
+        wordWrap: { width: panelWidth - 56, useAdvancedWrap: true },
+      })
+      .setOrigin(0.5);
+
+    const progressText = this.add
+      .text(w / 2, panel.y + 44, t(bootLocale, "bootstrap.loading.progress", { value: 0 }), {
+        fontSize: `${progressSize}px`,
+        color: "#d7ecff",
+        fontStyle: "600",
+        align: "center",
+      })
+      .setOrigin(0.5);
+
     this.load.setPath("assets");
     this.load.json("balances", "data/balances.json");
     this.load.json("enemies", "data/enemies.json");
@@ -62,15 +105,16 @@ export class BootScene extends Phaser.Scene {
     this.load.image("rarity_frame_rare", "generated/rarity_frame_rare.png");
     this.load.image("rarity_frame_epic", "generated/rarity_frame_epic.png");
 
-    const w = this.scale.width;
-    const h = this.scale.height;
-    const barBg = this.add.rectangle(w / 2, h / 2, Math.min(520, w * 0.8), 16, 0x1b2635);
+    const barBg = this.add.rectangle(w / 2, panel.y + 76, Math.min(520, panelWidth - 40), 18, 0x1b2635, 1);
     barBg.setOrigin(0.5);
-    const bar = this.add.rectangle(barBg.x - barBg.width / 2, barBg.y, 0, 12, 0x5cc8ff);
+    barBg.setStrokeStyle(1, 0x34516e, 0.9);
+    const bar = this.add.rectangle(barBg.x - barBg.width / 2 + 3, barBg.y, 0, 12, 0x5cc8ff, 1);
     bar.setOrigin(0, 0.5);
 
     this.load.on("progress", (p: number) => {
-      bar.width = barBg.width * Phaser.Math.Clamp(p, 0, 1);
+      const safeProgress = Phaser.Math.Clamp(p, 0, 1);
+      bar.width = Math.max(0, (barBg.width - 6) * safeProgress);
+      progressText.setText(t(bootLocale, "bootstrap.loading.progress", { value: Math.round(safeProgress * 100) }));
     });
   }
 

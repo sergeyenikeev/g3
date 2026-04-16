@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Magnet Caravan UI Audit Matrix</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #071018;
+        --panel: #10202c;
+        --line: rgba(92, 200, 255, 0.24);
+        --text: #d9f2ff;
+        --muted: #98b7c7;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 28px;
+        background:
+          radial-gradient(circle at top right, rgba(92, 200, 255, 0.08), transparent 24%),
+          linear-gradient(180deg, #08111a, var(--bg));
+        color: var(--text);
+        font-family: Georgia, Cambria, "Times New Roman", serif;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 36px;
+        line-height: 1;
+      }
+      .lead {
+        margin: 0 0 24px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.45;
+      }
+      .group {
+        margin: 0 0 28px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        background: rgba(8, 17, 26, 0.82);
+      }
+      h2 {
+        margin: 0 0 14px;
+        font-size: 24px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 14px;
+      }
+      .shot {
+        margin: 0;
+        border: 1px solid rgba(255, 209, 102, 0.24);
+        background: var(--panel);
+        overflow: hidden;
+      }
+      .shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #020508;
+      }
+      figcaption {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 10px 12px 12px;
+        font-size: 13px;
+      }
+      figcaption span {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Magnet Caravan UI Audit Matrix</h1>
+    <p class="lead">Generated from the local mock platform build. The gallery covers staged menu disclosure, workshop, leaderboard, runtime HUD, settings, upgrade, and results in RU/EN across desktop and compact mobile viewports.</p>
+    
+        <section class="group">
+          <h2>EN · Desktop 1600x900</h2>
+          <div class="grid">
+            
+            <figure class="shot">
+              <img src="en/desktop/01_starter_menu.png" alt="Starter menu" loading="lazy" />
+              <figcaption><strong>01_starter_menu</strong><span>Starter menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/02_growing_menu.png" alt="Growing menu" loading="lazy" />
+              <figcaption><strong>02_growing_menu</strong><span>Growing menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/03_growing_workshop.png" alt="Growing workshop" loading="lazy" />
+              <figcaption><strong>03_growing_workshop</strong><span>Growing workshop</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/04_growing_leaderboard.png" alt="Growing leaderboard" loading="lazy" />
+              <figcaption><strong>04_growing_leaderboard</strong><span>Growing leaderboard</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/05_growing_ui.png" alt="Growing runtime HUD" loading="lazy" />
+              <figcaption><strong>05_growing_ui</strong><span>Growing runtime HUD</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/06_growing_settings.png" alt="Growing settings" loading="lazy" />
+              <figcaption><strong>06_growing_settings</strong><span>Growing settings</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/07_growing_upgrade.png" alt="Growing upgrade" loading="lazy" />
+              <figcaption><strong>07_growing_upgrade</strong><span>Growing upgrade</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/07b_growing_results.png" alt="Growing results" loading="lazy" />
+              <figcaption><strong>07b_growing_results</strong><span>Growing results</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/08_advanced_menu.png" alt="Advanced menu" loading="lazy" />
+              <figcaption><strong>08_advanced_menu</strong><span>Advanced menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/09_advanced_workshop.png" alt="Advanced workshop" loading="lazy" />
+              <figcaption><strong>09_advanced_workshop</strong><span>Advanced workshop</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/desktop/10_advanced_leaderboard.png" alt="Advanced leaderboard" loading="lazy" />
+              <figcaption><strong>10_advanced_leaderboard</strong><span>Advanced leaderboard</span></figcaption>
+            </figure>
+          
+          </div>
+        </section>
+      
+
+        <section class="group">
+          <h2>EN · Mobile 680x380</h2>
+          <div class="grid">
+            
+            <figure class="shot">
+              <img src="en/mobile/01_starter_menu.png" alt="Starter menu" loading="lazy" />
+              <figcaption><strong>01_starter_menu</strong><span>Starter menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/02_growing_menu.png" alt="Growing menu" loading="lazy" />
+              <figcaption><strong>02_growing_menu</strong><span>Growing menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/03_growing_workshop.png" alt="Growing workshop" loading="lazy" />
+              <figcaption><strong>03_growing_workshop</strong><span>Growing workshop</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/04_growing_leaderboard.png" alt="Growing leaderboard" loading="lazy" />
+              <figcaption><strong>04_growing_leaderboard</strong><span>Growing leaderboard</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/05_growing_ui.png" alt="Growing runtime HUD" loading="lazy" />
+              <figcaption><strong>05_growing_ui</strong><span>Growing runtime HUD</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/06_growing_settings.png" alt="Growing settings" loading="lazy" />
+              <figcaption><strong>06_growing_settings</strong><span>Growing settings</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/07_growing_upgrade.png" alt="Growing upgrade" loading="lazy" />
+              <figcaption><strong>07_growing_upgrade</strong><span>Growing upgrade</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/07b_growing_results.png" alt="Growing results" loading="lazy" />
+              <figcaption><strong>07b_growing_results</strong><span>Growing results</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/08_advanced_menu.png" alt="Advanced menu" loading="lazy" />
+              <figcaption><strong>08_advanced_menu</strong><span>Advanced menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/09_advanced_workshop.png" alt="Advanced workshop" loading="lazy" />
+              <figcaption><strong>09_advanced_workshop</strong><span>Advanced workshop</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="en/mobile/10_advanced_leaderboard.png" alt="Advanced leaderboard" loading="lazy" />
+              <figcaption><strong>10_advanced_leaderboard</strong><span>Advanced leaderboard</span></figcaption>
+            </figure>
+          
+          </div>
+        </section>
+      
+
+        <section class="group">
+          <h2>RU · Desktop 1600x900</h2>
+          <div class="grid">
+            
+            <figure class="shot">
+              <img src="ru/desktop/01_starter_menu.png" alt="Starter menu" loading="lazy" />
+              <figcaption><strong>01_starter_menu</strong><span>Starter menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/02_growing_menu.png" alt="Growing menu" loading="lazy" />
+              <figcaption><strong>02_growing_menu</strong><span>Growing menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/03_growing_workshop.png" alt="Growing workshop" loading="lazy" />
+              <figcaption><strong>03_growing_workshop</strong><span>Growing workshop</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/04_growing_leaderboard.png" alt="Growing leaderboard" loading="lazy" />
+              <figcaption><strong>04_growing_leaderboard</strong><span>Growing leaderboard</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/05_growing_ui.png" alt="Growing runtime HUD" loading="lazy" />
+              <figcaption><strong>05_growing_ui</strong><span>Growing runtime HUD</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/06_growing_settings.png" alt="Growing settings" loading="lazy" />
+              <figcaption><strong>06_growing_settings</strong><span>Growing settings</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/07_growing_upgrade.png" alt="Growing upgrade" loading="lazy" />
+              <figcaption><strong>07_growing_upgrade</strong><span>Growing upgrade</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/07b_growing_results.png" alt="Growing results" loading="lazy" />
+              <figcaption><strong>07b_growing_results</strong><span>Growing results</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/08_advanced_menu.png" alt="Advanced menu" loading="lazy" />
+              <figcaption><strong>08_advanced_menu</strong><span>Advanced menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/09_advanced_workshop.png" alt="Advanced workshop" loading="lazy" />
+              <figcaption><strong>09_advanced_workshop</strong><span>Advanced workshop</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/desktop/10_advanced_leaderboard.png" alt="Advanced leaderboard" loading="lazy" />
+              <figcaption><strong>10_advanced_leaderboard</strong><span>Advanced leaderboard</span></figcaption>
+            </figure>
+          
+          </div>
+        </section>
+      
+
+        <section class="group">
+          <h2>RU · Mobile 680x380</h2>
+          <div class="grid">
+            
+            <figure class="shot">
+              <img src="ru/mobile/01_starter_menu.png" alt="Starter menu" loading="lazy" />
+              <figcaption><strong>01_starter_menu</strong><span>Starter menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/02_growing_menu.png" alt="Growing menu" loading="lazy" />
+              <figcaption><strong>02_growing_menu</strong><span>Growing menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/03_growing_workshop.png" alt="Growing workshop" loading="lazy" />
+              <figcaption><strong>03_growing_workshop</strong><span>Growing workshop</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/04_growing_leaderboard.png" alt="Growing leaderboard" loading="lazy" />
+              <figcaption><strong>04_growing_leaderboard</strong><span>Growing leaderboard</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/05_growing_ui.png" alt="Growing runtime HUD" loading="lazy" />
+              <figcaption><strong>05_growing_ui</strong><span>Growing runtime HUD</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/06_growing_settings.png" alt="Growing settings" loading="lazy" />
+              <figcaption><strong>06_growing_settings</strong><span>Growing settings</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/07_growing_upgrade.png" alt="Growing upgrade" loading="lazy" />
+              <figcaption><strong>07_growing_upgrade</strong><span>Growing upgrade</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/07b_growing_results.png" alt="Growing results" loading="lazy" />
+              <figcaption><strong>07b_growing_results</strong><span>Growing results</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/08_advanced_menu.png" alt="Advanced menu" loading="lazy" />
+              <figcaption><strong>08_advanced_menu</strong><span>Advanced menu</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/09_advanced_workshop.png" alt="Advanced workshop" loading="lazy" />
+              <figcaption><strong>09_advanced_workshop</strong><span>Advanced workshop</span></figcaption>
+            </figure>
+          
+
+            <figure class="shot">
+              <img src="ru/mobile/10_advanced_leaderboard.png" alt="Advanced leaderboard" loading="lazy" />
+              <figcaption><strong>10_advanced_leaderboard</strong><span>Advanced leaderboard</span></figcaption>
+            </figure>
+          
+          </div>
+        </section>
+      
+  </body>
+</html>

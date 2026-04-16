@@ -20,6 +20,8 @@ const legacyUploadZip = join(distDir, "upload_ready", "magnet-caravan_yandex_upl
 const legacyUploadZipChecksum = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.sha256.txt");
 const ruDocPath = join(rootDir, "docs", "platform_texts", "yandex_ru.md");
 const enDocPath = join(rootDir, "docs", "platform_texts", "yandex_en.md");
+const uiAuditMatrixDir = join(rootDir, "artifacts", "ui-audit", "matrix");
+const yandexPublishSmokeDir = join(rootDir, "artifacts", "yandex-publish-pass");
 
 const packageJson = JSON.parse(await readFile(join(rootDir, "package.json"), "utf8"));
 const version = String(packageJson.version ?? "0.0.0");
@@ -99,6 +101,7 @@ await mkdir(join(uploadRoot, "game"), { recursive: true });
 await mkdir(join(uploadRoot, "texts", "source"), { recursive: true });
 await mkdir(join(uploadRoot, "metadata"), { recursive: true });
 await mkdir(join(uploadRoot, "instructions"), { recursive: true });
+await mkdir(join(uploadRoot, "review_evidence"), { recursive: true });
 
 await copyFile(gameArchivePath, join(uploadRoot, "game", "magnet-caravan_yandex.zip"));
 await copyFile(gameArchivePath, join(uploadRoot, consoleUploadArchiveName));
@@ -106,6 +109,7 @@ await copyFile(ruDocPath, join(uploadRoot, "texts", "source", "yandex_ru.md"));
 await copyFile(enDocPath, join(uploadRoot, "texts", "source", "yandex_en.md"));
 await copyFile(join(rootDir, "docs", "YANDEX_PUBLISH.md"), join(uploadRoot, "instructions", "YANDEX_PUBLISH.md"));
 await cp(join(rootDir, "docs", "promo", "yandex"), join(uploadRoot, "media"), { recursive: true });
+const reviewEvidence = await copyReviewEvidence(uploadRoot);
 
 await writeFile(join(uploadRoot, "texts", "title.txt"), `${card.title}\n`, "utf8");
 await writeFile(join(uploadRoot, "texts", "short_description_ru.txt"), `${card.descriptions.ru.short}\n`, "utf8");
@@ -129,6 +133,7 @@ await writeFile(
       preferredConsoleUploadArchive: consoleUploadArchiveName,
       card,
       primaryMedia,
+      reviewEvidence,
     },
     null,
     2
@@ -139,6 +144,7 @@ await writeFile(
 const archiveStat = await stat(join(uploadRoot, "game", "magnet-caravan_yandex.zip"));
 await writeFile(join(uploadRoot, "README.md"), buildReadme({ version, generatedAt, archiveSizeBytes: archiveStat.size }), "utf8");
 await writeFile(join(uploadRoot, "instructions", "UPLOAD_CHECKLIST.md"), buildUploadChecklist(), "utf8");
+await writeFile(join(uploadRoot, "instructions", "MODERATION_EVIDENCE.md"), buildModerationEvidenceMarkdown(reviewEvidence), "utf8");
 await writeChecksums(uploadRoot, join(uploadRoot, "metadata", "checksums.sha256"));
 
 await zipDirectory(uploadRoot, uploadZip);
@@ -273,6 +279,62 @@ function buildUploadChecklist() {
 `;
 }
 
+function buildModerationEvidenceMarkdown(reviewEvidence) {
+  const uiAuditSection = reviewEvidence.uiAudit.present
+    ? `- Included visual matrix: \`${reviewEvidence.uiAudit.path}\`\n- Gallery entry point: \`${reviewEvidence.uiAudit.indexPath}\``
+    : "- UI audit matrix was not found when the publishing kit was assembled. Run `npm run audit:ui` before `npm run package:yandex` to include it.";
+
+  const publishSmokeSection = reviewEvidence.publishSmoke.present
+    ? `- Included publish smoke report: \`${reviewEvidence.publishSmoke.reportPath}\`\n- Included screenshots: \`${reviewEvidence.publishSmoke.path}\``
+    : "- Yandex publish smoke evidence was not found when the publishing kit was assembled. Run `npm run audit:yandex` before `npm run package:yandex` to include it.";
+
+  return `# Moderation Evidence
+
+This file maps the historical Yandex moderation issues to the current automated proofs bundled with the publishing kit.
+
+## Included Evidence
+${uiAuditSection}
+${publishSmokeSection}
+
+## Historical Issues
+
+### 1. Not all language-dependent texts were translated
+- Evidence: RU/EN UI matrix in \`${reviewEvidence.uiAudit.path || "review_evidence/ui_audit_matrix"}\`
+- Supporting automation: RU/EN viewport smoke in the local test suite
+- Notes: key menu, HUD, upgrade, results, and boot/fatal overlays now use the shared i18n layer.
+
+### 2. Elements were clipped after window resize
+- Evidence: compact and desktop screenshots in \`${reviewEvidence.uiAudit.path || "review_evidence/ui_audit_matrix"}\`
+- Supporting automation: compact viewport bounds assertions in Playwright e2e
+
+### 3. Elements and texts overlapped each other
+- Evidence: UI matrix screenshots for menu, workshop, leaderboard, settings, upgrade, and results
+- Supporting automation: compact viewport text-bound checks in \`menu\`, \`ui\`, \`upgrade\`, and \`results\`
+
+### 4. Text selection or browser context menu appeared on the playfield
+- Evidence: publish smoke report in \`${reviewEvidence.publishSmoke.reportPath || "review_evidence/yandex_publish_smoke/report.md"}\`
+- Supporting automation: synthetic \`contextmenu\` and \`selectstart\` prevention checks on the Yandex preview build
+
+### 5. Startup or runtime error appeared in the game
+- Evidence: publish smoke report plus screenshots in \`${reviewEvidence.publishSmoke.path || "review_evidence/yandex_publish_smoke"}\`
+- Supporting automation: boot without fatal overlay, zero runtime page errors during Yandex preview smoke
+
+### 6. The game looked unfinished or in-development
+- Evidence: current promo captures in \`media/\`, localized loading screen, staged menu, and polished overlays in the UI audit matrix
+- Supporting automation: build and visual audit artifacts included in this publishing kit
+
+### 7. Text was too small
+- Evidence: compact/mobile screenshots in \`${reviewEvidence.uiAudit.path || "review_evidence/ui_audit_matrix"}\`
+- Supporting automation: narrow viewport visual matrix and compact moderation smoke
+
+## Recommended Workflow
+1. Run \`npm run audit:ui\`.
+2. Run \`npm run audit:yandex\`.
+3. Run \`npm run package:yandex\`.
+4. Review this file and the bundled evidence before uploading the draft.
+`;
+}
+
 function extractMarkdownSection(markdown, heading) {
   const marker = `## ${heading}`;
   const startIndex = markdown.indexOf(marker);
@@ -302,6 +364,42 @@ function normalizeBulletSection(section) {
     .map((line) => line.replace(/^\s*-\s*/, "").trim())
     .filter(Boolean)
     .join(" ");
+}
+
+async function copyReviewEvidence(uploadDir) {
+  const reviewRoot = join(uploadDir, "review_evidence");
+  const uiAuditPresent = await pathExists(uiAuditMatrixDir);
+  const publishSmokePresent = await pathExists(yandexPublishSmokeDir);
+
+  if (uiAuditPresent) {
+    await cp(uiAuditMatrixDir, join(reviewRoot, "ui_audit_matrix"), { recursive: true });
+  }
+
+  if (publishSmokePresent) {
+    await cp(yandexPublishSmokeDir, join(reviewRoot, "yandex_publish_smoke"), { recursive: true });
+  }
+
+  return {
+    uiAudit: {
+      present: uiAuditPresent,
+      path: uiAuditPresent ? "review_evidence/ui_audit_matrix" : null,
+      indexPath: uiAuditPresent ? "review_evidence/ui_audit_matrix/index.html" : null,
+    },
+    publishSmoke: {
+      present: publishSmokePresent,
+      path: publishSmokePresent ? "review_evidence/yandex_publish_smoke" : null,
+      reportPath: publishSmokePresent ? "review_evidence/yandex_publish_smoke/report.md" : null,
+    },
+  };
+}
+
+async function pathExists(targetPath) {
+  try {
+    await stat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function ensureFilesExist(paths) {

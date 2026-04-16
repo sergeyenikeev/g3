@@ -25,6 +25,7 @@ import {
   queueNextEndlessLevel,
 } from "../run/endlessLevels";
 import { applyTrainingModeConfig, TRAINING_STARTING_SCRAP } from "../tutorial/trainingMode";
+import { getUiProgressSnapshot, type UiProgressStage } from "../meta/uiProgression";
 import type { SaveData } from "../../platform/save/saveManager";
 import { VISUAL_PALETTE, createBgFarSilhouette, createBgTile256, createDecals, createVfxTextures } from "../../visual/TextureFactory";
 import { VfxManager, type VfxQuality } from "../../visual/VfxManager";
@@ -132,6 +133,7 @@ export class GameScene extends Phaser.Scene {
   private visualQualityAuto = true;
   private fpsProbe = { t: 0, frames: 0, done: false };
   private locale: Locale = "en";
+  private uiStage: UiProgressStage = "starter";
 
   private readonly onVfxScrapCollected = (p: any) => this.vfx?.emit(GAME_EVENTS.SCRAP_COLLECTED, p);
   private readonly onVfxFlipUsed = (p: any) => this.vfx?.emit(GAME_EVENTS.FLIP_USED, p);
@@ -286,6 +288,7 @@ export class GameScene extends Phaser.Scene {
           : `run:${this.state.startedAtMs}`;
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     const platformLanguageHint = (this.registry.get("platformLanguageHint") as string | undefined) ?? null;
+    this.uiStage = save ? getUiProgressSnapshot(save).stage : "starter";
     this.locale =
       ((this.registry.get("locale") as Locale | undefined) ??
         resolveLocale(save?.settings?.language ?? "auto", platformLanguageHint ? [platformLanguageHint] : null));
@@ -2120,9 +2123,20 @@ export class GameScene extends Phaser.Scene {
     if (this.drone) buffs.push(t(this.locale, "status.drone"));
     if (this.scrapMines.length > 0) buffs.push(t(this.locale, "status.mines", { value: this.scrapMines.length }));
     if (this.state.cores > 0) buffs.push(t(this.locale, "status.corePull", { value: this.getCorePullMult().toFixed(2) }));
+    const visibleBuffs = buffs.slice(0, this.getHudStatusLimit());
+    const hiddenCount = Math.max(0, buffs.length - visibleBuffs.length);
+    if (hiddenCount > 0) {
+      visibleBuffs.push(t(this.locale, "hud.moreStatuses", { count: formatNumber(this.locale, hiddenCount) }));
+    }
 
     this.registry.set("uiStatusPrimary", waveStatus);
-    this.registry.set("uiStatusSecondary", buffs.join(" | "));
+    this.registry.set("uiStatusSecondary", visibleBuffs.join(" | "));
+  }
+
+  private getHudStatusLimit(): number {
+    if (this.uiStage === "starter") return 1;
+    if (this.uiStage === "growing") return 2;
+    return 4;
   }
 
   private getActiveLevelFinaleStatus(): string {
@@ -2204,6 +2218,8 @@ export class GameScene extends Phaser.Scene {
     const waveInLevel = getWaveInEndlessLevel(this.state.waveIndex, this.state.endless.wavesPerLevel);
     const planLabel = describeWavePlan(this.wavePlan, this.locale);
     const phaseLabel = `${t(this.locale, "hud.wave")} ${waveInLevel}/${this.state.endless.wavesPerLevel}`;
+    if (this.uiStage === "starter") return phaseLabel;
+    if (this.uiStage === "growing") return `${modifierCopy.title} | ${phaseLabel}`;
     return planLabel ? `${modifierCopy.title} | ${phaseLabel} | ${planLabel}` : `${modifierCopy.title} | ${phaseLabel}`;
   }
 

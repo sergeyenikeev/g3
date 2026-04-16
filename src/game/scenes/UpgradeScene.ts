@@ -98,7 +98,7 @@ export class UpgradeScene extends Phaser.Scene {
             .filter(Boolean)
             .join(" | "),
           {
-            fontSize: "10px",
+            fontSize: "13px",
             color: lastCleared.objectiveCompleted ? "#98ffb9" : "#ffb084",
             align: "center",
             wordWrap: { width: Math.min(420, width * 0.84) },
@@ -109,7 +109,7 @@ export class UpgradeScene extends Phaser.Scene {
         addHeaderLine(
           t(this.locale, "upgrade.levelClear", { level: lastCleared.levelIndex, reward }),
           {
-            fontSize: shortLayout ? "13px" : "15px",
+            fontSize: shortLayout ? "14px" : "15px",
             color: "#7fdfff",
             fontStyle: "700",
             align: "center",
@@ -129,7 +129,7 @@ export class UpgradeScene extends Phaser.Scene {
             .filter(Boolean)
             .join(" | "),
           {
-            fontSize: shortLayout ? "10px" : "12px",
+            fontSize: shortLayout ? "12px" : "13px",
             color: lastCleared.objectiveCompleted ? "#98ffb9" : "#ffb084",
             align: "center",
             wordWrap: { width: Math.min(420, width * 0.84) },
@@ -146,7 +146,7 @@ export class UpgradeScene extends Phaser.Scene {
       addHeaderLine(
         t(this.locale, "upgrade.nextLevel", { level: pendingLevel.index, modifier: modifierCopy.title }),
         {
-          fontSize: compactLayout ? "11px" : shortLayout ? "12px" : "14px",
+          fontSize: compactLayout ? "13px" : shortLayout ? "14px" : "15px",
           color: "#98b7c7",
           align: "center",
           wordWrap: { width: Math.min(460, width * 0.84) },
@@ -162,7 +162,7 @@ export class UpgradeScene extends Phaser.Scene {
             .filter(Boolean)
             .join(" | "),
           {
-            fontSize: shortLayout ? "10px" : "12px",
+            fontSize: shortLayout ? "12px" : "13px",
             color: "#7fdfff",
             align: "center",
             wordWrap: { width: Math.min(420, width * 0.82) },
@@ -173,8 +173,8 @@ export class UpgradeScene extends Phaser.Scene {
     }
 
     const rerollEnabled = uiStage !== "starter" && Boolean(this.state.config.ads?.rewarded?.reroll?.enabled);
-    const rerollHeight = compactLayout ? 36 : shortLayout ? 40 : 44;
-    const rerollWidth = compactLayout ? 196 : shortLayout ? 208 : 220;
+    const rerollHeight = compactLayout ? 40 : shortLayout ? 44 : 48;
+    const rerollWidth = compactLayout ? 220 : shortLayout ? 232 : 244;
     const rerollY = rerollEnabled ? headerCursor + (compactLayout ? 18 : shortLayout ? 20 : 22) : headerCursor;
     const reroll = this.add
       .rectangle(width / 2, rerollY, rerollWidth, rerollHeight, 0x1b2635, 0.95)
@@ -183,7 +183,7 @@ export class UpgradeScene extends Phaser.Scene {
       .setDepth(1001);
     const rerollLabel = this.add
       .text(reroll.x, reroll.y, t(this.locale, "upgrade.reroll"), {
-        fontSize: compactLayout ? "13px" : shortLayout ? "14px" : "16px",
+        fontSize: compactLayout ? "14px" : shortLayout ? "15px" : "16px",
         color: "#d9f2ff",
         fontStyle: "700",
         align: "center",
@@ -247,10 +247,10 @@ export class UpgradeScene extends Phaser.Scene {
       offer: offer.map((o) => ({ id: o.upgrade.id, rarity: o.upgrade.rarity })),
     });
 
-    const w = Math.min(compactLayout ? 332 : shortLayout ? 348 : 360, width * 0.88);
-    const gap = compactLayout ? 8 : shortLayout ? 12 : 18;
+    const w = Math.min(compactLayout ? 336 : shortLayout ? 352 : 364, width * 0.88);
+    const gap = compactLayout ? 6 : shortLayout ? 10 : 16;
     const availableHeight = Math.max(offer.length * 72 + (offer.length - 1) * gap, height - 16 - this.offerTopY);
-    const h = Math.min(shortLayout ? 124 : 154, Math.max(compactLayout ? 72 : 96, (availableHeight - (offer.length - 1) * gap) / offer.length));
+    const h = Math.min(shortLayout ? 128 : 156, Math.max(compactLayout ? 78 : 96, (availableHeight - (offer.length - 1) * gap) / offer.length));
     const entryStartY = this.offerTopY + h / 2;
 
     offer.forEach((o, idx) => {
@@ -258,13 +258,13 @@ export class UpgradeScene extends Phaser.Scene {
       const y = entryStartY + idx * (h + gap);
       const rarityColor = RARITY_COLORS[o.upgrade.rarity] ?? 0x6e7a86;
       const copy = getUpgradeCopy(this.locale, o.upgrade);
-      const compactCard = h <= 84;
-      const titleFontSize = compactCard ? 14 : h <= 110 ? 16 : 18;
-      const descFontSize = compactCard ? 10 : h <= 110 ? 11 : 14;
-      const badgeFontSize = compactCard ? 8 : 10;
-      const titleWrapWidth = compactCard ? w - 110 : w - 132;
-      const descText = compactCard ? shortenText(copy.desc, 72) : shortenText(copy.desc, h <= 110 ? 120 : 220);
-      const badgeLimit = compactCard ? 2 : h <= 110 ? 3 : Number.POSITIVE_INFINITY;
+      const compactCard = h <= 88;
+      const titleFontSize = compactCard ? 15 : h <= 110 ? 16 : 18;
+      const descFontSize = compactCard ? 12 : h <= 110 ? 13 : 14;
+      const badgeFontSize = compactCard ? 10 : 11;
+      const titleWrapWidth = compactCard ? w - 116 : w - 132;
+      const descText = compactCard ? shortenText(copy.desc, 54) : shortenText(copy.desc, h <= 110 ? 108 : 220);
+      const badgeLimit = compactCard ? 1 : h <= 110 ? 2 : Number.POSITIVE_INFINITY;
 
       const glow = this.add
         .image(0, 0, "vfx_glow_blob")
@@ -323,7 +323,7 @@ export class UpgradeScene extends Phaser.Scene {
 
       const chip = this.add
         .text(w / 2 - 18, -h / 2 + 14, getRarityLabel(this.locale, o.upgrade.rarity), {
-          fontSize: compactCard ? "10px" : "12px",
+          fontSize: compactCard ? "11px" : "12px",
           color: "#0b0f14",
           backgroundColor: `#${rarityColor.toString(16).padStart(6, "0")}`,
           padding: { left: 8, right: 8, top: 4, bottom: 4 },
