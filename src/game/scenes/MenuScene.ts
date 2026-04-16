@@ -27,11 +27,13 @@ import {
   getLeaderboardCareerMilestones,
   getLeaderboardCareerProgress,
   getLeaderboardDivision,
+  getLeaderboardRank,
   getLeaderboardNextDivision,
   getUnlockedLeaderboardCareerMilestones,
   getNextLeaderboardCareerMilestone,
   type LeaderboardFilter,
 } from "../run/leaderboard";
+import { getLeaderboardRowLimit, getRecommendedWorkshopNodeId, getUiProgressSnapshot, getVisibleWorkshopNodeIds } from "../meta/uiProgression";
 import type { AdsManager } from "../../platform/ads/adsManager";
 import { AD_PLACEMENTS } from "../../platform/ads/placements";
 import { bindPageLifecycle } from "../../platform/pageLifecycle";
@@ -95,6 +97,7 @@ export class MenuScene extends Phaser.Scene {
   private workshopDim!: Phaser.GameObjects.Rectangle;
   private workshopBox!: Phaser.GameObjects.Container;
   private workshopWalletText!: Phaser.GameObjects.Text;
+  private workshopRecommendationText!: Phaser.GameObjects.Text;
   private workshopHintText!: Phaser.GameObjects.Text;
   private workshopFooterText!: Phaser.GameObjects.Text;
   private workshopBuildChips: Phaser.GameObjects.Container[] = [];
@@ -240,7 +243,7 @@ export class MenuScene extends Phaser.Scene {
       .text(
         0,
         0,
-        buildMenuBestText(this.locale, save, 3),
+        buildMenuBestText(this.locale, save, getUiProgressSnapshot(save).stage, 2),
         {
           fontSize: "15px",
           color: "#98b7c7",
@@ -1239,10 +1242,15 @@ export class MenuScene extends Phaser.Scene {
     };
     let liveopsClaimBusy = false;
     const refreshPlayButton = () => {
-      const onboarding = getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops);
+      const save = this.saveManager.get();
+      const onboarding = getOnboardingBoostStatus(save, this.staticData.liveops);
+      const uiStage = getUiProgressSnapshot(save).stage;
       const boostedStart = boosterEnabled && rewardBoostEnabled && !onboarding.eligible;
       const compactRewardCopy = currentLayoutMode === "minimal" || this.scale.height <= 430;
-      if (onboarding.eligible) {
+      if (uiStage === "starter") {
+        labelPlay.setText(t(this.locale, "menu.play"));
+        btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
+      } else if (onboarding.eligible) {
         labelPlay.setText(
           t(this.locale, "menu.playFreeBoost", {
             usesLeft: formatNumber(this.locale, onboarding.usesLeft),
@@ -1257,10 +1265,10 @@ export class MenuScene extends Phaser.Scene {
         btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
       }
       labelPlay.setStyle({
-        fontSize: onboarding.eligible ? "18px" : boostedStart ? (compactRewardCopy ? "14px" : "16px") : "24px",
+        fontSize: uiStage === "starter" ? "24px" : onboarding.eligible ? "18px" : boostedStart ? (compactRewardCopy ? "14px" : "16px") : "24px",
         align: "center",
       });
-      labelPlay.setLineSpacing(boostedStart ? 2 : 0);
+      labelPlay.setLineSpacing(uiStage === "starter" ? 0 : boostedStart ? 2 : 0);
       labelPlay.setWordWrapWidth(Math.max(180, btnPlay.width - 28), true);
       fitTextScaleToWidth(labelPlay, Math.max(180, btnPlay.width - 28), 0.68);
     };
@@ -1542,12 +1550,19 @@ export class MenuScene extends Phaser.Scene {
     btnCloseUtility.on("pointerdown", closeUtility);
 
     const layoutMenu = (s: { width: number; height: number }) => {
+      const uiSnapshot = getUiProgressSnapshot(this.saveManager.get());
+      const uiStage = uiSnapshot.stage;
+      const starterUi = uiStage === "starter";
+      const growingUi = uiStage === "growing";
+      const advancedUi = uiStage === "advanced";
+      if (!advancedUi) missionsExpanded = false;
       const mode = getMenuLayoutMode(s.width, s.height);
       currentLayoutMode = mode;
       const compact = mode !== "full";
       const minimal = mode === "minimal";
       const compressedMenu = s.height <= 520;
-      const hideSummaryPanel = !missionsExpanded && s.height <= 430;
+      const hideSummaryThreshold = growingUi ? 500 : 430;
+      const hideSummaryPanel = starterUi || (!missionsExpanded && s.height <= hideSummaryThreshold);
       const topInset = minimal ? 14 : 18;
       const topGap = 10;
       const topButtonHeight = 34;
@@ -1594,9 +1609,21 @@ export class MenuScene extends Phaser.Scene {
 
       let navCursorX = s.width - topInset;
       navCursorX = placeTopButton(btnUtility, labelUtility, btnUtility.width, navCursorX, !missionsExpanded);
-      navCursorX = placeTopButton(btnLeaderboard, labelLeaderboard, btnLeaderboard.width, navCursorX, !missionsExpanded && !utilityVisible && !minimal);
-      navCursorX = placeTopButton(btnWorkshop, labelWorkshop, btnWorkshop.width, navCursorX, !missionsExpanded && !utilityVisible && !minimal);
-      placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, !missionsExpanded);
+      navCursorX = placeTopButton(
+        btnLeaderboard,
+        labelLeaderboard,
+        btnLeaderboard.width,
+        navCursorX,
+        !starterUi && !missionsExpanded && !utilityVisible && !minimal
+      );
+      navCursorX = placeTopButton(
+        btnWorkshop,
+        labelWorkshop,
+        btnWorkshop.width,
+        navCursorX,
+        !starterUi && !missionsExpanded && !utilityVisible && !minimal
+      );
+      placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, advancedUi && !missionsExpanded);
 
       setUtilityVisible(utilityVisible);
       if (utilityVisible) {
@@ -1607,6 +1634,8 @@ export class MenuScene extends Phaser.Scene {
         const panelLeft = panelCenterX - panelWidth / 2;
         const panelTop = panelCenterY - panelHeight / 2;
         const settingsButtonWidth = Math.floor((panelWidth - 52) / 2);
+        const utilityFeatureRowVisible = !starterUi;
+        const settingsStartY = utilityFeatureRowVisible ? panelTop + 142 : panelTop + 106;
 
         utilityPanelBg.setSize(panelWidth, panelHeight).setPosition(panelCenterX, panelCenterY);
         utilityPanelAccent.setSize(panelWidth - 48, 2).setPosition(panelCenterX, panelTop + 48);
@@ -1616,18 +1645,25 @@ export class MenuScene extends Phaser.Scene {
         labelCloseUtility.setPosition(btnCloseUtility.x + btnCloseUtility.width / 2, btnCloseUtility.y + btnCloseUtility.height / 2);
         fitTextScaleToWidth(labelCloseUtility, btnCloseUtility.width - 16, 0.76);
 
-        btnWorkshop.setVisible(true).setPosition(panelLeft + 18, panelTop + 88).setSize(settingsButtonWidth, 38);
-        labelWorkshop.setVisible(true).setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
-        btnLeaderboard.setVisible(true).setPosition(panelLeft + 34 + settingsButtonWidth, panelTop + 88).setSize(settingsButtonWidth, 38);
-        labelLeaderboard.setVisible(true).setPosition(btnLeaderboard.x + btnLeaderboard.width / 2, btnLeaderboard.y + btnLeaderboard.height / 2);
-        fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 18, 0.72);
-        fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 18, 0.72);
+        btnWorkshop.setVisible(utilityFeatureRowVisible).setPosition(panelLeft + 18, panelTop + 88).setSize(settingsButtonWidth, 38);
+        labelWorkshop.setVisible(utilityFeatureRowVisible).setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
+        btnLeaderboard
+          .setVisible(utilityFeatureRowVisible)
+          .setPosition(panelLeft + 34 + settingsButtonWidth, panelTop + 88)
+          .setSize(settingsButtonWidth, 38);
+        labelLeaderboard
+          .setVisible(utilityFeatureRowVisible)
+          .setPosition(btnLeaderboard.x + btnLeaderboard.width / 2, btnLeaderboard.y + btnLeaderboard.height / 2);
+        if (utilityFeatureRowVisible) {
+          fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 18, 0.72);
+          fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 18, 0.72);
+        }
 
         const settingsButtons = [
-          { button: btnQuality, label: labelQuality, x: panelLeft + 18, y: panelTop + 142 },
-          { button: btnSfx, label: labelSfx, x: panelLeft + 34 + settingsButtonWidth, y: panelTop + 142 },
-          { button: btnMusic, label: labelMusic, x: panelLeft + 18, y: panelTop + 196 },
-          { button: btnLanguage, label: labelLanguage, x: panelLeft + 34 + settingsButtonWidth, y: panelTop + 196 },
+          { button: btnQuality, label: labelQuality, x: panelLeft + 18, y: settingsStartY },
+          { button: btnSfx, label: labelSfx, x: panelLeft + 34 + settingsButtonWidth, y: settingsStartY },
+          { button: btnMusic, label: labelMusic, x: panelLeft + 18, y: settingsStartY + 54 },
+          { button: btnLanguage, label: labelLanguage, x: panelLeft + 34 + settingsButtonWidth, y: settingsStartY + 54 },
         ];
         for (const entry of settingsButtons) {
           entry.button.setSize(settingsButtonWidth, 38).setPosition(entry.x, entry.y);
@@ -1647,6 +1683,7 @@ export class MenuScene extends Phaser.Scene {
       title.setStyle({ fontSize: minimal ? (compressedMenu ? "30px" : "36px") : compressedMenu ? "34px" : shortDesktop ? "40px" : "52px" });
       title.setScale(1);
       fitTextScaleToWidth(title, menuInnerWidth, minimal ? 0.78 : compact ? 0.72 : shortDesktop ? 0.76 : 0.84);
+      taglineText.setText(t(this.locale, `menu.stageHint.${uiStage}`));
       taglineText.setStyle({ fontSize: compressedMenu ? "12px" : minimal ? "14px" : compact ? "16px" : shortDesktop ? "13px" : "18px" });
       taglineText.setWordWrapWidth(menuInnerWidth, true);
       bestText.setStyle({ fontSize: compressedMenu ? "11px" : minimal ? "12px" : compact ? "13px" : shortDesktop ? "12px" : "15px" });
@@ -1656,8 +1693,10 @@ export class MenuScene extends Phaser.Scene {
       this.heroCaptionText.setStyle({ fontSize: "16px", align: "center" });
       this.heroCaptionText.setWordWrapWidth(this.heroPanel.width - 42, true);
       fitTextScaleToWidth(this.heroCaptionText, this.heroPanel.width - 42, 0.78);
+      this.heroHintText.setText(starterUi ? "" : t(this.locale, "menu.heroLead"));
       this.heroHintText.setStyle({ fontSize: "12px", align: "center" });
       this.heroHintText.setWordWrapWidth(this.heroPanel.width - 54, true);
+      this.heroHintText.setVisible(showPreview && !starterUi);
       fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 18, 0.8);
       fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 18, 0.8);
       fitTextScaleToWidth(labelPilot, btnPilot.width - 18, 0.72);
@@ -1692,18 +1731,22 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(labelMissions, btnMissions.width - 22, 0.76);
       boostToggleTitle.setStyle({ fontSize: compressedMenu ? "10px" : minimal ? "11px" : "12px", align: "left" });
       boostToggleHint.setStyle({ fontSize: compressedMenu ? "9px" : minimal ? "9px" : "10px", align: "left" });
-      const showBoostToggle = boosterEnabled && !getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops).eligible && !missionsExpanded;
+      const showBoostToggle =
+        !starterUi &&
+        boosterEnabled &&
+        !getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops).eligible &&
+        !missionsExpanded;
       title.setVisible(!missionsExpanded);
       taglineText.setVisible(!missionsExpanded);
       this.menuPanel.setVisible(!missionsExpanded);
       btnPlay.setVisible(!missionsExpanded);
       labelPlay.setVisible(!missionsExpanded);
-      btnDaily.setVisible(!missionsExpanded);
-      labelDaily.setVisible(!missionsExpanded);
-      btnTraining.setVisible(!missionsExpanded);
-      labelTraining.setVisible(!missionsExpanded);
-      btnMissions.setVisible(!missionsExpanded);
-      labelMissions.setVisible(!missionsExpanded);
+      btnDaily.setVisible(!missionsExpanded && !starterUi);
+      labelDaily.setVisible(!missionsExpanded && !starterUi);
+      btnTraining.setVisible(!missionsExpanded && starterUi);
+      labelTraining.setVisible(!missionsExpanded && starterUi);
+      btnMissions.setVisible(!missionsExpanded && advancedUi);
+      labelMissions.setVisible(!missionsExpanded && advancedUi);
       boostToggleBg.setVisible(showBoostToggle);
       boostToggleTrack.setVisible(showBoostToggle);
       boostToggleFill.setVisible(showBoostToggle && rewardBoostEnabled);
@@ -1713,9 +1756,9 @@ export class MenuScene extends Phaser.Scene {
       const ctaEntries = [
         { kind: "button" as const, button: btnPlay, label: labelPlay, height: btnPlay.height },
         ...(showBoostToggle ? [{ kind: "boost" as const, height: 44 }] : []),
-        { kind: "button" as const, button: btnDaily, label: labelDaily, height: btnDaily.height },
-        { kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height },
-        { kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height },
+        ...(!starterUi ? [{ kind: "button" as const, button: btnDaily, label: labelDaily, height: btnDaily.height }] : []),
+        ...(starterUi ? [{ kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height }] : []),
+        ...(advancedUi ? [{ kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height }] : []),
       ];
       const ctaGap = compressedMenu ? 4 : minimal ? 6 : compact ? 6 : 8;
       const ctaStackHeight =
@@ -1725,12 +1768,12 @@ export class MenuScene extends Phaser.Scene {
       taglineText.setPosition(leftX, desiredTaglineY);
       const taglineBottom = taglineText.y + taglineText.displayHeight / 2;
       bestText.setVisible(false);
-      if (!minimal && !compressedMenu) {
+      if (!starterUi && !minimal && !compressedMenu) {
         const bestTargetY = Math.round(taglineBottom + (shortDesktop ? 8 : 12) + bestText.displayHeight / 2);
-        const maxSummaryEntries = shortDesktop ? 1 : 3;
+        const maxSummaryEntries = growingUi ? 1 : shortDesktop ? 1 : 2;
         const maxBestBottom = ctaBottomLimit - ctaStackHeight - 10;
         for (let summaryEntries = maxSummaryEntries; summaryEntries >= 0; summaryEntries -= 1) {
-          bestText.setText(buildMenuBestText(this.locale, this.saveManager.get(), summaryEntries));
+          bestText.setText(buildMenuBestText(this.locale, this.saveManager.get(), uiStage, summaryEntries));
           bestText.setPosition(leftX, bestTargetY);
           if (bestText.y + bestText.displayHeight / 2 <= maxBestBottom) {
             bestText.setVisible(true);
@@ -2438,8 +2481,16 @@ export class MenuScene extends Phaser.Scene {
         wordWrap: { width: WORKSHOP_PANEL_WIDTH - 96 },
       })
       .setOrigin(0, 0);
+    this.workshopRecommendationText = this.add
+      .text(-halfWidth + 40, -halfHeight + 98, "", {
+        fontSize: "15px",
+        color: "#ffd78a",
+        fontStyle: "700",
+        wordWrap: { width: WORKSHOP_PANEL_WIDTH - 96 },
+      })
+      .setOrigin(0, 0);
     this.workshopHintText = this.add
-      .text(-halfWidth + 40, -halfHeight + 98, t(this.locale, "menu.installedBuild"), {
+      .text(-halfWidth + 40, -halfHeight + 128, t(this.locale, "menu.installedBuild"), {
         fontSize: "12px",
         color: "#98b7c7",
         fontStyle: "700",
@@ -2469,7 +2520,17 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0, 0);
 
     this.workshopBox = this.add
-      .container(0, 0, [panel, accent, title, this.workshopWalletText, this.workshopHintText, btnClose, labelClose, this.workshopFooterText])
+      .container(0, 0, [
+        panel,
+        accent,
+        title,
+        this.workshopWalletText,
+        this.workshopRecommendationText,
+        this.workshopHintText,
+        btnClose,
+        labelClose,
+        this.workshopFooterText,
+      ])
       .setDepth(1401)
       .setScrollFactor(0);
     this.workshopBox.setVisible(false);
@@ -2631,23 +2692,134 @@ export class MenuScene extends Phaser.Scene {
     this.leaderboardBox.setVisible(false);
   }
 
+  private getWorkshopPanelMetrics(): { width: number; height: number; compact: boolean } {
+    const compact = this.scale.height <= 420 || this.scale.width <= 760;
+    return {
+      compact,
+      width: compact ? 640 : WORKSHOP_PANEL_WIDTH,
+      height: compact ? 640 : WORKSHOP_PANEL_HEIGHT,
+    };
+  }
+
+  private getLeaderboardPanelMetrics(): { width: number; height: number; compact: boolean } {
+    const compact = this.scale.height <= 420 || this.scale.width <= 760;
+    return {
+      compact,
+      width: compact ? 640 : 700,
+      height: compact ? 620 : 940,
+    };
+  }
+
   private layoutWorkshop(): void {
     if (!this.workshopDim || !this.workshopBox) return;
     const { width, height } = this.scale;
+    const metrics = this.getWorkshopPanelMetrics();
+    const halfWidth = metrics.width / 2;
+    const halfHeight = metrics.height / 2;
+    const panel = this.workshopBox.list[0] as Phaser.GameObjects.Rectangle | undefined;
+    const accent = this.workshopBox.list[1] as Phaser.GameObjects.Rectangle | undefined;
+    const title = this.workshopBox.list[2] as Phaser.GameObjects.Text | undefined;
+    const btnClose = this.workshopBox.list[6] as Phaser.GameObjects.Rectangle | undefined;
+    const labelClose = this.workshopBox.list[7] as Phaser.GameObjects.Text | undefined;
+
     this.workshopDim.setSize(width, height);
-    const scale = Math.min(1, (width - 32) / WORKSHOP_PANEL_WIDTH, (height - 32) / WORKSHOP_PANEL_HEIGHT);
+    panel?.setSize(metrics.width, metrics.height);
+    accent?.setPosition(0, -halfHeight + 48).setSize(metrics.width - 96, 2);
+    title?.setPosition(0, -halfHeight + 22).setStyle({ fontSize: metrics.compact ? "24px" : "28px" });
+    this.workshopWalletText
+      .setPosition(-halfWidth + 40, -halfHeight + 60)
+      .setStyle({ fontSize: metrics.compact ? "15px" : "16px", wordWrap: { width: metrics.width - 96 } });
+    this.workshopRecommendationText
+      .setPosition(-halfWidth + 40, -halfHeight + 90)
+      .setStyle({ fontSize: metrics.compact ? "14px" : "15px", wordWrap: { width: metrics.width - 96 } });
+    this.workshopHintText
+      .setPosition(-halfWidth + 40, -halfHeight + 118)
+      .setStyle({ fontSize: metrics.compact ? "11px" : "12px", wordWrap: { width: metrics.width - 96 } });
+    this.workshopFooterText
+      .setPosition(-halfWidth + 40, halfHeight - 48)
+      .setStyle({ fontSize: metrics.compact ? "11px" : "12px", wordWrap: { width: metrics.width - 96 } });
+    btnClose?.setPosition(halfWidth - 52, -halfHeight + 22);
+    labelClose?.setPosition(halfWidth - 52, -halfHeight + 22);
+    fitTextScaleToWidth(this.workshopWalletText, metrics.width - 96, 0.78);
+    fitTextScaleToWidth(this.workshopRecommendationText, metrics.width - 96, 0.8);
+    fitTextScaleToWidth(this.workshopHintText, metrics.width - 96, 0.78);
+    fitTextScaleToWidth(this.workshopFooterText, metrics.width - 96, 0.78);
+    const scale = Math.min(1, (width - 24) / metrics.width, (height - 24) / metrics.height);
     this.workshopBox.setScale(scale).setPosition(width / 2, height / 2);
   }
 
   private layoutLeaderboard(): void {
     if (!this.leaderboardDim || !this.leaderboardBox) return;
     const { width, height } = this.scale;
+    const metrics = this.getLeaderboardPanelMetrics();
+    const halfWidth = metrics.width / 2;
+    const halfHeight = metrics.height / 2;
+    const headerTitleY = -halfHeight + 22;
+    const headerAccentY = -halfHeight + 48;
+    const headerHintY = metrics.compact ? -halfHeight + 84 : -halfHeight + 92;
+    const filterY = metrics.compact ? -halfHeight + 136 : -halfHeight + 152;
+    const rowsStartY = metrics.compact ? -halfHeight + 182 : -halfHeight + 218;
+    const rowStep = metrics.compact ? 44 : 48;
+    const rowWidth = metrics.compact ? metrics.width - 84 : 620;
+    const rowHeight = metrics.compact ? 42 : 46;
+    const rowTextX = -rowWidth / 2 + 20;
+    const rowTextTop = metrics.compact ? 14 : 16;
+    const panel = this.leaderboardBox.list[0] as Phaser.GameObjects.Rectangle | undefined;
+    const accent = this.leaderboardBox.list[1] as Phaser.GameObjects.Rectangle | undefined;
+    const title = this.leaderboardBox.list[2] as Phaser.GameObjects.Text | undefined;
+    const btnClose = this.leaderboardBox.list[6] as Phaser.GameObjects.Rectangle | undefined;
+    const labelClose = this.leaderboardBox.list[7] as Phaser.GameObjects.Text | undefined;
+
     this.leaderboardDim.setSize(width, height);
-    const scale = Math.min(1, (width - 48) / 700, (height - 48) / 940);
+    panel?.setSize(metrics.width, metrics.height);
+    accent?.setPosition(0, headerAccentY).setSize(metrics.width - 108, 2);
+    title?.setPosition(0, headerTitleY).setStyle({ fontSize: metrics.compact ? "24px" : "28px" });
+    this.leaderboardHintText.setPosition(0, headerHintY).setStyle({
+      fontSize: metrics.compact ? "11px" : "12px",
+      wordWrap: { width: metrics.width - 140 },
+    });
+    btnClose?.setPosition(halfWidth - 58, headerTitleY);
+    labelClose?.setPosition(halfWidth - 58, headerTitleY);
+
+    const filterSpacing = metrics.compact ? 156 : 184;
+    const filterButtonWidth = metrics.compact ? 128 : 148;
+    this.leaderboardFilterButtons.forEach((entry, index) => {
+      const x = -filterSpacing + index * filterSpacing;
+      entry.button.setPosition(x, filterY).setSize(filterButtonWidth, 38);
+      entry.label.setPosition(x, filterY).setStyle({ fontSize: metrics.compact ? "13px" : "14px" });
+    });
+
+    this.leaderboardRows.forEach((row, index) => {
+      const y = rowsStartY + index * rowStep;
+      row.bg.setPosition(0, y).setSize(rowWidth, rowHeight);
+      row.text.setPosition(rowTextX, y - rowTextTop).setStyle({ wordWrap: { width: rowWidth - 40 } });
+    });
+
+    this.leaderboardEmptyPanel.setPosition(0, metrics.compact ? -32 : -86).setSize(rowWidth, metrics.compact ? 140 : 172);
+    this.leaderboardEmptyText.setPosition(0, metrics.compact ? -32 : -86).setStyle({
+      fontSize: metrics.compact ? "13px" : "14px",
+      wordWrap: { width: rowWidth - 48 },
+    });
+    this.leaderboardFooterText.setPosition(0, metrics.compact ? halfHeight - 104 : 316).setStyle({
+      fontSize: metrics.compact ? "11px" : "12px",
+      wordWrap: { width: metrics.width - 140 },
+    });
+    this.leaderboardCareerTitleText.setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 184 : 170);
+    this.leaderboardCareerText.setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 158 : 196).setStyle({
+      fontSize: metrics.compact ? "11px" : "12px",
+      wordWrap: { width: rowWidth - 40 },
+    });
+    this.leaderboardPlatformText.setPosition(0, metrics.compact ? halfHeight - 56 : 392).setStyle({
+      fontSize: metrics.compact ? "9px" : "10px",
+      wordWrap: { width: metrics.width - 180 },
+    });
+
+    const scale = Math.min(1, (width - 28) / metrics.width, (height - 28) / metrics.height);
     this.leaderboardBox.setScale(scale).setPosition(width / 2, height / 2);
   }
 
   private showWorkshop(): void {
+    if (getUiProgressSnapshot(this.saveManager.get()).stage === "starter") return;
     this.hideLeaderboard();
     this.analytics.track(ANALYTICS_EVENTS.MENU_CTA_WORKSHOP, { dateUtc: this.getCurrentDateUtc() });
     this.refreshWorkshopSummary();
@@ -2662,6 +2834,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private showLeaderboard(): void {
+    if (getUiProgressSnapshot(this.saveManager.get()).stage === "starter") return;
     this.hideWorkshop();
     this.analytics.track(ANALYTICS_EVENTS.MENU_CTA_LEADERBOARD, { dateUtc: this.getCurrentDateUtc() });
     this.analytics.track(ANALYTICS_EVENTS.LEADERBOARD_OPEN, {
@@ -2685,12 +2858,16 @@ export class MenuScene extends Phaser.Scene {
     this.saveData = save;
     this.refreshWalletSummary();
     const requestNonce = ++this.leaderboardRefreshNonce;
+    const uiStage = getUiProgressSnapshot(save).stage;
+    const compactLeaderboard = this.getLeaderboardPanelMetrics().compact;
+    const fullLeaderboard = uiStage === "advanced" && !compactLeaderboard;
 
     const hasDaily = save.leaderboard.entries.some((entry) => entry.mode === "daily");
     const hasRun = save.leaderboard.entries.some((entry) => entry.mode === "run");
     this.leaderboardFilter = this.normalizeLeaderboardFilter(save.leaderboard.entries, this.leaderboardFilter);
     this.latestLeaderboardFilter = this.normalizeLeaderboardFilter(save.leaderboard.entries, this.latestLeaderboardFilter);
-    const filtered = filterLeaderboardEntries(save.leaderboard.entries, this.leaderboardFilter);
+    const effectiveFilter = fullLeaderboard ? this.leaderboardFilter : hasRun ? "run" : hasDaily ? "daily" : "all";
+    const filtered = filterLeaderboardEntries(save.leaderboard.entries, effectiveFilter);
     const bestScore = save.leaderboard.entries.reduce((best, entry) => Math.max(best, entry.score), 0);
     const nextDivision = getLeaderboardNextDivision(bestScore);
     const careerMilestones = getLeaderboardCareerMilestones();
@@ -2708,6 +2885,8 @@ export class MenuScene extends Phaser.Scene {
     for (const entry of this.leaderboardFilterButtons) {
       const selected = entry.filter === this.leaderboardFilter;
       const disabled = (entry.filter === "daily" && !hasDaily) || (entry.filter === "run" && !hasRun);
+      entry.button.setVisible(fullLeaderboard);
+      entry.label.setVisible(fullLeaderboard);
       entry.button.setFillStyle(selected ? 0x183246 : 0x121a24, selected ? 0.98 : 0.94);
       entry.button.setStrokeStyle(2, selected ? 0xffd166 : disabled ? 0x5f6b76 : 0x3aa4d4, selected ? 0.9 : disabled ? 0.45 : 0.72);
       entry.button.setAlpha(disabled ? 0.55 : 1);
@@ -2715,26 +2894,39 @@ export class MenuScene extends Phaser.Scene {
       entry.label.setText(t(this.locale, `leaderboard.filter.${entry.filter}`));
     }
 
+    const rank = this.latestLeaderboardRank ?? getLeaderboardRank(filtered, this.latestLeaderboardEntryId ?? "");
     this.leaderboardHintText.setText(
-      [
-        t(this.locale, "menu.leaderboardHint", {
-          mode: t(this.locale, `leaderboard.filter.${this.leaderboardFilter}`),
-          pilot: save.settings.pilotName || t(this.locale, "menu.pilotAuto"),
-        }),
-        nextMilestone
-          ? t(this.locale, "menu.leaderboardCareerStatus", {
-              count: formatNumber(this.locale, claimedMilestones.size),
-              total: formatNumber(this.locale, careerMilestones.length),
-              title: t(this.locale, `leaderboard.milestone.${nextMilestone.id}`),
-            })
-          : t(this.locale, "menu.leaderboardCareerComplete", {
-              count: formatNumber(this.locale, claimedMilestones.size),
-              total: formatNumber(this.locale, careerMilestones.length),
-        }),
-      ].join("\n")
+      fullLeaderboard
+        ? [
+            t(this.locale, "menu.leaderboardHint", {
+              mode: t(this.locale, `leaderboard.filter.${effectiveFilter}`),
+              pilot: save.settings.pilotName || t(this.locale, "menu.pilotAuto"),
+            }),
+            nextMilestone
+              ? t(this.locale, "menu.leaderboardCareerStatus", {
+                  count: formatNumber(this.locale, claimedMilestones.size),
+                  total: formatNumber(this.locale, careerMilestones.length),
+                  title: t(this.locale, `leaderboard.milestone.${nextMilestone.id}`),
+                })
+              : t(this.locale, "menu.leaderboardCareerComplete", {
+                  count: formatNumber(this.locale, claimedMilestones.size),
+                  total: formatNumber(this.locale, careerMilestones.length),
+                }),
+          ].join("\n")
+        : [
+            rank
+              ? `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, bestScore)}`
+              : t(this.locale, "menu.leaderboardScoring"),
+            nextDivision
+              ? t(this.locale, "results.nextDivision", {
+                  division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
+                  score: formatNumber(this.locale, nextDivision.minScore),
+                })
+              : t(this.locale, "results.topDivision"),
+          ].join("\n")
     );
-    this.leaderboardHintText.setStyle({ fontSize: "12px" });
-    if (this.leaderboardHintText.height > 42) {
+    this.leaderboardHintText.setStyle({ fontSize: compactLeaderboard ? "11px" : fullLeaderboard ? "12px" : "14px" });
+    if (fullLeaderboard && !compactLeaderboard && this.leaderboardHintText.height > 42) {
       this.leaderboardHintText.setStyle({ fontSize: "11px" });
     }
     this.leaderboardPlatformText.setText(getPortalBoardLoadingLabel(this.locale));
@@ -2742,12 +2934,17 @@ export class MenuScene extends Phaser.Scene {
     this.leaderboardEmptyPanel.setVisible(!hasVisibleEntries);
     this.leaderboardEmptyText
       .setVisible(!hasVisibleEntries)
-      .setText([t(this.locale, "menu.leaderboardEmpty"), t(this.locale, "menu.leaderboardScoring")].join("\n\n"));
+      .setText(
+        fullLeaderboard
+          ? [t(this.locale, "menu.leaderboardEmpty"), t(this.locale, "menu.leaderboardScoring")].join("\n\n")
+          : t(this.locale, "menu.leaderboardEmpty")
+      );
 
+    const rowLimit = compactLeaderboard ? (uiStage === "advanced" ? 5 : 3) : getLeaderboardRowLimit(uiStage);
     for (let i = 0; i < this.leaderboardRows.length; i++) {
       const row = this.leaderboardRows[i]!;
       const entry = filtered[i];
-      if (!entry) {
+      if (!entry || i >= rowLimit) {
         row.bg.setVisible(false);
         row.text.setVisible(false);
         continue;
@@ -2774,9 +2971,14 @@ export class MenuScene extends Phaser.Scene {
         .setVisible(true)
         .setFillStyle(isLatest ? 0x173028 : 0x121a24, isLatest ? 0.98 : 0.94)
         .setStrokeStyle(2, accent, isLatest ? 0.92 : 0.72);
-      row.text.setVisible(true).setText(
-        `${rank}. ${entry.pilot} [${modeLabel} | ${divisionLabel}]  ${formatNumber(this.locale, entry.score)}\n${secondary} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)} | ${t(this.locale, "hud.bolts")} ${formatNumber(this.locale, entry.bolts)} | ${t(this.locale, "results.cores")} ${formatNumber(this.locale, entry.cores)}${badge ? ` | ${badge}` : ""}`
-      );
+      row.text
+        .setVisible(true)
+        .setText(
+          fullLeaderboard
+            ? `${rank}. ${entry.pilot} [${modeLabel} | ${divisionLabel}]  ${formatNumber(this.locale, entry.score)}\n${secondary} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)} | ${t(this.locale, "hud.bolts")} ${formatNumber(this.locale, entry.bolts)} | ${t(this.locale, "results.cores")} ${formatNumber(this.locale, entry.cores)}${badge ? ` | ${badge}` : ""}`
+            : `${rank}. ${entry.pilot} | ${formatNumber(this.locale, entry.score)}\n${divisionLabel} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}${badge ? ` | ${badge}` : ""}`
+        )
+        .setStyle({ fontSize: compactLeaderboard ? "12px" : fullLeaderboard ? "13px" : "14px" });
     }
 
     this.leaderboardCareerTitleText.setText(t(this.locale, "menu.careerMilestonesTitle"));
@@ -2793,6 +2995,12 @@ export class MenuScene extends Phaser.Scene {
         )
         .join("\n")
     );
+    this.leaderboardCareerTitleText.setVisible(fullLeaderboard);
+    this.leaderboardCareerText.setVisible(fullLeaderboard);
+    this.leaderboardPlatformText.setVisible(fullLeaderboard);
+    this.leaderboardFooterText
+      .setPosition(0, compactLeaderboard ? 206 : fullLeaderboard ? 316 : 148)
+      .setStyle({ fontSize: compactLeaderboard ? "11px" : "12px" });
 
     this.leaderboardFooterText.setText(
       this.latestPromotionDivision && (this.latestPromotionReward.bolts > 0 || this.latestPromotionReward.cores > 0)
@@ -2828,7 +3036,11 @@ export class MenuScene extends Phaser.Scene {
         : t(this.locale, "menu.leaderboardScoring")
     );
 
-    await this.refreshPlatformLeaderboardSummary(requestNonce);
+    if (fullLeaderboard) {
+      await this.refreshPlatformLeaderboardSummary(requestNonce);
+    } else {
+      this.leaderboardPlatformText.setText("");
+    }
   }
 
   private normalizeLeaderboardFilter(entries: readonly SaveData["leaderboard"]["entries"][number][], filter: LeaderboardFilter): LeaderboardFilter {
@@ -2900,8 +3112,10 @@ export class MenuScene extends Phaser.Scene {
     const save = this.saveManager.get();
     this.saveData = save;
     const wallet = save.meta.wallet;
+    const uiStage = getUiProgressSnapshot(save).stage;
+    const walletKey = uiStage === "starter" ? "menu.walletCompact" : "menu.wallet";
     this.walletText?.setText(
-      t(this.locale, "menu.wallet", {
+      t(this.locale, walletKey, {
         bolts: formatResource(this.locale, "bolts", wallet.bolts ?? 0),
         cores: formatResource(this.locale, "cores", wallet.cores ?? 0),
       })
@@ -2912,65 +3126,130 @@ export class MenuScene extends Phaser.Scene {
     const save = this.saveManager.get();
     this.saveData = save;
     this.refreshWalletSummary();
+    const uiSnapshot = getUiProgressSnapshot(save);
+    const visibleNodeIds = getVisibleWorkshopNodeIds(
+      save,
+      this.staticData.metaTree.nodes.map((node) => node.id)
+    );
+    const visibleNodeSet = new Set(visibleNodeIds);
+    const visibleNodes = this.staticData.metaTree.nodes.filter((node) => visibleNodeSet.has(node.id));
+    const recommendedNodeId = getRecommendedWorkshopNodeId(save, visibleNodeIds);
+    const recommendedNode = visibleNodes.find((node) => node.id === recommendedNodeId) ?? null;
+    const activeMetaEntries = this.staticData.metaTree.nodes
+      .map((node) => ({ node, level: Math.max(0, Math.floor(save.meta.nodeLevels[node.id] ?? 0)) }))
+      .filter((entry) => entry.level > 0);
+    const workshopMetrics = this.getWorkshopPanelMetrics();
+    const compactWorkshop = workshopMetrics.compact;
+    const prioritizedVisibleNodes = recommendedNode
+      ? [recommendedNode, ...visibleNodes.filter((node) => node.id !== recommendedNode.id)]
+      : visibleNodes;
+    const renderedNodeLimit = compactWorkshop ? (uiSnapshot.stage === "advanced" ? 6 : 4) : prioritizedVisibleNodes.length;
+    const renderedNodes = prioritizedVisibleNodes.slice(0, renderedNodeLimit);
+    const stockpileKey = uiSnapshot.stage === "starter" ? "menu.stockpileCompact" : "menu.stockpile";
+    const helperCopy = compactWorkshop
+      ? t(this.locale, "menu.workshopCompactViewport")
+      : uiSnapshot.stage === "starter"
+        ? t(this.locale, "menu.workshopUnlockLaterStarter")
+        : uiSnapshot.stage === "growing"
+          ? t(this.locale, "menu.workshopUnlockLaterGrowing")
+          : activeMetaEntries.length > 0
+            ? t(this.locale, "menu.installedBuild")
+            : t(this.locale, "menu.installedNone");
+    const panelTextWidth = workshopMetrics.width - 96;
 
     this.workshopWalletText.setText(
-      t(this.locale, "menu.stockpile", {
+      t(this.locale, stockpileKey, {
         bolts: formatResource(this.locale, "bolts", getMetaWalletAmount(save, "bolts")),
         cores: formatResource(this.locale, "cores", getMetaWalletAmount(save, "cores")),
       })
     );
-    const activeMetaEntries = this.staticData.metaTree.nodes
-      .map((node) => ({ node, level: Math.max(0, Math.floor(save.meta.nodeLevels[node.id] ?? 0)) }))
-      .filter((entry) => entry.level > 0);
+    this.workshopRecommendationText.setText(
+      recommendedNode
+        ? t(this.locale, "menu.workshopRecommendation", {
+            name: getMetaNodeName(this.locale, recommendedNode.id, recommendedNode.name),
+          })
+        : t(this.locale, "menu.workshopRecommendationDone")
+    );
+    fitTextScaleToWidth(this.workshopWalletText, panelTextWidth, 0.78);
+    fitTextScaleToWidth(this.workshopRecommendationText, panelTextWidth, 0.8);
     this.workshopHintText
-      .setText(activeMetaEntries.length > 0 ? t(this.locale, "menu.installedBuild") : t(this.locale, "menu.installedNone"))
+      .setText(
+        [
+          t(this.locale, "menu.workshopVisibleCount", {
+            visible: formatNumber(this.locale, renderedNodes.length),
+            total: formatNumber(this.locale, this.staticData.metaTree.nodes.length),
+          }),
+          helperCopy,
+        ].join("\n")
+      )
       .setVisible(true);
+    fitTextScaleToWidth(this.workshopHintText, panelTextWidth, 0.78);
+    this.workshopFooterText.setText(
+      compactWorkshop
+        ? t(this.locale, "menu.workshopCompactViewport")
+        : uiSnapshot.stage === "advanced"
+        ? t(this.locale, "menu.workshopFooter")
+        : uiSnapshot.stage === "starter"
+          ? t(this.locale, "menu.workshopUnlockLaterStarter")
+          : t(this.locale, "menu.workshopUnlockLaterGrowing")
+    );
+    fitTextScaleToWidth(this.workshopFooterText, panelTextWidth, 0.78);
 
     for (const chip of this.workshopBuildChips) chip.destroy();
     this.workshopBuildChips = [];
-    let chipCursorX = -312;
-    let chipCursorY = -278;
-    const chipRowWidth = 624;
-    for (const entry of activeMetaEntries) {
-      const badge = getMetaNodeBadgeSpecs(this.locale, entry.node.id, 1)[0];
-      if (!badge) continue;
-      const chip = createMenuBadge(this, 0, -244, `${badge.label} ${entry.level}`, badge.fill, badge.stroke, badge.textColor);
-      const chipBg = chip.list[0] as Phaser.GameObjects.Rectangle | undefined;
-      const chipWidth = chipBg?.width ?? 0;
-      if (chipCursorX > -312 && chipCursorX + chipWidth > -312 + chipRowWidth) {
-        chipCursorX = -312;
-        chipCursorY += 24;
+    let chipCursorX = -workshopMetrics.width / 2 + 40;
+    let chipCursorY = -workshopMetrics.height / 2 + 172;
+    const chipRowWidth = workshopMetrics.width - 80;
+    if (!compactWorkshop) {
+      for (const entry of activeMetaEntries) {
+        const badge = getMetaNodeBadgeSpecs(this.locale, entry.node.id, 1)[0];
+        if (!badge) continue;
+        const chip = createMenuBadge(this, 0, -244, `${badge.label} ${entry.level}`, badge.fill, badge.stroke, badge.textColor);
+        const chipBg = chip.list[0] as Phaser.GameObjects.Rectangle | undefined;
+        const chipWidth = chipBg?.width ?? 0;
+        if (chipCursorX > -workshopMetrics.width / 2 + 40 && chipCursorX + chipWidth > -workshopMetrics.width / 2 + 40 + chipRowWidth) {
+          chipCursorX = -workshopMetrics.width / 2 + 40;
+          chipCursorY += 24;
+        }
+        chip.setPosition(chipCursorX + chipWidth / 2, chipCursorY);
+        chipCursorX += chipWidth + 8;
+        this.workshopBuildChips.push(chip);
+        this.workshopBox.add(chip);
       }
-      chip.setPosition(chipCursorX + chipWidth / 2, chipCursorY);
-      chipCursorX += chipWidth + 8;
-      this.workshopBuildChips.push(chip);
-      this.workshopBox.add(chip);
     }
 
     for (const card of this.workshopCards) card.destroy();
     this.workshopCards = [];
 
-    const cardWidth = 304;
-    const cardHeight = 96;
-    const cardGapX = 16;
-    const cardGapY = 6;
-    const cardOriginLeft = -312;
-    const leftCardX = cardOriginLeft + cardWidth / 2;
-    const rightCardX = leftCardX + cardWidth + cardGapX;
-    const cardRows = Math.ceil(this.staticData.metaTree.nodes.length / 2);
-    const desiredCardsStartY = this.workshopBuildChips.length > 0 ? chipCursorY + 44 : -184;
-    const maxCardsBottom = this.workshopFooterText.y - 22;
-    const maxCardsStartY = maxCardsBottom - cardHeight / 2 - Math.max(0, cardRows - 1) * (cardHeight + cardGapY);
+    const workshopLayout =
+      compactWorkshop
+        ? uiSnapshot.stage === "advanced"
+          ? { columns: 2, cardWidth: 272, cardHeight: 98, cardGapX: 12, cardGapY: 10, textPad: 24, buttonWidth: 100, buttonHeight: 34 }
+          : { columns: 2, cardWidth: 272, cardHeight: 100, cardGapX: 12, cardGapY: 10, textPad: 24, buttonWidth: 100, buttonHeight: 34 }
+        : uiSnapshot.stage === "starter"
+        ? { columns: 1, cardWidth: 624, cardHeight: 116, cardGapX: 0, cardGapY: 12, textPad: 34, buttonWidth: 132, buttonHeight: 38 }
+        : uiSnapshot.stage === "growing"
+          ? { columns: 2, cardWidth: 304, cardHeight: 108, cardGapX: 16, cardGapY: 10, textPad: 30, buttonWidth: 112, buttonHeight: 36 }
+          : { columns: 3, cardWidth: 198, cardHeight: 96, cardGapX: 10, cardGapY: 8, textPad: 22, buttonWidth: 86, buttonHeight: 34 };
+    const gridWidth =
+      workshopLayout.columns * workshopLayout.cardWidth + Math.max(0, workshopLayout.columns - 1) * workshopLayout.cardGapX;
+    const gridLeft = -gridWidth / 2;
+    const cardRows = Math.ceil(renderedNodes.length / workshopLayout.columns);
+    const desiredCardsStartY = this.workshopBuildChips.length > 0 ? chipCursorY + 44 : compactWorkshop ? -workshopMetrics.height / 2 + 184 : -146;
+    const maxCardsBottom = workshopMetrics.height / 2 - 70;
+    const maxCardsStartY =
+      maxCardsBottom -
+      workshopLayout.cardHeight / 2 -
+      Math.max(0, cardRows - 1) * (workshopLayout.cardHeight + workshopLayout.cardGapY);
     let cardsStartY = Math.min(desiredCardsStartY, maxCardsStartY);
     const showBuildSummary = cardsStartY >= desiredCardsStartY;
     if (!showBuildSummary) {
-      this.workshopHintText.setVisible(false);
       for (const chip of this.workshopBuildChips) chip.destroy();
       this.workshopBuildChips = [];
       cardsStartY = maxCardsStartY;
     }
 
-    this.staticData.metaTree.nodes.forEach((node, idx) => {
+    renderedNodes.forEach((node, idx) => {
       const level = getMetaNodeLevel(save, node.id);
       const cost = getMetaNodeCost(this.staticData.metaTree, node.id, level);
       const currencyAmount = cost ? getMetaWalletAmount(save, cost.currency) : 0;
@@ -2978,58 +3257,75 @@ export class MenuScene extends Phaser.Scene {
       const affordable = Boolean(cost) && currencyAmount >= costAmount;
       const maxed = level >= node.maxLevel || !cost;
       const badge = getMetaNodeBadgeSpecs(this.locale, node.id, 1)[0];
-      const column = idx % 2;
-      const row = Math.floor(idx / 2);
-      const x = column === 0 ? leftCardX : rightCardX;
-      const y = cardsStartY + row * (cardHeight + cardGapY);
-      const accentColor = maxed ? 0x57c27d : badge?.stroke ?? (cost?.currency === "cores" ? 0xffd166 : idx % 2 === 0 ? 0x5cc8ff : 0x3aa4d4);
-      const textLeft = -cardWidth / 2 + 32;
-      const buttonCenterX = cardWidth / 2 - 58;
-      const buttonWidth = 108;
-      const buttonY = 6;
-      const buttonLeft = buttonCenterX - buttonWidth / 2;
-      const textWrapWidth = Math.max(120, Math.floor(buttonLeft - textLeft - 14));
-      const badgeNode = badge ? createMenuBadge(this, 0, -24, badge.label, badge.fill, badge.stroke, badge.textColor) : null;
+      const column = idx % workshopLayout.columns;
+      const row = Math.floor(idx / workshopLayout.columns);
+      const x = gridLeft + column * (workshopLayout.cardWidth + workshopLayout.cardGapX) + workshopLayout.cardWidth / 2;
+      const y = cardsStartY + row * (workshopLayout.cardHeight + workshopLayout.cardGapY);
+      const isRecommended = recommendedNodeId === node.id;
+      const accentColor = isRecommended
+        ? 0xffd166
+        : maxed
+          ? 0x57c27d
+          : badge?.stroke ?? (cost?.currency === "cores" ? 0xffd166 : idx % 2 === 0 ? 0x5cc8ff : 0x3aa4d4);
+      const textLeft = -workshopLayout.cardWidth / 2 + workshopLayout.textPad;
+      const buttonCenterX = workshopLayout.cardWidth / 2 - (workshopLayout.buttonWidth / 2 + 18);
+      const buttonLeft = buttonCenterX - workshopLayout.buttonWidth / 2;
+      const textWrapWidth = Math.max(70, Math.floor(buttonLeft - textLeft - 12));
+      const badgeNode = badge ? createMenuBadge(this, 0, -workshopLayout.cardHeight / 2 + 20, badge.label, badge.fill, badge.stroke, badge.textColor) : null;
+      const recommendedBadgeNode = isRecommended
+        ? createMenuBadge(
+            this,
+            buttonCenterX,
+            -workshopLayout.cardHeight / 2 + 20,
+            t(this.locale, "menu.recommendedBadge"),
+            0xffd166,
+            0xffd166,
+            "#1b1305"
+          )
+        : null;
       const badgeBg = badgeNode?.list[0] as Phaser.GameObjects.Rectangle | undefined;
       const badgeWidth = badgeBg?.width ?? 0;
-      const badgeX = badgeNode ? cardWidth / 2 - 18 - badgeWidth / 2 : 0;
+      const badgeX = badgeNode ? workshopLayout.cardWidth / 2 - 14 - badgeWidth / 2 : 0;
       const titleMaxWidth = Math.max(
-        96,
-        Math.floor((badgeNode ? badgeX - badgeWidth / 2 - 10 : buttonLeft - 14) - textLeft)
+        72,
+        Math.floor((badgeNode ? badgeX - badgeWidth / 2 - 8 : buttonLeft - 10) - textLeft)
       );
 
-      const bg = this.add.rectangle(0, 0, cardWidth, cardHeight, 0x121a24, 0.97).setStrokeStyle(2, accentColor, maxed ? 0.72 : 0.58);
-      const accent = this.add.rectangle(-cardWidth / 2 + 4, 0, 6, cardHeight, accentColor, 0.92);
+      const bg = this.add
+        .rectangle(0, 0, workshopLayout.cardWidth, workshopLayout.cardHeight, isRecommended ? 0x16212b : 0x121a24, 0.97)
+        .setStrokeStyle(2, accentColor, isRecommended ? 0.82 : maxed ? 0.72 : 0.58);
+      const accent = this.add.rectangle(-workshopLayout.cardWidth / 2 + 4, 0, 6, workshopLayout.cardHeight, accentColor, 0.92);
       const title = this.add
-        .text(textLeft, -32, getMetaNodeName(this.locale, node.id, node.name), {
-          fontSize: "15px",
+        .text(textLeft, -workshopLayout.cardHeight / 2 + 14, getMetaNodeName(this.locale, node.id, node.name), {
+          fontSize: compactWorkshop ? "14px" : uiSnapshot.stage === "starter" ? "18px" : uiSnapshot.stage === "growing" ? "16px" : "13px",
           color: "#d9f2ff",
           fontStyle: "700",
         })
         .setOrigin(0, 0);
-      fitTextScaleToWidth(title, titleMaxWidth, 0.56);
+      fitTextScaleToWidth(title, titleMaxWidth, 0.62);
       const desc = this.add
-        .text(textLeft, -10, getMetaNodeDescription(this.locale, node.id), {
-          fontSize: "10px",
+        .text(textLeft, -workshopLayout.cardHeight / 2 + (uiSnapshot.stage === "advanced" ? 36 : 40), getMetaNodeDescription(this.locale, node.id), {
+          fontSize: compactWorkshop ? "11px" : uiSnapshot.stage === "starter" ? "12px" : uiSnapshot.stage === "growing" ? "11px" : "10px",
           color: "#98b7c7",
-          wordWrap: { width: Math.min(148, textWrapWidth + 4) },
+          wordWrap: { width: Math.max(70, textWrapWidth + 6) },
         })
         .setOrigin(0, 0);
       desc.setLineSpacing(1);
-      if (desc.displayHeight > 24) {
-        desc.setScale(Phaser.Math.Clamp(24 / desc.displayHeight, 0.82, 1));
+      const descHeightCap = compactWorkshop ? 22 : uiSnapshot.stage === "starter" ? 34 : 24;
+      if (desc.displayHeight > descHeightCap) {
+        desc.setScale(Phaser.Math.Clamp(descHeightCap / desc.displayHeight, 0.82, 1));
       }
-      const levelY = Math.max(16, Math.min(24, desc.y + desc.displayHeight + 6));
-      const progressY = Math.min(cardHeight / 2 - 12, levelY + 14);
+      const levelY = Math.max(12, Math.min(workshopLayout.cardHeight / 2 - 32, desc.y + desc.displayHeight + 8));
+      const progressY = Math.min(workshopLayout.cardHeight / 2 - 12, levelY + 16);
       const levelText = this.add
         .text(textLeft, levelY, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
-          fontSize: "11px",
+          fontSize: compactWorkshop ? "11px" : uiSnapshot.stage === "starter" ? "12px" : "11px",
           color: maxed ? "#57c27d" : "#7fdfff",
           fontStyle: "700",
         })
         .setOrigin(0, 0);
-      const progressWidth = Math.max(98, textWrapWidth - 10);
-      fitTextScaleToWidth(levelText, progressWidth, 0.84);
+      const progressWidth = Math.max(70, textWrapWidth - 8);
+      fitTextScaleToWidth(levelText, progressWidth, 0.82);
       const progressBg = this.add.rectangle(textLeft, progressY, progressWidth, 6, 0x0b141d, 0.95).setOrigin(0, 0.5);
       const progressFill = this.add
         .rectangle(
@@ -3043,40 +3339,57 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(0, 0.5);
 
       const btn = this.add
-        .rectangle(buttonCenterX, buttonY, buttonWidth, 34, affordable ? 0x1b2635 : 0x0d131b, 0.98)
-        .setStrokeStyle(2, maxed ? 0x57c27d : affordable ? 0xffd166 : 0x5f6b76, 0.86);
+        .rectangle(
+          buttonCenterX,
+          uiSnapshot.stage === "advanced" ? 2 : 4,
+          workshopLayout.buttonWidth,
+          workshopLayout.buttonHeight,
+          affordable || isRecommended ? 0x1b2635 : 0x0d131b,
+          0.98
+        )
+        .setStrokeStyle(2, maxed ? 0x57c27d : affordable || isRecommended ? 0xffd166 : 0x5f6b76, isRecommended ? 0.94 : 0.86);
       const priceLabel = cost ? formatResource(this.locale, cost.currency, cost.amount) : t(this.locale, "menu.maxed");
       const btnLabel = this.add
         .text(
           buttonCenterX,
-          buttonY - 6,
+          (uiSnapshot.stage === "advanced" ? 2 : 4) - 6,
           maxed ? t(this.locale, "menu.installedButton") : affordable ? t(this.locale, "menu.buy") : t(this.locale, "menu.locked"),
-          { fontSize: "12px", color: "#d9f2ff", fontStyle: "700" }
+          { fontSize: compactWorkshop ? "11px" : uiSnapshot.stage === "starter" ? "13px" : "12px", color: "#d9f2ff", fontStyle: "700" }
         )
         .setOrigin(0.5);
       const costLabel = this.add
-        .text(buttonCenterX, buttonY + 10, priceLabel, {
-          fontSize: "10px",
-          color: maxed ? "#57c27d" : affordable ? "#ffd166" : "#98b7c7",
+        .text(buttonCenterX, (uiSnapshot.stage === "advanced" ? 2 : 4) + 10, priceLabel, {
+          fontSize: compactWorkshop ? "10px" : uiSnapshot.stage === "starter" ? "11px" : "10px",
+          color: maxed ? "#57c27d" : affordable || isRecommended ? "#ffd166" : "#98b7c7",
           fontStyle: "700",
           align: "center",
-          wordWrap: { width: 98 },
+          wordWrap: { width: workshopLayout.buttonWidth - 10 },
         })
         .setOrigin(0.5);
-      fitTextScaleToWidth(btnLabel, buttonWidth - 18, 0.76);
-      fitTextScaleToWidth(costLabel, buttonWidth - 16, 0.76);
-      if (badgeNode) {
-        badgeNode.setPosition(badgeX, -22);
-      }
+      fitTextScaleToWidth(btnLabel, workshopLayout.buttonWidth - 14, 0.74);
+      fitTextScaleToWidth(costLabel, workshopLayout.buttonWidth - 12, 0.72);
+      if (badgeNode) badgeNode.setPosition(badgeX, -workshopLayout.cardHeight / 2 + 18);
 
       if (!maxed && affordable) {
         btn.setInteractive({ useHandCursor: true });
         btn.on("pointerdown", () => void this.buyMetaNode(node.id));
       }
 
-      const card = this.add
-        .container(x, y, [bg, accent, title, ...(badgeNode ? [badgeNode] : []), desc, levelText, progressBg, progressFill, btn, btnLabel, costLabel])
-        .setDepth(1402);
+      const cardContents: Phaser.GameObjects.GameObject[] = [
+        bg,
+        accent,
+        title,
+        ...(badgeNode ? [badgeNode] : []),
+        ...(recommendedBadgeNode ? [recommendedBadgeNode] : []),
+        desc,
+        levelText,
+        progressBg,
+        progressFill,
+        btn,
+        btnLabel,
+        costLabel,
+      ];
+      const card = this.add.container(x, y, cardContents).setDepth(1402);
       this.workshopCards.push(card);
       this.workshopBox.add(card);
     });
@@ -3463,7 +3776,12 @@ function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores:
   return parts.join(" | ");
 }
 
-function buildMenuBestText(locale: Locale, save: SaveData | null | undefined, topEntries: number): string {
+function buildMenuBestText(
+  locale: Locale,
+  save: SaveData | null | undefined,
+  stage: "starter" | "growing" | "advanced",
+  summaryEntries: number
+): string {
   const stats = save?.stats ?? { bestWave: 0, bestBolts: 0 };
   const entries = save?.leaderboard?.entries ?? [];
   const lines = [
@@ -3473,24 +3791,53 @@ function buildMenuBestText(locale: Locale, save: SaveData | null | undefined, to
     }),
   ];
 
-  if (topEntries <= 0) {
+  if (stage === "starter" || summaryEntries <= 0) {
     return lines.join("\n");
   }
-
-  lines.push(t(locale, "menu.leaderboardTitle"));
 
   if (entries.length <= 0) {
     lines.push(t(locale, "menu.leaderboardEmpty"));
     return lines.join("\n");
   }
 
-  for (const [index, entry] of entries.slice(0, Math.max(1, topEntries)).entries()) {
-    const modeLabel = entry.mode === "daily" ? t(locale, "leaderboard.mode.daily") : t(locale, "leaderboard.mode.run");
-    const divisionLabel = t(locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`);
+  const sorted = [...entries].sort((a, b) => b.score - a.score || b.wave - a.wave || b.createdAtMs - a.createdAtMs);
+  const bestScore = sorted.reduce((best, entry) => Math.max(best, entry.score), 0);
+  const currentDivision = getLeaderboardDivision(bestScore);
+  const nextDivision = getLeaderboardNextDivision(bestScore);
+
+  const leader = sorted[0];
+  if (leader) {
     lines.push(
-      `${index + 1}. ${entry.pilot} [${modeLabel} | ${divisionLabel}] | ${formatNumber(locale, entry.score)} | ${t(locale, "hud.wave")} ${formatNumber(locale, entry.wave)}`
+      t(locale, "menu.leaderboardLeaderLine", {
+        pilot: leader.pilot,
+        score: formatNumber(locale, leader.score),
+      })
     );
   }
+
+  if (stage === "advanced" && summaryEntries > 1) {
+    const rival = sorted[1];
+    if (rival) {
+      lines.push(
+        t(locale, "menu.leaderboardRivalLine", {
+          pilot: rival.pilot,
+          score: formatNumber(locale, rival.score),
+        })
+      );
+    }
+  }
+
+  lines.push(
+    nextDivision
+      ? t(locale, "menu.leaderboardLeagueLine", {
+          division: t(locale, `leaderboard.division.${currentDivision.id}`),
+          nextDivision: t(locale, `leaderboard.division.${nextDivision.id}`),
+          score: formatNumber(locale, nextDivision.minScore),
+        })
+      : t(locale, "menu.leaderboardLeagueTop", {
+          division: t(locale, `leaderboard.division.${currentDivision.id}`),
+        })
+  );
 
   return lines.join("\n");
 }
@@ -3500,31 +3847,45 @@ function formatMissionObjectiveLabel(locale: Locale, type: MissionObjectiveType,
 }
 
 function getMenuDailySummaryTitle(locale: Locale): string {
-  return locale === "ru" ? "ДЕЙЛИК СЕГОДНЯ" : "TODAY'S DAILY";
+  return t(locale, "menu.dailySummaryTitle");
 }
 
 function getMenuWeeklyRaceTitle(locale: Locale): string {
-  return locale === "ru" ? "НЕДЕЛЬНАЯ ГОНКА" : "WEEKLY RACE";
+  return t(locale, "menu.weeklyRaceTitle");
 }
 
 function getMenuWeeklyRaceEntryLine(locale: Locale): string {
-  return locale === "ru" ? "Сделай заезд и войди в недельный рейтинг" : "Post a run to enter weekly";
+  return t(locale, "menu.weeklyRaceEntry");
 }
 
 function formatMenuWeeklyRaceRankLine(locale: Locale, rank: number, division: string, score: string): string {
-  return locale === "ru" ? `Место #${rank} | ${division} | ${score}` : `Weekly #${rank} | ${division} | ${score}`;
+  return t(locale, "menu.weeklyRaceRankLine", {
+    rank: formatNumber(locale, rank),
+    division,
+    score,
+  });
 }
 
 function formatMenuWeeklyRaceBestLine(locale: Locale, division: string, score: string): string {
-  return locale === "ru" ? `Лучший за неделю | ${division} | ${score}` : `Best this week | ${division} | ${score}`;
+  return t(locale, "menu.weeklyRaceBestLine", {
+    division,
+    score,
+  });
 }
 
 function formatMenuWeeklyRaceTargetLine(locale: Locale, division: string, remaining: string, score: string): string {
-  return locale === "ru" ? `До ${division}: ${remaining} | цель ${score}` : `Next ${division} in ${remaining} | goal ${score}`;
+  return t(locale, "menu.weeklyRaceTargetLine", {
+    division,
+    remaining,
+    score,
+  });
 }
 
 function formatMenuWeeklyRaceHotLine(locale: Locale, division: string, remaining: string): string {
-  return locale === "ru" ? `\u0415\u0449\u0451 \u0440\u044b\u0432\u043e\u043a \u0434\u043e ${division} | ${remaining}` : `One strong run to ${division} | ${remaining}`;
+  return t(locale, "menu.weeklyRaceHotLine", {
+    division,
+    remaining,
+  });
 }
 
 function formatMenuLiveopsHeadline(
@@ -3537,14 +3898,20 @@ function formatMenuLiveopsHeadline(
   tomorrowTitle: string
 ): string {
   if (comebackEligible) {
-    return locale === "ru"
-      ? `\u0412\u043e\u0437\u0432\u0440\u0430\u0442 ${comebackDays}\u0434 | ${comebackReward}`
-      : `Comeback ${comebackDays}d | ${comebackReward}`;
+    return t(locale, "menu.liveopsHeadlineComeback", {
+      days: comebackDays,
+      reward: comebackReward,
+    });
   }
   if (rotationBadge) {
-    return locale === "ru" ? `${rotationBadge} | ${rotationTitle ?? "\u0420\u043e\u0442\u0430\u0446\u0438\u044f"}` : `${rotationBadge} | ${rotationTitle ?? "Rotation"}`;
+    return t(locale, "menu.liveopsHeadlineRotation", {
+      badge: rotationBadge,
+      title: rotationTitle ?? t(locale, "menu.liveopsRotationFallback"),
+    });
   }
-  return locale === "ru" ? `\u0417\u0430\u0432\u0442\u0440\u0430 | ${tomorrowTitle}` : `Tomorrow | ${tomorrowTitle}`;
+  return t(locale, "menu.liveopsHeadlineTomorrow", {
+    title: tomorrowTitle,
+  });
 }
 
 function formatMenuLiveopsStatusLine(
@@ -3557,13 +3924,21 @@ function formatMenuLiveopsStatusLine(
   weeklyDone: string,
   weeklyTotal: string
 ): string {
-  return locale === "ru"
-    ? `\u0421\u0435\u0440\u0438\u044f ${streakDay} ${streakReady ? "\u0413\u041e\u0422\u041e\u0412\u041e" : "\u0417\u0410\u0411\u0420\u0410\u041D\u041E"} | \u0433\u043e\u0442\u043e\u0432\u043e ${readyClaims} | \u0434 ${dailyDone}/${dailyTotal} | \u043d ${weeklyDone}/${weeklyTotal}`
-    : `Streak ${streakDay} ${streakReady ? "READY" : "CLAIMED"} | ready ${readyClaims} | d ${dailyDone}/${dailyTotal} | w ${weeklyDone}/${weeklyTotal}`;
+  return t(locale, "menu.liveopsStatusLine", {
+    day: streakDay,
+    streakState: t(locale, streakReady ? "menu.missionReady" : "menu.missionClaimed"),
+    ready: readyClaims,
+    daily: `${dailyDone}/${dailyTotal}`,
+    weekly: `${weeklyDone}/${weeklyTotal}`,
+  });
 }
 
 function formatMenuDailyLoginLine(locale: Locale, day: string, maxDay: string, reward: string): string {
-  return locale === "ru" ? `\u041b\u043e\u0433\u0438\u043d ${day}/${maxDay} | ${reward}` : `Login ${day}/${maxDay} | ${reward}`;
+  return t(locale, "menu.dailyLoginLine", {
+    day,
+    max: maxDay,
+    reward,
+  });
 }
 
 function formatMenuDailyStatusLine(
@@ -3573,33 +3948,26 @@ function formatMenuDailyStatusLine(
   best: string,
   nextStartState: "free" | "rewarded" | "locked"
 ): string {
-  const nextLabel =
-    locale === "ru"
-      ? nextStartState === "free"
-        ? "\u0441\u0442\u0430\u0440\u0442 \u0431\u0435\u0441\u043f\u043b."
-        : nextStartState === "rewarded"
-          ? "\u0441\u0442\u0430\u0440\u0442 \u0437\u0430 \u0440\u0435\u043a\u043b."
-          : "\u0441\u0442\u0430\u0440\u0442 \u0437\u0430\u043a\u0440."
-      : nextStartState === "free"
-        ? "start free"
-        : nextStartState === "rewarded"
-          ? "start ad"
-          : "start locked";
-  return locale === "ru" ? `\u041f\u043e\u043f\u044b\u0442\u043a\u0438 ${used}/${max} | ${best} | ${nextLabel}` : `Attempts ${used}/${max} | ${best} | ${nextLabel}`;
+  return t(locale, "menu.dailyStatusLine", {
+    used,
+    max,
+    best,
+    next: t(locale, `menu.dailyStartState.${nextStartState}`),
+  });
 }
 
 function formatMenuRewardsSummary(locale: Locale, readyClaims: number): string {
   const ready = Math.max(0, Math.floor(readyClaims));
-  if (locale === "ru") {
-    return ready > 0 ? `\u0413\u043e\u0442\u043e\u0432\u043e ${ready}` : "\u041f\u043e\u043a\u0430 \u0442\u0438\u0445\u043e";
-  }
-  return ready > 0 ? `Ready ${ready}` : "Quiet for now";
+  return ready > 0 ? t(locale, "menu.rewardsReadySummary", { count: ready }) : t(locale, "menu.rewardsQuietSummary");
 }
 
 function formatMenuProgressSummary(locale: Locale, done: number, total: number): string {
   const safeDone = formatNumber(locale, Math.max(0, Math.floor(done)));
   const safeTotal = formatNumber(locale, Math.max(0, Math.floor(total)));
-  return locale === "ru" ? `${safeDone}/${safeTotal} \u0432\u044b\u043f.` : `${safeDone}/${safeTotal} complete`;
+  return t(locale, "menu.progressSummary", {
+    done: safeDone,
+    total: safeTotal,
+  });
 }
 
 function getMenuLayoutMode(width: number, height: number): MenuLayoutMode {
@@ -3609,25 +3977,23 @@ function getMenuLayoutMode(width: number, height: number): MenuLayoutMode {
 }
 
 function getMenuWeeklyRaceTopLine(locale: Locale): string {
-  return locale === "ru" ? "Верхняя лига уже взята" : "Top division secured";
+  return t(locale, "menu.weeklyRaceTopLine");
 }
 
 function formatMenuWeeklyRaceLaunchLine(locale: Locale, division: string, score: string): string {
-  return locale === "ru" ? `Первый порог ${division} на ${score}` : `First step ${division} at ${score}`;
-}
-
-function _formatMenuWeeklyRaceRewardLine(locale: Locale, reward: string, usingPlatformBoard: boolean): string {
-  if (locale === "ru") return usingPlatformBoard ? `Награда недели ${reward}` : `Локально | награда ${reward}`;
-  return usingPlatformBoard ? `Week payout ${reward}` : `Local weekly | payout ${reward}`;
+  return t(locale, "menu.weeklyRaceLaunchLine", {
+    division,
+    score,
+  });
 }
 
 function formatCompactRewardLabel(locale: Locale, reward: { bolts: number; cores: number }): string {
   const parts: string[] = [];
   if (reward.bolts > 0) {
-    parts.push(`${formatNumber(locale, reward.bolts)}${locale === "ru" ? "Б" : "B"}`);
+    parts.push(t(locale, "menu.rewardBoltsCompact", { value: formatNumber(locale, reward.bolts) }));
   }
   if (reward.cores > 0) {
-    parts.push(`${formatNumber(locale, reward.cores)}${locale === "ru" ? "Я" : "C"}`);
+    parts.push(t(locale, "menu.rewardCoresCompact", { value: formatNumber(locale, reward.cores) }));
   }
   return parts.join(" | ");
 }
@@ -3635,49 +4001,42 @@ function formatCompactRewardLabel(locale: Locale, reward: { bolts: number; cores
 function formatStartBoosterRewardLabel(locale: Locale, reward: StartBoosterPreview, compact = false): string {
   const parts: string[] = [];
   if (reward.tailSegments > 0) {
-    parts.push(
-      locale === "ru"
-        ? `+${formatNumber(locale, reward.tailSegments)} ${compact ? "сегм." : "сегмента"}`
-        : `+${formatNumber(locale, reward.tailSegments)} ${compact ? "tail" : "tail segments"}`
-    );
+    parts.push(t(locale, compact ? "menu.rewardTailCompact" : "menu.rewardTailLong", { value: formatNumber(locale, reward.tailSegments) }));
   }
   if (reward.bolts > 0) {
-    parts.push(locale === "ru" ? `+${formatNumber(locale, reward.bolts)} болт.` : `+${formatNumber(locale, reward.bolts)} bolts`);
+    parts.push(t(locale, "menu.rewardBoltsShort", { value: formatNumber(locale, reward.bolts) }));
   }
   if (reward.cores > 0) {
-    parts.push(locale === "ru" ? `+${formatNumber(locale, reward.cores)} яд.` : `+${formatNumber(locale, reward.cores)} cores`);
+    parts.push(t(locale, "menu.rewardCoresShort", { value: formatNumber(locale, reward.cores) }));
   }
-  return parts.length > 0 ? parts.join(" | ") : locale === "ru" ? "без бонуса" : "no bonus";
+  return parts.length > 0 ? parts.join(" | ") : t(locale, "menu.rewardNone");
 }
 
 function getRewardedPlayCtaLabel(locale: Locale, reward: StartBoosterPreview, compact = false): string {
   const rewardLabel = formatStartBoosterRewardLabel(locale, reward, compact);
-  return locale === "ru" ? `СМОТРЕТЬ РЕКЛАМУ\nИГРА: ${rewardLabel}` : `WATCH AD\nPLAY: ${rewardLabel}`;
+  return t(locale, "menu.rewardedPlayCta", { reward: rewardLabel });
 }
 
 function getRewardedDailyCtaLabel(locale: Locale, reward: StartBoosterPreview, compact = false): string {
   const rewardLabel = formatStartBoosterRewardLabel(locale, reward, compact);
-  return locale === "ru" ? `СМОТРЕТЬ РЕКЛАМУ\nДЕЙЛИК: ${rewardLabel}` : `WATCH AD\nDAILY: ${rewardLabel}`;
+  return t(locale, "menu.rewardedDailyCta", { reward: rewardLabel });
 }
 
 function getStartBoosterToggleTitle(locale: Locale): string {
-  return locale === "ru" ? "СТАРТОВЫЙ БУСТ ЗА РЕКЛАМУ" : "START BOOST FOR AD";
+  return t(locale, "menu.startBoosterToggleTitle");
 }
 
 function getStartBoosterToggleHint(locale: Locale, reward: StartBoosterPreview, compact = false): string {
   const rewardLabel = formatStartBoosterRewardLabel(locale, reward, true);
-  if (locale === "ru") {
-    return compact ? `Награда: ${rewardLabel}` : `Награда для игры и дейлика: ${rewardLabel}`;
-  }
-  return compact ? `Reward: ${rewardLabel}` : `Reward for Play and Daily: ${rewardLabel}`;
+  return t(locale, compact ? "menu.startBoosterToggleHintCompact" : "menu.startBoosterToggleHint", { reward: rewardLabel });
 }
 
 function getMenuWeeklyRaceNoRewardCompactLabel(locale: Locale): string {
-  return locale === "ru" ? "0Б" : "0";
+  return t(locale, "menu.weeklyRaceNoRewardCompact");
 }
 
 function getMenuWeeklyRaceHeldRewardBadgeLabel(locale: Locale, reward: string): string {
-  return locale === "ru" ? `СБРОС ${reward}` : `RESET ${reward}`;
+  return t(locale, "menu.weeklyRaceHeldRewardBadge", { reward });
 }
 
 function getMenuWeeklyRaceRiskBadgeConfig(
@@ -3688,7 +4047,7 @@ function getMenuWeeklyRaceRiskBadgeConfig(
 ): { label: string; fill: number; stroke: number; text: string; alpha: number; strokeAlpha: number } {
   if (topLocked) {
     return {
-      label: locale === "ru" ? "ТОП УДЕРЖАН" : "TOP SAFE",
+      label: t(locale, "menu.weeklyRaceRiskTopSafe"),
       fill: 0x13283d,
       stroke: 0x5cc8ff,
       text: "#d9f2ff",
@@ -3698,7 +4057,7 @@ function getMenuWeeklyRaceRiskBadgeConfig(
   }
   if (rewardDelta) {
     return {
-      label: locale === "ru" ? `СГОРИТ +${rewardDelta}` : `BURNS +${rewardDelta}`,
+      label: t(locale, "menu.weeklyRaceRiskBurns", { reward: rewardDelta }),
       fill: 0x21170c,
       stroke: 0xffd166,
       text: "#fff0d4",
@@ -3708,7 +4067,7 @@ function getMenuWeeklyRaceRiskBadgeConfig(
   }
   if (entryReward) {
     return {
-      label: locale === "ru" ? `ВХОД ${entryReward}` : `ENTRY ${entryReward}`,
+      label: t(locale, "menu.weeklyRaceRiskEntry", { reward: entryReward }),
       fill: 0x1b1508,
       stroke: 0xffd166,
       text: "#fff0d4",
@@ -3717,7 +4076,7 @@ function getMenuWeeklyRaceRiskBadgeConfig(
     };
   }
   return {
-    label: locale === "ru" ? "ДЕРЖИ ПЭЙАУТ" : "HOLD PAYOUT",
+    label: t(locale, "menu.weeklyRaceRiskHoldPayout"),
     fill: 0x13283d,
     stroke: 0x5cc8ff,
     text: "#d9f2ff",
@@ -3726,75 +4085,27 @@ function getMenuWeeklyRaceRiskBadgeConfig(
   };
 }
 
-function _formatMenuWeeklyRaceLeaderRewardLine(
-  locale: Locale,
-  reward: string,
-  leaderName: string,
-  leaderScore: string,
-  usingPlatformBoard: boolean
-): string {
-  if (locale === "ru") {
-    return usingPlatformBoard ? `Награда ${reward} | лидер ${leaderName} ${leaderScore}` : `Локально | ${reward} | лучший ${leaderName} ${leaderScore}`;
-  }
-  return usingPlatformBoard ? `Payout ${reward} | leader ${leaderName} ${leaderScore}` : `Local weekly | ${reward} | best ${leaderName} ${leaderScore}`;
-}
-
-function _getMenuWeeklyRaceNoRewardLabel(locale: Locale): string {
-  return locale === "ru" ? "без награды" : "no payout yet";
-}
-
 function getMenuWeeklyRaceStateBadgeLabel(
   locale: Locale,
   state: "enter" | "climbing" | "payout" | "near_promo" | "hot_run" | "top"
 ): string {
-  if (locale === "ru") {
-    if (state === "hot_run") return "\u0420\u042b\u0412\u041e\u041A";
-    if (state === "enter") return "\u0412\u0425\u041e\u0414";
-    if (state === "climbing") return "\u0412 \u0413\u041e\u041d\u041A\u0415";
-    if (state === "payout") return "\u041D\u0410\u0413\u0420\u0410\u0414\u0410";
-    if (state === "near_promo") return "\u0410\u041F \u0420\u042F\u0414\u041E\u041C";
-    return "\u0422\u041E\u041F";
-  }
-  if (state === "hot_run") return "HOT RUN";
-  if (state === "enter") return "ENTER";
-  if (state === "climbing") return "RACING";
-  if (state === "payout") return "PAYOUT";
-  if (state === "near_promo") return "NEAR PROMO";
-  return "TOP";
-}
-
-function _getMenuWeeklyRaceStateLabel(
-  locale: Locale,
-  state: "enter" | "climbing" | "payout" | "near_promo" | "hot_run" | "top"
-): string {
-  if (locale === "ru") {
-    if (state === "enter") return "\u0412\u0425\u041e\u0414";
-    if (state === "climbing") return "\u0412 \u0413\u041e\u041d\u041a\u0415";
-    if (state === "payout") return "\u041d\u0410\u0413\u0420\u0410\u0414\u0410";
-    if (state === "near_promo") return "\u0410\u041f \u0420\u042f\u0414\u041e\u041c";
-    return "\u0422\u041e\u041f";
-  }
-  if (state === "enter") return "ENTER";
-  if (state === "climbing") return "RACING";
-  if (state === "payout") return "PAYOUT";
-  if (state === "near_promo") return "NEAR PROMO";
-  return "TOP";
+  return t(locale, `menu.weeklyRaceState.${state}`);
 }
 
 function getMenuWeeklyRaceJumpLabel(locale: Locale, state: "debut" | "up" | "down", value: number | null): string {
   const safeValue = Math.max(0, Math.floor(value ?? 0));
   if (state === "debut") {
-    return locale === "ru" ? `\u041d\u041e\u0412\u042b\u0419 #${safeValue}` : `NEW #${safeValue}`;
+    return t(locale, "menu.weeklyRaceJumpDebut", { rank: safeValue });
   }
   return state === "up" ? `+${safeValue}` : `-${safeValue}`;
 }
 
 function getMenuWeeklyRaceProgressLabel(locale: Locale, percent: number, division: string): string {
-  return locale === "ru" ? `${percent}% \u0434\u043e ${division}` : `${percent}% to ${division}`;
+  return t(locale, "menu.weeklyRaceProgressLabel", { percent, division });
 }
 
 function getMenuWeeklyRaceHotProgressLabel(locale: Locale, division: string): string {
-  return locale === "ru" ? `\u0420\u042b\u0412\u041e\u041A \u0414\u041e ${division}` : `PUSH TO ${division}`;
+  return t(locale, "menu.weeklyRaceHotProgressLabel", { division });
 }
 
 function getNextWeeklyResetAtMs(nowMs: number): number {
@@ -3810,16 +4121,23 @@ function getMenuWeeklyResetBadgeLabel(locale: Locale, remainingMs: number): stri
   const hours = Math.floor((safeMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
   const minutes = Math.max(1, Math.floor((safeMs % (60 * 60 * 1000)) / (60 * 1000)));
   if (days >= 1) {
-    return locale === "ru" ? `\u0421\u0411\u0420\u041e\u0421 ${days}\u0414 ${hours}\u0427` : `RESET ${days}D ${hours}H`;
+    return t(locale, "menu.weeklyRaceResetDays", {
+      days: formatNumber(locale, days),
+      hours: formatNumber(locale, hours),
+    });
   }
   if (totalHours >= 1) {
-    return locale === "ru" ? `\u0421\u0411\u0420\u041e\u0421 ${totalHours}\u0427` : `RESET ${totalHours}H`;
+    return t(locale, "menu.weeklyRaceResetHours", {
+      hours: formatNumber(locale, totalHours),
+    });
   }
-  return locale === "ru" ? `\u0421\u0411\u0420\u041e\u0421 ${minutes}\u041c` : `RESET ${minutes}M`;
+  return t(locale, "menu.weeklyRaceResetMinutes", {
+    minutes: formatNumber(locale, minutes),
+  });
 }
 
 function getMenuWeeklyRaceProgressTopLabel(locale: Locale): string {
-  return locale === "ru" ? "\u0412\u0415\u0420\u0425\u041d\u042f\u042f \u041b\u0418\u0413\u0410" : "TOP DIVISION";
+  return t(locale, "menu.weeklyRaceTopDivision");
 }
 
 function getMenuBoardDivisionReward(
@@ -3891,38 +4209,31 @@ function sanitizeCareerMilestoneIds(raw: unknown): LeaderboardCareerMilestoneId[
 }
 
 function getPortalBoardsTitle(locale: Locale): string {
-  return locale === "ru" ? "РЕЙТИНГИ ПЛАТФОРМЫ" : "PORTAL BOARDS";
+  return t(locale, "menu.portalBoardsTitle");
 }
 
 function getPortalBoardLoadingLabel(locale: Locale): string {
-  return locale === "ru" ? "Загрузка рейтингов платформы..." : "Loading portal boards...";
+  return t(locale, "menu.portalBoardsLoading");
 }
 
 function getPortalBoardUnavailableLabel(locale: Locale): string {
-  return locale === "ru" ? "рейтинги платформы недоступны" : "portal boards unavailable";
+  return t(locale, "menu.portalBoardsUnavailable");
 }
 
 function getPortalBoardUnrankedLabel(locale: Locale): string {
-  return locale === "ru" ? "без места" : "unranked";
+  return t(locale, "menu.portalBoardsUnranked");
 }
 
 function getPortalBoardFallbackLabel(locale: Locale): string {
-  return locale === "ru" ? "локально" : "local fallback";
+  return t(locale, "menu.portalBoardsFallback");
 }
 
 function getPortalBoardTopLabel(locale: Locale): string {
-  return locale === "ru" ? "верхняя лига" : "top division";
+  return t(locale, "menu.portalBoardsTop");
 }
 
 function getPortalBoardLabel(locale: Locale, key: "daily" | "weekly" | "all_time"): string {
-  if (locale === "ru") {
-    if (key === "daily") return "День";
-    if (key === "weekly") return "Неделя";
-    return "Все время";
-  }
-  if (key === "daily") return "Daily";
-  if (key === "weekly") return "Weekly";
-  return "All-Time";
+  return t(locale, `menu.portalBoard.${key}`);
 }
 
 function _buildInstalledMetaSummary(
@@ -3936,7 +4247,7 @@ function _buildInstalledMetaSummary(
     .map((entry) => {
       const badge = getMetaNodeBadgeSpecs(locale, entry.node.id, 1)[0];
       const label = badge?.label ?? getMetaNodeName(locale, entry.node.id, entry.node.name);
-      return `${label} ${locale === "ru" ? "ур." : "Lv."}${entry.level}`;
+      return `${label} ${t(locale, "menu.installedLevelShort")}${entry.level}`;
     });
 
   return active.length > 0

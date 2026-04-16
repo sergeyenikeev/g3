@@ -1,0 +1,14 @@
+
+> magnet-caravan@0.1.0 dev
+> vite --host 127.0.0.1 --port 4173 --strictPort
+
+
+  [32m[1mVITE[22m v6.4.1[39m  [2mready in [0m[1m220[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4173[22m/[39m
+[2m07:04:35[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/i18n/localization.ts[22m
+[2m07:05:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/game/scenes/MenuScene.ts[22m
+[2m07:05:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/game/scenes/MenuScene.ts[22m
+[2m07:07:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/game/scenes/MenuScene.ts[22m
+[2m07:07:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/game/scenes/MenuScene.ts[22m
+[2m07:18:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/main.ts[22m

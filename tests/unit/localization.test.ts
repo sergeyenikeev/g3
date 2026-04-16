@@ -90,4 +90,25 @@ describe("localization", () => {
     expect(getDailyRotationCopy("ru", "caravan_week").title).not.toContain("Caravan");
     expect(getLiveopsEventCopy("ru", "tomorrow_offer").title).not.toContain("Tomorrow");
   });
+  it("covers staged menu and weekly race copy used by redesigned menu helpers", () => {
+    expect(t("en", "menu.weeklyRaceHotLine", { division: "Elite", remaining: "1200" })).toBe("One strong run to Elite | 1200");
+    expect(
+      t("en", "menu.liveopsStatusLine", {
+        day: "3",
+        streakState: "READY",
+        ready: "2",
+        daily: "1/3",
+        weekly: "4/8",
+      })
+    ).toBe("Streak 3 READY | ready 2 | d 1/3 | w 4/8");
+    expect(t("en", "menu.weeklyRaceHeldRewardBadge", { reward: "120B" })).toBe("RESET 120B");
+    expect(t("en", "menu.rewardBoltsCompact", { value: "35" })).toBe("35B");
+    expect(t("en", "menu.installedLevelShort")).toBe("Lv.");
+
+    expect(t("ru", "menu.weeklyRaceHotLine", { division: "Элита", remaining: "1200" })).not.toContain("One strong run");
+    expect(t("ru", "menu.liveopsStatusLine", { day: "3", streakState: "ГОТОВО", ready: "2", daily: "1/3", weekly: "4/8" })).not.toContain("Streak");
+    expect(t("ru", "menu.weeklyRaceHeldRewardBadge", { reward: "120Б" })).not.toContain("RESET");
+    expect(t("ru", "menu.rewardBoltsCompact", { value: "35" })).not.toContain("B");
+    expect(t("ru", "menu.installedLevelShort")).not.toBe("Lv.");
+  });
 });

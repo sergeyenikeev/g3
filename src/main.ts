@@ -1,27 +1,29 @@
 import "./style.css";
+import { installBrowserInteractionGuards, reportFatalStartupError } from "./app/bootstrapShell";
 import { ensurePlatformSdkLoaded } from "./platform/sdk/loadPlatformSdk";
 
 // Phaser source builds still touch `global` in some code paths.
 (globalThis as typeof globalThis & { global?: typeof globalThis }).global ??= globalThis;
 
-const preventBrowserUi = (event: Event) => {
-  event.preventDefault();
-};
+installBrowserInteractionGuards();
 
-for (const eventName of ["contextmenu", "selectstart", "dragstart"] as const) {
-  window.addEventListener(eventName, preventBrowserUi, { capture: true });
-}
+window.addEventListener("error", (event) => {
+  reportFatalStartupError(event.error ?? event.message);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  reportFatalStartupError(event.reason);
+});
 
 void (async () => {
   try {
     await ensurePlatformSdkLoaded();
-  } catch {
-    // ignore
-  }
-
-  const { createGame } = await import("./app/createGame");
-  const game = createGame("app");
-  if (import.meta.env.DEV || import.meta.env.VITE_E2E === "1") {
-    (window as any).__MC_GAME__ = game;
+    const { createGame } = await import("./app/createGame");
+    const game = createGame("app");
+    if (import.meta.env.DEV || import.meta.env.VITE_E2E === "1") {
+      (window as any).__MC_GAME__ = game;
+    }
+  } catch (error) {
+    reportFatalStartupError(error);
   }
 })();

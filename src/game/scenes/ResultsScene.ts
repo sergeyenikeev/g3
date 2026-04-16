@@ -13,6 +13,7 @@ import type { RunState } from "../run/runState";
 import { normalizeDailySave } from "../daily/dailyAttempts";
 import { getUtcYyyymmdd } from "../daily/daily";
 import { applyRunSummaryToLiveops, getBoardId, getWeekKey, upsertWeeklyLeaderboardEntry } from "../liveops/liveops";
+import { getUiProgressSnapshot } from "../meta/uiProgression";
 import { grantMetaWallet } from "../meta/metaProgression";
 import {
   buildLeaderboardEntry,
@@ -85,6 +86,7 @@ export class ResultsScene extends Phaser.Scene {
     void signalPlatformGameplayStop(this.platformAdapter);
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
+    const uiStage = save ? getUiProgressSnapshot(save).stage : "starter";
     this.exitBusy = false;
     this.x2Used = false;
     this.recordRunPromise = null;
@@ -159,7 +161,7 @@ export class ResultsScene extends Phaser.Scene {
       .setLineSpacing(4)
       .setDepth(2001);
 
-    const x2Cfg = this.state.config.ads?.rewarded?.x2Results;
+    const x2Cfg = uiStage === "starter" ? undefined : this.state.config.ads?.rewarded?.x2Results;
     if (x2Cfg?.enabled) {
       this.analytics?.track(ANALYTICS_EVENTS.X2_RESULTS_OFFER, {
         mode: this.state.mode,

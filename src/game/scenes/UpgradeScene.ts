@@ -6,6 +6,7 @@ import type { AdsManager } from "../../platform/ads/adsManager";
 import type { RunState } from "../run/runState";
 import { applyEffects } from "../effects/applyEffects";
 import { GAME_EVENTS } from "../events";
+import { getUiProgressSnapshot } from "../meta/uiProgression";
 import { getUpgradeBadgeSpecs } from "../upgrades/upgradeBadges";
 import { makeUpgradeOffer } from "../upgrades/upgradeSelection";
 import { updatePityAfterPick } from "../upgrades/rarity";
@@ -51,6 +52,7 @@ export class UpgradeScene extends Phaser.Scene {
     void signalPlatformGameplayStop((this.registry.get("platformAdapter") as PlatformAdapter | undefined) ?? null);
     const save = (this.registry.get("saveData") as SaveData | undefined) ?? null;
     this.locale = ((this.registry.get("locale") as Locale | undefined) ?? resolveLocale(save?.settings?.language ?? "auto"));
+    const uiStage = save ? getUiProgressSnapshot(save).stage : "starter";
     createVfxTextures(this);
     createRarityFrames(this);
 
@@ -170,7 +172,7 @@ export class UpgradeScene extends Phaser.Scene {
       }
     }
 
-    const rerollEnabled = Boolean(this.state.config.ads?.rewarded?.reroll?.enabled);
+    const rerollEnabled = uiStage !== "starter" && Boolean(this.state.config.ads?.rewarded?.reroll?.enabled);
     const rerollHeight = compactLayout ? 36 : shortLayout ? 40 : 44;
     const rerollWidth = compactLayout ? 196 : shortLayout ? 208 : 220;
     const rerollY = rerollEnabled ? headerCursor + (compactLayout ? 18 : shortLayout ? 20 : 22) : headerCursor;
