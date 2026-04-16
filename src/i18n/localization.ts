@@ -745,6 +745,91 @@ Object.assign(MESSAGES.ru, {
   "leaderboard.recordBadge": "\u041d\u041e\u0412\u042b\u0419 \u0420\u0415\u041a\u041e\u0420\u0414",
 });
 
+Object.assign(MESSAGES.en, {
+  "results.boostReward": (p?: Record<string, unknown>) => `WATCH AD\nEXTRA REWARD: ${p?.reward ?? ""}`,
+});
+
+Object.assign(MESSAGES.ru, {
+  "menu.daily": "\u0415\u0416\u0415\u0414\u041D\u0415\u0412\u041D\u042B\u0419 \u0417\u0410\u0415\u0417\u0414",
+  "menu.dailyFree": "\u0415\u0416\u0415\u0414\u041D\u0415\u0412\u041D\u042B\u0419 \u0417\u0410\u0415\u0417\u0414",
+  "menu.dailyRewarded": "\u0421\u041c\u041e\u0422\u0420\u0415\u0422\u042c \u0420\u0415\u041A\u041B\u0410\u041C\u0423\n\u041e\u0422\u041A\u0420\u042B\u0422\u042C \u0415\u0416\u0415\u0414\u041D\u0415\u0412\u041D\u042B\u0419 \u0417\u0410\u0415\u0417\u0414",
+  "menu.dailyLocked": "\u0415\u0416\u0415\u0414\u041D\u0415\u0412\u041D\u042B\u0419 \u0417\u0410\u0415\u0417\u0414 \u041D\u0415\u0414\u041E\u0421\u0422\u0423\u041F\u0415\u041D",
+  "menu.dailyBoost": "\u0421\u041C\u041E\u0422\u0420\u0415\u0422\u042C \u0420\u0415\u041A\u041B\u0410\u041C\u0423\n\u0415\u0416\u0415\u0414\u041D\u0415\u0412\u041D\u042B\u0419 \u0417\u0410\u0415\u0417\u0414 + \u0411\u041E\u041D\u0423\u0421",
+  "menu.dailyBoostExtra": "\u0421\u041C\u041E\u0422\u0420\u0415\u0422\u042C \u0420\u0415\u041A\u041B\u0410\u041C\u0423\n\u0415\u0429\u0401 \u041E\u0414\u0418\u041D \u0415\u0416\u0415\u0414\u041D\u0415\u0412\u041D\u042B\u0419 \u0417\u0410\u0415\u0417\u0414 + \u0411\u041E\u041D\u0423\u0421",
+  "menu.dailyBoostLocked": "\u0415\u0416\u0415\u0414\u041D\u0415\u0412\u041D\u042B\u0419 \u0417\u0410\u0415\u0417\u0414 + \u0411\u041E\u041D\u0423\u0421 \u041D\u0415\u0414\u041E\u0421\u0422\u0423\u041F\u0415\u041D",
+  "menu.summaryDaily": "\u0421\u0415\u0413\u041E\u0414\u041D\u042F",
+  "menu.missions": "\u0417\u0410\u0414\u0410\u041D\u0418\u042F",
+  "menu.nextDailyFree": "\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0435\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u044B\u0439 \u0437\u0430\u0435\u0437\u0434: \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E.",
+  "menu.nextDailyRewarded": "\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0435\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u044B\u0439 \u0437\u0430\u0435\u0437\u0434: \u0437\u0430 \u0440\u0435\u043A\u043B\u0430\u043C\u0443.",
+  "menu.nextDailyUnavailable": "\u0415\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u044B\u0439 \u0437\u0430\u0435\u0437\u0434 \u043D\u0430 \u0441\u0435\u0433\u043E\u0434\u043D\u044F \u0438\u0441\u0447\u0435\u0440\u043F\u0430\u043D.",
+  "menu.boostDailyDisabled": "\u0411\u043E\u043D\u0443\u0441\u043D\u044B\u0439 \u0441\u0442\u0430\u0440\u0442 \u0432 \u0435\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u043E\u043C \u0437\u0430\u0435\u0437\u0434\u0435 \u043E\u0442\u043A\u043B\u044E\u0447\u0451\u043D.",
+  "menu.boostDailyFree": "\u0411\u043E\u043D\u0443\u0441\u043D\u044B\u0439 \u0441\u0442\u0430\u0440\u0442 \u0432 \u0435\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u043E\u043C \u0437\u0430\u0435\u0437\u0434\u0435: 1 \u0440\u0435\u043A\u043B\u0430\u043C\u0430.",
+  "menu.boostDailyRewarded": "\u0411\u043E\u043D\u0443\u0441\u043D\u044B\u0439 \u0441\u0442\u0430\u0440\u0442 \u0438 \u0434\u043E\u043F. \u043F\u043E\u043F\u044B\u0442\u043A\u0430: 1 \u0440\u0435\u043A\u043B\u0430\u043C\u0430.",
+  "menu.boostDailyUnavailable": "\u0411\u043E\u043D\u0443\u0441\u043D\u044B\u0439 \u0441\u0442\u0430\u0440\u0442 \u0432 \u0435\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u043E\u043C \u0437\u0430\u0435\u0437\u0434\u0435 \u0441\u0435\u0433\u043E\u0434\u043D\u044F \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D.",
+  "menu.dailySummaryTitle": "\u0415\u0416\u0415\u0414\u041D\u0415\u0412\u041D\u042B\u0419 \u0417\u0410\u0415\u0417\u0414",
+  "menu.rewardedDailyCta": (p?: Record<string, unknown>) =>
+    `\u0421\u041C\u041E\u0422\u0420\u0415\u0422\u042C \u0420\u0415\u041A\u041B\u0410\u041C\u0423\n\u0411\u041E\u041D\u0423\u0421 \u041A \u0417\u0410\u0415\u0417\u0414\u0423: ${p?.reward ?? ""}`,
+  "menu.dailyStartState.free": "\u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E",
+  "menu.dailyStartState.rewarded": "\u0437\u0430 \u0440\u0435\u043A\u043B\u0430\u043C\u0443",
+  "menu.dailyStartState.locked": "\u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E",
+  "hud.daily": "\u0415\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u044B\u0439",
+  "leaderboard.filter.daily": "\u0414\u0415\u041D\u042C",
+  "leaderboard.mode.daily": "\u0415\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u044B\u0439 \u0437\u0430\u0435\u0437\u0434",
+  "results.boostReward": (p?: Record<string, unknown>) =>
+    `\u0421\u041C\u041E\u0422\u0420\u0415\u0422\u042C \u0420\u0415\u041A\u041B\u0410\u041C\u0423\n\u0415\u0429\u0401: ${p?.reward ?? ""}`,
+});
+
+Object.assign(MESSAGES.en, {
+  "menu.dailyVariantLine": (p?: Record<string, unknown>) => `Today: ${p?.title ?? ""}`,
+  "menu.dailyLoginLine": (p?: Record<string, unknown>) => `Login reward: ${p?.reward ?? ""} | Day ${p?.day ?? "0"}/${p?.max ?? "0"}`,
+  "menu.dailyStatusLine": (p?: Record<string, unknown>) =>
+    `Attempts: ${p?.used ?? "0"}/${p?.max ?? "0"} | ${p?.best ?? ""} | Start: ${p?.next ?? ""}`,
+  "menu.rewardsReadySummary": (p?: Record<string, unknown>) => `To claim ${p?.count ?? 0}`,
+  "menu.progressSummary": (p?: Record<string, unknown>) => `${p?.done ?? "0"}/${p?.total ?? "0"}`,
+  "menu.weeklyRaceHeldRewardBadge": (p?: Record<string, unknown>) => `Reward ${p?.reward ?? "0"}`,
+  "menu.weeklyRaceRiskEntry": (p?: Record<string, unknown>) => `Reward ${p?.reward ?? ""}`,
+  "menu.weeklyRaceRiskBurns": (p?: Record<string, unknown>) => `Risk ${p?.reward ?? ""}`,
+  "menu.weeklyRaceResetDays": (p?: Record<string, unknown>) => `Reset in ${p?.days ?? 0}d ${p?.hours ?? 0}h`,
+  "menu.weeklyRaceResetHours": (p?: Record<string, unknown>) => `Reset in ${p?.hours ?? 0}h`,
+  "menu.weeklyRaceResetMinutes": (p?: Record<string, unknown>) => `Reset in ${p?.minutes ?? 0}m`,
+});
+
+Object.assign(MESSAGES.ru, {
+  "menu.dailyVariantLine": (p?: Record<string, unknown>) => `\u0421\u0435\u0433\u043e\u0434\u043d\u044f: ${p?.title ?? ""}`,
+  "menu.dailyLoginLine": (p?: Record<string, unknown>) =>
+    `\u041d\u0430\u0433\u0440\u0430\u0434\u0430 \u0432\u0445\u043e\u0434\u0430: ${p?.reward ?? ""} | \u0414\u0435\u043d\u044c ${p?.day ?? "0"}/${p?.max ?? "0"}`,
+  "menu.dailyStatusLine": (p?: Record<string, unknown>) =>
+    `\u041f\u043e\u043f\u044b\u0442\u043a\u0438: ${p?.used ?? "0"}/${p?.max ?? "0"} | ${p?.best ?? ""} | \u0421\u0442\u0430\u0440\u0442: ${p?.next ?? ""}`,
+  "menu.bestNone": "\u041b\u0443\u0447\u0448\u0435\u0435: \u0435\u0449\u0451 \u043d\u0435\u0442",
+  "menu.rewardsReadySummary": (p?: Record<string, unknown>) => `\u041a \u0432\u044b\u0434\u0430\u0447\u0435 ${p?.count ?? 0}`,
+  "menu.progressSummary": (p?: Record<string, unknown>) => `${p?.done ?? "0"}/${p?.total ?? "0"}`,
+  "menu.weeklyRaceHeldRewardBadge": (p?: Record<string, unknown>) =>
+    `\u041d\u0430\u0433\u0440\u0430\u0434\u0430 ${p?.reward ?? "0\u0411"}`,
+  "menu.weeklyRaceRiskEntry": (p?: Record<string, unknown>) => `\u041d\u0430\u0433\u0440\u0430\u0434\u0430 ${p?.reward ?? ""}`,
+  "menu.weeklyRaceRiskBurns": (p?: Record<string, unknown>) => `\u0420\u0438\u0441\u043a ${p?.reward ?? ""}`,
+  "menu.weeklyRaceResetDays": (p?: Record<string, unknown>) =>
+    `\u0421\u0431\u0440\u043e\u0441 \u0447\u0435\u0440\u0435\u0437 ${p?.days ?? 0}\u0434 ${p?.hours ?? 0}\u0447`,
+  "menu.weeklyRaceResetHours": (p?: Record<string, unknown>) =>
+    `\u0421\u0431\u0440\u043e\u0441 \u0447\u0435\u0440\u0435\u0437 ${p?.hours ?? 0}\u0447`,
+  "menu.weeklyRaceResetMinutes": (p?: Record<string, unknown>) =>
+    `\u0421\u0431\u0440\u043e\u0441 \u0447\u0435\u0440\u0435\u0437 ${p?.minutes ?? 0}\u043c`,
+});
+
+Object.assign(MESSAGES.en, {
+  "menu.missionProgress": "Progress",
+  "menu.mission.collect_heavy_scrap": (p?: Record<string, unknown>) => `Heavy scrap ${p?.target ?? 0}`,
+  "menu.mission.deflect_projectiles": (p?: Record<string, unknown>) => `Deflect ${p?.target ?? 0} shots`,
+});
+
+Object.assign(MESSAGES.ru, {
+  "menu.missionProgress": "\u041f\u0440\u043e\u0433\u0440\u0435\u0441\u0441",
+  "menu.mission.bank_bolts": (p?: Record<string, unknown>) => `\u0421\u0434\u0430\u0439 ${p?.target ?? 0} \u0431\u043e\u043b\u0442\u043e\u0432`,
+  "menu.mission.collect_heavy_scrap": (p?: Record<string, unknown>) =>
+    `\u0422\u044f\u0436\u0451\u043b\u044b\u0439 \u043b\u043e\u043c ${p?.target ?? 0}`,
+  "menu.mission.deflect_projectiles": (p?: Record<string, unknown>) =>
+    `\u041e\u0442\u0431\u0435\u0439 ${p?.target ?? 0} \u0432\u044b\u0441\u0442\u0440\u0435\u043b\u043e\u0432`,
+});
+
 const UPGRADE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   en: {
     wide_field: { title: "Wide Field", desc: "+12% magnet radius per stack." },

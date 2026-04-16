@@ -168,14 +168,13 @@ export class ResultsScene extends Phaser.Scene {
         score: computeRunScore(this.state),
         wave: this.state.waveIndex,
       });
-      const boostedMult = this.getRewardedResultsMult();
       const btnX2 = this.add
         .rectangle(width / 2, 0, 280, 52, 0x1b2635, 0.95)
         .setStrokeStyle(2, 0x57c27d, 0.9)
         .setInteractive({ useHandCursor: true })
         .setDepth(2001);
       const labelX2 = this.add
-        .text(btnX2.x, btnX2.y, t(this.locale, "results.boost", { mult: formatMult(boostedMult) }), {
+        .text(btnX2.x, btnX2.y, this.getResultsBoostLabel(save), {
           fontSize: "16px",
           color: "#d9f2ff",
           fontStyle: "700",
@@ -240,6 +239,7 @@ export class ResultsScene extends Phaser.Scene {
     const nextMilestone = getNextLeaderboardCareerMilestone(careerProgress, [...claimedMilestones]);
     const leaderboardEntries = filterLeaderboardEntries(save?.leaderboard?.entries ?? [], this.latestLeaderboardFilter);
     const rank = this.latestLeaderboardRank ?? getLeaderboardRank(leaderboardEntries, this.getLeaderboardEntryId());
+    const workshopRewardText = formatLeaderboardReward(this.locale, rewardPreview) || t(this.locale, "menu.rewardNone");
     const topLines = leaderboardEntries.slice(0, ultraCompactLayout ? 1 : compactLayout ? 1 : 3).map((entry, index) => {
       const rankLabel = `${index + 1}. ${entry.pilot}`;
       const scoreLabel = formatNumber(this.locale, entry.score);
@@ -251,20 +251,17 @@ export class ResultsScene extends Phaser.Scene {
       this.latestLeaderboardPreviousBest === null ? null : score - this.latestLeaderboardPreviousBest;
     const summaryLines = ultraCompactLayout
       ? [
-          `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
-          `${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)} | ${t(this.locale, "results.workshop", {
-            bolts: formatNumber(this.locale, rewardPreview.bolts),
-            cores: formatNumber(this.locale, rewardPreview.cores),
-          })}`,
+          `${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, this.state.waveIndex)}`,
+          `${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)} | ${workshopRewardText}`,
         ]
       : compactLayout
         ? [
-            `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
-            `${t(this.locale, "hud.level")}: ${formatNumber(this.locale, this.state.endless.current.index)} | ${t(this.locale, "hud.wave")}: ${formatNumber(this.locale, this.state.waveIndex)} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)}`,
-            t(this.locale, "results.workshop", {
+            `${t(this.locale, "results.pilot")}: ${currentEntry.pilot}`,
+            `${t(this.locale, "results.score")}: ${formatNumber(this.locale, score)} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, this.state.waveIndex)} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
+            `${t(this.locale, "results.workshop", {
               bolts: formatNumber(this.locale, rewardPreview.bolts),
               cores: formatNumber(this.locale, rewardPreview.cores),
-            }),
+            })}`,
           ]
         : [
           `${t(this.locale, "results.pilot")}: ${currentEntry.pilot} | ${t(this.locale, "results.division")}: ${t(this.locale, `leaderboard.division.${division.id}`)}`,
@@ -320,6 +317,7 @@ export class ResultsScene extends Phaser.Scene {
             ? t(this.locale, "results.weeklyDeltaDown", { value: formatNumber(this.locale, Math.abs(this.latestWeeklyRankDelta)) })
             : "",
     ].filter(Boolean);
+    if (this.x2Label?.visible) this.x2Label.setText(this.getResultsBoostLabel(save));
     this.summaryText.setText(summaryLines.join("\n"));
     this.progressText.setText(progressLines.slice(0, ultraCompactLayout ? 1 : compactLayout ? 2 : progressLines.length).join("\n"));
     this.leaderboardText.setText(
@@ -360,12 +358,12 @@ export class ResultsScene extends Phaser.Scene {
     const availableSectionHeight = Math.max(140, panelBottom - 20 - reservedButtonsHeight - sectionGap - sectionsTop);
     const fontPresets = ultraCompactLayout
       ? [
+          { summary: 15, progress: 13, leaderboard: 12 },
           { summary: 14, progress: 12, leaderboard: 12 },
-          { summary: 13, progress: 12, leaderboard: 12 },
         ]
       : compactLayout
         ? [
-            { summary: 15, progress: 13, leaderboard: 13 },
+            { summary: 16, progress: 14, leaderboard: 13 },
             { summary: 14, progress: 12, leaderboard: 12 },
           ]
         : [
@@ -471,6 +469,11 @@ export class ResultsScene extends Phaser.Scene {
     const adMult = this.state.config.ads?.rewarded?.x2Results?.mult;
     const perkMult = this.state.perks.results_bonus?.params?.baseMult;
     return positiveNum(adMult, 2) * positiveNum(perkMult, 1);
+  }
+
+  private getResultsBoostLabel(save: SaveData | null): string {
+    const rewardText = formatLeaderboardReward(this.locale, this.computeCurrentRunRewards(save)) || t(this.locale, "menu.rewardNone");
+    return t(this.locale, "results.boostReward", { reward: rewardText });
   }
 
   private async recordRunOnceAndPersistScores(): Promise<void> {
@@ -722,10 +725,6 @@ function fitTextScaleToWidth(text: Phaser.GameObjects.Text, maxWidth: number, mi
   text.setScale(1);
   if (text.width <= 0 || text.width <= maxWidth) return;
   text.setScale(Phaser.Math.Clamp(maxWidth / text.width, minScale, 1));
-}
-
-function formatMult(v: number): string {
-  return Number.isInteger(v) ? `${v}` : v.toFixed(2).replace(/\.?0+$/, "");
 }
 
 function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores: number }): string {

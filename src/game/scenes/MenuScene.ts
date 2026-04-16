@@ -451,7 +451,9 @@ export class MenuScene extends Phaser.Scene {
 
     btnPlay.on("pointerdown", () => {
       const onboarding = getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops);
-      void (boosterEnabled && rewardBoostEnabled && !onboarding.eligible ? this.startRunBoosted() : startStandardRun());
+      void (rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled && !onboarding.eligible
+        ? this.startRunBoosted()
+        : startStandardRun());
     });
 
     const btnPlayBoost = this.add
@@ -825,12 +827,13 @@ export class MenuScene extends Phaser.Scene {
       bolts: Math.max(0, Math.floor(boosterCfg?.addBolts ?? 0)),
       cores: Math.max(0, Math.floor(boosterCfg?.addCores ?? 0)),
     });
+    const rewardedStartBoosterUnlocked = () => getUiProgressSnapshot(this.saveManager.get()).stage === "advanced";
 
     const refreshDailyButtons = (info: DailyAttemptsInfo) => {
       const regularPlan = planDailyStart(info, { boosted: false, boosterEnabled });
       const boostedPlan = planDailyStart(info, { boosted: true, boosterEnabled });
       const onboarding = getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops);
-      const boostVisible = boosterEnabled && !onboarding.eligible;
+      const boostVisible = rewardedStartBoosterUnlocked() && boosterEnabled && !onboarding.eligible;
       const compactRewardCopy = currentLayoutMode === "minimal" || this.scale.height <= 430;
       const rewardPreview = getRewardedBoosterPreview();
       const usingRewardedBooster = boostVisible && rewardBoostEnabled;
@@ -898,12 +901,12 @@ export class MenuScene extends Phaser.Scene {
       const title = formatMissionObjectiveLabel(this.locale, status.def.objective.type, target);
       const progress = `${formatNumber(this.locale, Math.min(status.progress, target))}/${formatNumber(this.locale, target)}`;
       const reward = formatLeaderboardReward(this.locale, status.def.reward);
-      const state = status.claimed
+      const stateLine = status.claimed
         ? t(this.locale, "menu.missionClaimed")
         : status.completed
           ? t(this.locale, "menu.missionReady")
-          : t(this.locale, "menu.missionProgress");
-      return `${state} | ${title}\n${progress}${reward ? ` | ${reward}` : ""}`;
+          : `${t(this.locale, "menu.missionProgress")} ${progress}`;
+      return `${title}\n${stateLine}${reward ? ` | ${reward}` : ""}`;
     };
     const applyMissionRows = (
       rows: Array<{ bg: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text }>,
@@ -1248,7 +1251,7 @@ export class MenuScene extends Phaser.Scene {
       const save = this.saveManager.get();
       const onboarding = getOnboardingBoostStatus(save, this.staticData.liveops);
       const uiStage = getUiProgressSnapshot(save).stage;
-      const boostedStart = boosterEnabled && rewardBoostEnabled && !onboarding.eligible;
+      const boostedStart = uiStage === "advanced" && boosterEnabled && rewardBoostEnabled && !onboarding.eligible;
       const compactRewardCopy = currentLayoutMode === "minimal" || this.scale.height <= 430;
       if (uiStage === "starter") {
         labelPlay.setText(t(this.locale, "menu.play"));
@@ -1445,7 +1448,7 @@ export class MenuScene extends Phaser.Scene {
       this.scene.launch("ui");
     };
 
-    btnDaily.on("pointerdown", () => void this.startDaily(boosterEnabled && rewardBoostEnabled));
+    btnDaily.on("pointerdown", () => void this.startDaily(rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled));
     btnDailyBoost.disableInteractive();
     btnMissions.on("pointerdown", () => {
       missionsExpanded = true;
@@ -1458,7 +1461,7 @@ export class MenuScene extends Phaser.Scene {
       layoutMenu(this.scale);
     });
     boostToggleBg.on("pointerdown", () => {
-      if (!boosterEnabled) return;
+      if (!boosterEnabled || !rewardedStartBoosterUnlocked()) return;
       rewardBoostEnabled = !rewardBoostEnabled;
       refreshPlayButton();
       refreshDailyButtons(getDailyAttemptsInfo(this.staticData.daily, this.saveManager.get(), this.getCurrentDateUtc()));
@@ -1558,21 +1561,20 @@ export class MenuScene extends Phaser.Scene {
       const starterUi = uiStage === "starter";
       const growingUi = uiStage === "growing";
       const advancedUi = uiStage === "advanced";
-      if (!advancedUi) missionsExpanded = false;
+      if (starterUi) missionsExpanded = false;
       const mode = getMenuLayoutMode(s.width, s.height);
       currentLayoutMode = mode;
       const compact = mode !== "full";
       const minimal = mode === "minimal";
       const compressedMenu = s.height <= 520;
-      const hideSummaryThreshold = growingUi ? 500 : 430;
-      const hideSummaryPanel = starterUi || (!missionsExpanded && s.height <= hideSummaryThreshold);
+      const hideSummaryPanel = !missionsExpanded;
       const topInset = minimal ? 14 : 18;
       const topGap = 10;
       const topButtonHeight = 34;
       const contentTop = topInset + topButtonHeight + (minimal ? 18 : compact ? 26 : 34);
       const shortDesktop = mode === "compact" && s.height <= 820;
       const utilityVisible = utilityOpen && !missionsExpanded;
-      const showPreview = !missionsExpanded && mode === "full";
+      const showPreview = !missionsExpanded && mode === "full" && starterUi;
       const leftX = showPreview ? Math.round(s.width * 0.31) : s.width / 2;
       const titleY = minimal
         ? contentTop + (compressedMenu ? 10 : 18)
@@ -1735,7 +1737,7 @@ export class MenuScene extends Phaser.Scene {
       boostToggleTitle.setStyle({ fontSize: compressedMenu ? "10px" : minimal ? "11px" : "12px", align: "left" });
       boostToggleHint.setStyle({ fontSize: compressedMenu ? "9px" : minimal ? "9px" : "10px", align: "left" });
       const showBoostToggle =
-        !starterUi &&
+        advancedUi &&
         boosterEnabled &&
         !getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops).eligible &&
         !missionsExpanded;
@@ -1748,8 +1750,8 @@ export class MenuScene extends Phaser.Scene {
       labelDaily.setVisible(!missionsExpanded && !starterUi);
       btnTraining.setVisible(!missionsExpanded && starterUi);
       labelTraining.setVisible(!missionsExpanded && starterUi);
-      btnMissions.setVisible(!missionsExpanded && advancedUi);
-      labelMissions.setVisible(!missionsExpanded && advancedUi);
+      btnMissions.setVisible(!missionsExpanded && !starterUi);
+      labelMissions.setVisible(!missionsExpanded && !starterUi);
       boostToggleBg.setVisible(showBoostToggle);
       boostToggleTrack.setVisible(showBoostToggle);
       boostToggleFill.setVisible(showBoostToggle && rewardBoostEnabled);
@@ -1761,7 +1763,7 @@ export class MenuScene extends Phaser.Scene {
         ...(showBoostToggle ? [{ kind: "boost" as const, height: 44 }] : []),
         ...(!starterUi ? [{ kind: "button" as const, button: btnDaily, label: labelDaily, height: btnDaily.height }] : []),
         ...(starterUi ? [{ kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height }] : []),
-        ...(advancedUi ? [{ kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height }] : []),
+        ...(!starterUi ? [{ kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height }] : []),
       ];
       const ctaGap = compressedMenu ? 4 : minimal ? 6 : compact ? 6 : 8;
       const ctaStackHeight =
@@ -2005,7 +2007,12 @@ export class MenuScene extends Phaser.Scene {
       summaryWeeklyTitle.setVisible(false);
       summaryWeeklyValue.setVisible(false);
       controlsText.setVisible(false);
-      this.dailyPanel.setVisible(true).setPosition(s.width / 2, s.height / 2).setSize(Math.min(s.width - 28, MISSIONS_PANEL_WIDTH), Math.min(s.height - 28, MISSIONS_PANEL_HEIGHT));
+      const denseDesktop = !stackedMissions && shortDesktop;
+      const missionsPanelHeight = stackedMissions ? 720 : denseDesktop ? 520 : 560;
+      this.dailyPanel
+        .setVisible(true)
+        .setPosition(s.width / 2, s.height / 2)
+        .setSize(Math.min(s.width - 28, MISSIONS_PANEL_WIDTH), Math.min(s.height - 28, missionsPanelHeight));
       btnClaimOps.setVisible(true);
       labelClaimOps.setVisible(true);
       liveopsTitle.setVisible(true);
@@ -2022,15 +2029,18 @@ export class MenuScene extends Phaser.Scene {
       const rightColumnCenter = panelLeft + 12 + columnWidth + columnGap + columnWidth / 2;
       const claimButtonWidth = stackedMissions ? Math.min(148, innerWidth - 116) : Math.min(160, innerWidth - 132);
       const claimButtonHeight = 32;
-      const denseDesktop = !stackedMissions && shortDesktop;
       const panelBottom = detailPanelTop + this.dailyPanel.height;
       const controlsTargetY = panelBottom - (stackedMissions ? 18 : 16);
       const maxMissionBottom = controlsTargetY - controlsText.displayHeight / 2 - 10;
+      let missionToastY = panelBottom - 18;
       const headerTitleY = detailPanelTop + 18;
       const headerButtonY = detailPanelTop + 12;
       const liveopsCardY = detailPanelTop + (denseDesktop ? 76 : 82);
       const liveopsCardHeight = denseDesktop ? 52 : 58;
-      const detailSummaryLine = `${t(this.locale, "menu.summaryRewards")} ${summaryRewardsValue.text} | ${t(this.locale, "menu.summaryDaily")} ${summaryDailyValue.text} | ${t(this.locale, "menu.summaryWeekly")} ${summaryWeeklyValue.text}`;
+      const detailSummaryLine = [
+        `${t(this.locale, "menu.summaryRewards")}: ${summaryRewardsValue.text}`,
+        `${t(this.locale, "menu.summaryDaily")}: ${summaryDailyValue.text} | ${t(this.locale, "menu.summaryWeekly")}: ${summaryWeeklyValue.text}`,
+      ].join("\n");
 
       liveopsCardBg.setVisible(true);
       liveopsInfo.setVisible(true);
@@ -2080,30 +2090,34 @@ export class MenuScene extends Phaser.Scene {
       liveopsReadyBadgeBg.setPosition(badgeX, headerTitleY);
       liveopsReadyBadgeText.setPosition(badgeX, headerTitleY);
 
-      liveopsCardBg.setPosition(detailCenterX, liveopsCardY).setSize(innerWidth, liveopsCardHeight).setFillStyle(0x162330, 0.98);
+      liveopsCardBg
+        .setPosition(detailCenterX, liveopsCardY)
+        .setSize(innerWidth, liveopsCardHeight + (stackedMissions ? 12 : 16))
+        .setFillStyle(0x162330, 0.98);
       liveopsInfo.setText(detailSummaryLine);
       liveopsInfo.setOrigin(0, 0.5).setPosition(panelLeft + 16, liveopsCardY);
-      liveopsInfo.setStyle({ fontSize: stackedMissions ? "12px" : denseDesktop ? "11px" : "12px", align: "left" });
+      liveopsInfo.setStyle({ fontSize: stackedMissions ? "13px" : denseDesktop ? "12px" : "13px", align: "left" });
       liveopsInfo.setWordWrapWidth(innerWidth - 32, true);
+      liveopsInfo.setLineSpacing(3);
       liveopsInfo.setColor("#d9f2ff");
-      dailyMissionsTitle.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
-      weeklyMissionsTitle.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
+      dailyMissionsTitle.setStyle({ fontSize: denseDesktop ? "13px" : "14px" });
+      weeklyMissionsTitle.setStyle({ fontSize: denseDesktop ? "13px" : "14px" });
       fitTextScaleToWidth(dailyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.82);
       fitTextScaleToWidth(weeklyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.72);
 
       if (stackedMissions) {
         const weeklyCardTop = detailPanelTop + 196;
-        dailyInfoCardBg.setPosition(detailCenterX, detailPanelTop + 148).setSize(innerWidth, 84).setFillStyle(0x14222d, 0.98);
+        dailyInfoCardBg.setPosition(detailCenterX, detailPanelTop + 154).setSize(innerWidth, 96).setFillStyle(0x14222d, 0.98);
         dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + 118);
         dailyInfo.setPosition(panelLeft + 16, detailPanelTop + 134);
-        dailyInfo.setStyle({ fontSize: "12px" });
+        dailyInfo.setStyle({ fontSize: "13px" });
         dailyInfo.setWordWrapWidth(innerWidth - 24, true);
         dailyInfo.setColor("#d6e6ef");
 
-        weeklyRaceCardBg.setPosition(detailCenterX, detailPanelTop + 258).setSize(innerWidth, 128);
+        weeklyRaceCardBg.setPosition(detailCenterX, detailPanelTop + 270).setSize(innerWidth, 144);
         weeklyRaceTitle.setPosition(panelLeft + 16, detailPanelTop + 210);
         weeklyRaceInfo.setPosition(panelLeft + 16, detailPanelTop + 248);
-        weeklyRaceInfo.setStyle({ fontSize: "12px" });
+        weeklyRaceInfo.setStyle({ fontSize: "13px" });
         weeklyRaceInfo.setWordWrapWidth(innerWidth - 24, true);
         weeklyRaceBadgeBg.setPosition(innerLeft + innerWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 210);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
@@ -2135,21 +2149,23 @@ export class MenuScene extends Phaser.Scene {
           const dailyTitleY = cardBottom + 30;
           const weeklyTitleY = dailyTitleY + 114;
 
-          const dailyMissionYs = [dailyTitleY + 34, dailyTitleY + 78];
+          const dailyMissionYs = [dailyTitleY + 40, dailyTitleY + 92];
           dailyMissionRows.forEach((row, index) => {
-            row.bg.setPosition(detailCenterX, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(stackedRowWidth, 38);
+            row.bg.setPosition(detailCenterX, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(stackedRowWidth, 46);
             row.text.setPosition(detailCenterX, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]);
             row.text.setWordWrapWidth(stackedRowWidth - 18, true);
+            row.text.setStyle({ fontSize: "13px" });
           });
-          dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? dailyTitleY + 34) - 38);
+          dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? dailyTitleY + 40) - 42);
 
-          const weeklyMissionYs = [weeklyTitleY + 34, weeklyTitleY + 78, weeklyTitleY + 122];
+          const weeklyMissionYs = [weeklyTitleY + 40, weeklyTitleY + 92, weeklyTitleY + 144];
           weeklyMissionRows.forEach((row, index) => {
-            row.bg.setPosition(detailCenterX, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(stackedRowWidth, 38);
+            row.bg.setPosition(detailCenterX, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(stackedRowWidth, 46);
             row.text.setPosition(detailCenterX, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]);
             row.text.setWordWrapWidth(stackedRowWidth - 18, true);
+            row.text.setStyle({ fontSize: "13px" });
           });
-          weeklyMissionsTitle.setPosition(panelLeft + 16, (weeklyMissionYs[0] ?? weeklyTitleY + 34) - 40);
+          weeklyMissionsTitle.setPosition(panelLeft + 16, (weeklyMissionYs[0] ?? weeklyTitleY + 40) - 44);
           const lastWeeklyMissionBottom =
             (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.y ?? weeklyTitleY) +
             (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.height ?? 38) / 2;
@@ -2166,24 +2182,28 @@ export class MenuScene extends Phaser.Scene {
               row.text.y -= overflow;
             });
           }
+          const finalWeeklyMissionBottom =
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.y ?? weeklyTitleY) +
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.height ?? 38) / 2;
+          missionToastY = Math.min(panelBottom - 18, finalWeeklyMissionBottom + 28);
         };
         positionWeeklyRaceBody();
       } else {
-        const weeklyCardTop = detailPanelTop + (denseDesktop ? 109 : 114);
+        const weeklyCardTop = detailPanelTop + (denseDesktop ? 115 : 122);
         dailyInfoCardBg
-          .setPosition(leftColumnCenter, detailPanelTop + (denseDesktop ? 146 : 154))
-          .setSize(columnWidth, denseDesktop ? 74 : 84)
+          .setPosition(leftColumnCenter, detailPanelTop + (denseDesktop ? 152 : 164))
+          .setSize(columnWidth, denseDesktop ? 86 : 98)
           .setFillStyle(0x14222d, 0.98);
         dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 116 : 124));
         dailyInfo.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 130 : 140));
-        dailyInfo.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
+        dailyInfo.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
         dailyInfo.setWordWrapWidth(columnWidth - 24, true);
         dailyInfo.setColor("#d6e6ef");
 
-        weeklyRaceCardBg.setPosition(rightColumnCenter, detailPanelTop + (denseDesktop ? 166 : 176)).setSize(columnWidth, denseDesktop ? 120 : 130);
+        weeklyRaceCardBg.setPosition(rightColumnCenter, detailPanelTop + (denseDesktop ? 176 : 188)).setSize(columnWidth, denseDesktop ? 138 : 152);
         weeklyRaceTitle.setPosition(rightColumnLeft + 4, detailPanelTop + 126);
         weeklyRaceInfo.setPosition(rightColumnLeft + 4, detailPanelTop + (denseDesktop ? 158 : 166));
-        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
+        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
         weeklyRaceInfo.setWordWrapWidth(columnWidth - 24, true);
         weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 126);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
@@ -2214,29 +2234,29 @@ export class MenuScene extends Phaser.Scene {
 
           const missionTitleY = cardBottom + (denseDesktop ? 13 : 10);
 
-          const dailyMissionYs = denseDesktop ? [missionTitleY + 30, missionTitleY + 68] : [missionTitleY + 36, missionTitleY + 82];
+          const dailyMissionYs = denseDesktop ? [missionTitleY + 34, missionTitleY + 80] : [missionTitleY + 42, missionTitleY + 96];
           dailyMissionRows.forEach((row, index) => {
-            row.bg.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 34 : 40);
+            row.bg.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 40 : 46);
             row.text.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]);
-            row.text.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
+            row.text.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
             row.text.setWordWrapWidth(columnWidth - 16, true);
           });
-          dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? missionTitleY + (denseDesktop ? 30 : 36)) - (denseDesktop ? 30 : 38));
+          dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? missionTitleY + (denseDesktop ? 34 : 42)) - (denseDesktop ? 34 : 42));
 
-          const weeklyMissionYs = denseDesktop ? [missionTitleY + 30, missionTitleY + 68, missionTitleY + 106] : [missionTitleY + 36, missionTitleY + 82, missionTitleY + 128];
+          const weeklyMissionYs = denseDesktop ? [missionTitleY + 34, missionTitleY + 80, missionTitleY + 126] : [missionTitleY + 42, missionTitleY + 96, missionTitleY + 150];
           weeklyMissionRows.forEach((row, index) => {
-            row.bg.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 34 : 40);
+            row.bg.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 40 : 46);
             row.text.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]);
-            row.text.setStyle({ fontSize: denseDesktop ? "11px" : "12px" });
+            row.text.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
             row.text.setWordWrapWidth(columnWidth - 16, true);
           });
           weeklyMissionsTitle.setPosition(
             panelLeft + 28 + columnWidth,
-            (weeklyMissionYs[0] ?? missionTitleY + (denseDesktop ? 30 : 36)) - (denseDesktop ? 32 : 40)
+            (weeklyMissionYs[0] ?? missionTitleY + (denseDesktop ? 34 : 42)) - (denseDesktop ? 36 : 44)
           );
           const lastWeeklyMissionBottom =
             (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.y ?? missionTitleY) +
-            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.height ?? (denseDesktop ? 34 : 40)) / 2;
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.height ?? (denseDesktop ? 40 : 46)) / 2;
           const overflow = Math.max(0, lastWeeklyMissionBottom - maxMissionBottom);
           if (overflow > 0) {
             dailyMissionsTitle.y -= overflow;
@@ -2250,13 +2270,17 @@ export class MenuScene extends Phaser.Scene {
               row.text.y -= overflow;
             });
           }
+          const finalWeeklyMissionBottom =
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.y ?? missionTitleY) +
+            (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.height ?? (denseDesktop ? 40 : 46)) / 2;
+          missionToastY = Math.min(panelBottom - 18, finalWeeklyMissionBottom + 28);
         };
         positionWeeklyRaceBody();
       }
 
       controlsText.setPosition(leftX, controlsTargetY);
       controlsText.setStyle({ fontSize: compact ? "12px" : "13px" });
-      if (this.toastText) this.toastText.setPosition(s.width / 2, Math.min(s.height * 0.93, panelBottom - 18));
+      if (this.toastText) this.toastText.setPosition(s.width / 2, Math.min(s.height * 0.93, missionToastY));
       this.layoutWorkshop();
       this.layoutLeaderboard();
     };
@@ -3172,7 +3196,7 @@ export class MenuScene extends Phaser.Scene {
     const prioritizedVisibleNodes = recommendedNode
       ? [recommendedNode, ...visibleNodes.filter((node) => node.id !== recommendedNode.id)]
       : visibleNodes;
-    const renderedNodeLimit = compactWorkshop ? (uiSnapshot.stage === "advanced" ? 6 : 4) : prioritizedVisibleNodes.length;
+    const renderedNodeLimit = compactWorkshop ? 3 : prioritizedVisibleNodes.length;
     const renderedNodes = prioritizedVisibleNodes.slice(0, renderedNodeLimit);
     const stockpileKey = uiSnapshot.stage === "starter" ? "menu.stockpileCompact" : "menu.stockpile";
     const helperCopy = compactWorkshop
@@ -3252,14 +3276,14 @@ export class MenuScene extends Phaser.Scene {
 
     const workshopLayout =
       compactWorkshop
-        ? uiSnapshot.stage === "advanced"
-          ? { columns: 2, cardWidth: 272, cardHeight: 98, cardGapX: 12, cardGapY: 10, textPad: 24, buttonWidth: 100, buttonHeight: 34 }
-          : { columns: 2, cardWidth: 272, cardHeight: 100, cardGapX: 12, cardGapY: 10, textPad: 24, buttonWidth: 100, buttonHeight: 34 }
+        ? { columns: 1, cardWidth: 556, cardHeight: 118, cardGapX: 0, cardGapY: 12, textPad: 28, buttonWidth: 120, buttonHeight: 40 }
         : uiSnapshot.stage === "starter"
         ? { columns: 1, cardWidth: 624, cardHeight: 116, cardGapX: 0, cardGapY: 12, textPad: 34, buttonWidth: 132, buttonHeight: 38 }
         : uiSnapshot.stage === "growing"
           ? { columns: 2, cardWidth: 304, cardHeight: 108, cardGapX: 16, cardGapY: 10, textPad: 30, buttonWidth: 112, buttonHeight: 36 }
-          : { columns: 3, cardWidth: 198, cardHeight: 96, cardGapX: 10, cardGapY: 8, textPad: 22, buttonWidth: 86, buttonHeight: 34 };
+          : prioritizedVisibleNodes.length > 8
+            ? { columns: 3, cardWidth: 206, cardHeight: 104, cardGapX: 10, cardGapY: 10, textPad: 22, buttonWidth: 92, buttonHeight: 34 }
+            : { columns: 2, cardWidth: 298, cardHeight: 112, cardGapX: 16, cardGapY: 12, textPad: 28, buttonWidth: 112, buttonHeight: 38 };
     const gridWidth =
       workshopLayout.columns * workshopLayout.cardWidth + Math.max(0, workshopLayout.columns - 1) * workshopLayout.cardGapX;
     const gridLeft = -gridWidth / 2;
@@ -3326,7 +3350,7 @@ export class MenuScene extends Phaser.Scene {
       const accent = this.add.rectangle(-workshopLayout.cardWidth / 2 + 4, 0, 6, workshopLayout.cardHeight, accentColor, 0.92);
       const title = this.add
         .text(textLeft, -workshopLayout.cardHeight / 2 + 14, getMetaNodeName(this.locale, node.id, node.name), {
-          fontSize: compactWorkshop ? "14px" : uiSnapshot.stage === "starter" ? "18px" : uiSnapshot.stage === "growing" ? "16px" : "13px",
+          fontSize: compactWorkshop ? "18px" : uiSnapshot.stage === "starter" ? "18px" : uiSnapshot.stage === "growing" ? "16px" : "15px",
           color: "#d9f2ff",
           fontStyle: "700",
         })
@@ -3339,13 +3363,13 @@ export class MenuScene extends Phaser.Scene {
       );
       const desc = this.add
         .text(textLeft, -workshopLayout.cardHeight / 2 + (uiSnapshot.stage === "advanced" ? 36 : 40), descriptionPreview, {
-          fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "13px" : uiSnapshot.stage === "growing" ? "12px" : "11px",
+          fontSize: compactWorkshop ? "14px" : uiSnapshot.stage === "starter" ? "13px" : uiSnapshot.stage === "growing" ? "12px" : "12px",
           color: "#98b7c7",
           wordWrap: { width: Math.max(70, textWrapWidth + 6) },
         })
         .setOrigin(0, 0);
       desc.setLineSpacing(1);
-      const descHeightCap = compactWorkshop ? 30 : uiSnapshot.stage === "starter" ? 40 : uiSnapshot.stage === "growing" ? 32 : 28;
+      const descHeightCap = compactWorkshop ? 42 : uiSnapshot.stage === "starter" ? 40 : uiSnapshot.stage === "growing" ? 32 : 32;
       if (desc.displayHeight > descHeightCap) {
         desc.setScale(Phaser.Math.Clamp(descHeightCap / desc.displayHeight, 0.82, 1));
       }
@@ -3353,7 +3377,7 @@ export class MenuScene extends Phaser.Scene {
       const progressY = Math.min(workshopLayout.cardHeight / 2 - 12, levelY + 16);
       const levelText = this.add
         .text(textLeft, levelY, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
-          fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "12px" : "11px",
+          fontSize: compactWorkshop ? "13px" : uiSnapshot.stage === "starter" ? "12px" : "12px",
           color: maxed ? "#57c27d" : "#7fdfff",
           fontStyle: "700",
         })
@@ -3388,12 +3412,12 @@ export class MenuScene extends Phaser.Scene {
           buttonCenterX,
           (uiSnapshot.stage === "advanced" ? 2 : 4) - 6,
           maxed ? t(this.locale, "menu.installedButton") : affordable ? t(this.locale, "menu.buy") : t(this.locale, "menu.locked"),
-          { fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "13px" : "12px", color: "#d9f2ff", fontStyle: "700" }
+          { fontSize: compactWorkshop ? "13px" : uiSnapshot.stage === "starter" ? "13px" : "12px", color: "#d9f2ff", fontStyle: "700" }
         )
         .setOrigin(0.5);
       const costLabel = this.add
         .text(buttonCenterX, (uiSnapshot.stage === "advanced" ? 2 : 4) + 10, priceLabel, {
-          fontSize: compactWorkshop ? "11px" : uiSnapshot.stage === "starter" ? "11px" : "10px",
+          fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "11px" : "11px",
           color: maxed ? "#57c27d" : affordable || isRecommended ? "#ffd166" : "#98b7c7",
           fontStyle: "700",
           align: "center",
@@ -3493,7 +3517,7 @@ export class MenuScene extends Phaser.Scene {
         : t(this.locale, "menu.bestNone");
     dailyInfoText.setText(
       [
-        `${t(this.locale, "menu.seedLine", { seed: dateUtc })} | ${copy.title}`,
+        t(this.locale, "menu.dailyVariantLine", { title: copy.title }),
         formatMenuDailyLoginLine(
           this.locale,
           formatNumber(this.locale, currentLoginDay),
@@ -3840,25 +3864,13 @@ function buildMenuBestText(
   const nextDivision = getLeaderboardNextDivision(bestScore);
 
   const leader = sorted[0];
-  if (leader) {
+  if (stage === "advanced" && summaryEntries > 1 && leader) {
     lines.push(
       t(locale, "menu.leaderboardLeaderLine", {
         pilot: leader.pilot,
         score: formatNumber(locale, leader.score),
       })
     );
-  }
-
-  if (stage === "advanced" && summaryEntries > 1) {
-    const rival = sorted[1];
-    if (rival) {
-      lines.push(
-        t(locale, "menu.leaderboardRivalLine", {
-          pilot: rival.pilot,
-          score: formatNumber(locale, rival.score),
-        })
-      );
-    }
   }
 
   lines.push(

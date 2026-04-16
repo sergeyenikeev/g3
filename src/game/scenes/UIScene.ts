@@ -641,7 +641,13 @@ export class UIScene extends Phaser.Scene {
       : margin + 62;
 
     this.tutorialBox.setPosition(width / 2, tutorialCenterY);
-    this.levelBannerBaseY = this.tutorialBox.visible ? tutorialCenterY + tutorialHeight / 2 + 18 : margin + 84;
+    this.levelBannerBaseY = compactOverlayLayout
+      ? this.tutorialBox.visible
+        ? tutorialCenterY + tutorialHeight / 2 + 18
+        : Math.min(height - 74, this.hudPanel.y + this.hudPanel.height + 82)
+      : this.tutorialBox.visible
+        ? tutorialCenterY + tutorialHeight / 2 + 18
+        : margin + 84;
     this.levelBanner.setPosition(width / 2, this.levelBannerBaseY);
 
     this.reviveBox.setPosition(width / 2, height / 2);
