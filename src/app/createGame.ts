@@ -11,10 +11,37 @@ export function createGame(parentId: string): Phaser.Game {
     type: import.meta.env.VITE_E2E === "1" ? Phaser.CANVAS : Phaser.AUTO,
     parent: parentId,
     backgroundColor: "#0b0f14",
+    disableContextMenu: true,
     physics: {
       default: "arcade",
       arcade: {
         debug: false,
+      },
+    },
+    input: {
+      keyboard: {
+        capture: [
+          Phaser.Input.Keyboard.KeyCodes.UP,
+          Phaser.Input.Keyboard.KeyCodes.DOWN,
+          Phaser.Input.Keyboard.KeyCodes.LEFT,
+          Phaser.Input.Keyboard.KeyCodes.RIGHT,
+          Phaser.Input.Keyboard.KeyCodes.W,
+          Phaser.Input.Keyboard.KeyCodes.A,
+          Phaser.Input.Keyboard.KeyCodes.S,
+          Phaser.Input.Keyboard.KeyCodes.D,
+          Phaser.Input.Keyboard.KeyCodes.SPACE,
+          Phaser.Input.Keyboard.KeyCodes.SHIFT,
+          Phaser.Input.Keyboard.KeyCodes.ESC,
+        ],
+      },
+      mouse: {
+        preventDefaultDown: true,
+        preventDefaultUp: true,
+        preventDefaultMove: true,
+        preventDefaultWheel: true,
+      },
+      touch: {
+        capture: true,
       },
     },
     scale: {

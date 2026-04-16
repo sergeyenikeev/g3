@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatResource,
+  formatShortSeconds,
   getDailyRotationCopy,
   getDailyVariantCopy,
   getLevelFinaleCopy,
@@ -28,6 +29,11 @@ describe("localization", () => {
   it("normalizes invalid language settings to auto", () => {
     expect(normalizeLanguageSetting("fr")).toBe("auto");
     expect(normalizeLanguageSetting("ru")).toBe("ru");
+  });
+
+  it("formats compact cooldown labels without scene-level locale branches", () => {
+    expect(formatShortSeconds("en", 2.1)).toBe("3s");
+    expect(formatShortSeconds("ru", 2.1)).toBe("3с");
   });
 
   it("formats localized copy for gameplay and meta data", () => {

@@ -48,6 +48,15 @@ function loadScriptOnce(url: string): Promise<void> {
     const handleError = () => reject(new Error(`Failed to load script: ${url}`));
 
     if (existingScript) {
+      if ((existingScript as HTMLScriptElement & { readyState?: string }).dataset.mcLoaded === "true") {
+        resolve();
+        return;
+      }
+      const readyState = (existingScript as HTMLScriptElement & { readyState?: string }).readyState;
+      if (readyState === "loaded" || readyState === "complete") {
+        resolve();
+        return;
+      }
       existingScript.addEventListener("load", handleLoad, { once: true });
       existingScript.addEventListener("error", handleError, { once: true });
       return;
@@ -57,7 +66,10 @@ function loadScriptOnce(url: string): Promise<void> {
     s.src = url;
     s.async = true;
     s.crossOrigin = "anonymous";
-    s.onload = handleLoad;
+    s.onload = () => {
+      s.dataset.mcLoaded = "true";
+      handleLoad();
+    };
     s.onerror = handleError;
     document.head.appendChild(s);
   });

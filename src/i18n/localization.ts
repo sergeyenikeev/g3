@@ -1348,6 +1348,11 @@ export function formatResource(locale: Locale, currency: string, amount: number)
   return `${formatNumber(locale, amount)} ${resourceLabel(locale, currency, amount)}`;
 }
 
+export function formatShortSeconds(locale: Locale, seconds: number): string {
+  const safe = Math.ceil(Math.max(0, seconds));
+  return `${safe}${locale === "ru" ? "с" : "s"}`;
+}
+
 export function formatQualityLabel(locale: Locale, quality: "auto" | "low" | "medium" | "high"): string {
   return t(locale, `settings.${quality}`);
 }

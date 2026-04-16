@@ -260,6 +260,8 @@
 
 - Для publish build необходимо сохранить current release injection `/sdk.js` в HTML архива.
 - Rewarded / interstitial должны продолжать вызываться только через platform adapter.
+- Boot/runtime fallback должен оставаться продуктовым: без сырых stack traces и с понятным CTA на перезапуск.
+- Playfield shell должен продолжать жёстко блокировать browser context menu, selection и жесты, которые ломают игровой input.
 - Нужно отдельно прогнать smoke-test внутри черновика Яндекс Игр после сборки `build:yandex` / `package:yandex`.
 
 ## 10. Пошаговый implementation plan

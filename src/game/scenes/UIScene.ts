@@ -21,6 +21,7 @@ import {
   type Locale,
   formatNumber,
   formatQualityLabel,
+  formatShortSeconds,
   formatVolume,
   getDailyVariantCopy,
   getLanguageSettingLabel,
@@ -1463,5 +1464,5 @@ function fitTextScaleToWidth(text: Phaser.GameObjects.Text, maxWidth: number, mi
 }
 
 function formatCooldown(locale: Locale, seconds: number): string {
-  return `${Math.ceil(Math.max(0, seconds))}${locale === "ru" ? "с" : "s"}`;
+  return formatShortSeconds(locale, seconds);
 }
