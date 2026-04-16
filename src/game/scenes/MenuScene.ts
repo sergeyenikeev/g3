@@ -102,6 +102,13 @@ export class MenuScene extends Phaser.Scene {
   private workshopFooterText!: Phaser.GameObjects.Text;
   private workshopBuildChips: Phaser.GameObjects.Container[] = [];
   private workshopCards: Phaser.GameObjects.Container[] = [];
+  private workshopPagePrevButton!: Phaser.GameObjects.Rectangle;
+  private workshopPagePrevLabel!: Phaser.GameObjects.Text;
+  private workshopPageNextButton!: Phaser.GameObjects.Rectangle;
+  private workshopPageNextLabel!: Phaser.GameObjects.Text;
+  private workshopPageLabel!: Phaser.GameObjects.Text;
+  private workshopPageIndex = 0;
+  private workshopPageCount = 1;
   private leaderboardDim!: Phaser.GameObjects.Rectangle;
   private leaderboardBox!: Phaser.GameObjects.Container;
   private leaderboardHintText!: Phaser.GameObjects.Text;
@@ -2311,32 +2318,6 @@ export class MenuScene extends Phaser.Scene {
     this.time.delayedCall(0, () => {
       void signalPlatformGameReady(this.platformAdapter, this.registry);
     });
-    const allowMenuSessionToast = getUiProgressSnapshot(this.saveManager.get()).stage === "advanced";
-    const sessionSummary =
-      (this.registry.get("liveopsSessionSummary") as
-        | {
-            weeklyRewardGranted?: { reward: { bolts: number; cores: number } } | null;
-            comebackEligible?: boolean;
-          }
-        | undefined) ?? null;
-    if (allowMenuSessionToast && sessionSummary?.weeklyRewardGranted) {
-      this.toast(
-        t(this.locale, "toast.weeklyBoardReward", {
-          reward: formatLeaderboardReward(this.locale, sessionSummary.weeklyRewardGranted.reward),
-        })
-      );
-    }
-    if (allowMenuSessionToast && sessionSummary?.comebackEligible) {
-      const comeback = getComebackStatus(this.saveManager.get(), this.staticData.liveops);
-      if (comeback.eligible) {
-        this.toast(
-          t(this.locale, "toast.comebackReady", {
-            days: formatNumber(this.locale, comeback.daysAway),
-            reward: formatLeaderboardReward(this.locale, comeback.reward),
-          })
-        );
-      }
-    }
     void refreshDailyAndLiveops();
   }
 
@@ -2546,6 +2527,37 @@ export class MenuScene extends Phaser.Scene {
         wordWrap: { width: WORKSHOP_PANEL_WIDTH - 96 },
       })
       .setOrigin(0, 0);
+    this.workshopPagePrevButton = this.add
+      .rectangle(-56, halfHeight - 86, 48, 32, 0x121a24, 0.95)
+      .setStrokeStyle(2, 0x5cc8ff, 0.76)
+      .setInteractive({ useHandCursor: true });
+    this.workshopPagePrevLabel = this.add
+      .text(-56, halfHeight - 86, "<", {
+        fontSize: "16px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+    this.workshopPageLabel = this.add
+      .text(0, halfHeight - 86, "", {
+        fontSize: "12px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+    this.workshopPageNextButton = this.add
+      .rectangle(56, halfHeight - 86, 48, 32, 0x121a24, 0.95)
+      .setStrokeStyle(2, 0x5cc8ff, 0.76)
+      .setInteractive({ useHandCursor: true });
+    this.workshopPageNextLabel = this.add
+      .text(56, halfHeight - 86, ">", {
+        fontSize: "16px",
+        color: "#d9f2ff",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5);
+    this.workshopPagePrevButton.on("pointerdown", () => this.changeWorkshopPage(-1));
+    this.workshopPageNextButton.on("pointerdown", () => this.changeWorkshopPage(1));
 
     this.workshopBox = this.add
       .container(0, 0, [
@@ -2558,6 +2570,11 @@ export class MenuScene extends Phaser.Scene {
         btnClose,
         labelClose,
         this.workshopFooterText,
+        this.workshopPagePrevButton,
+        this.workshopPagePrevLabel,
+        this.workshopPageLabel,
+        this.workshopPageNextButton,
+        this.workshopPageNextLabel,
       ])
       .setDepth(1401)
       .setScrollFactor(0);
@@ -2721,26 +2738,37 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private getWorkshopPanelMetrics(): { width: number; height: number; compact: boolean } {
-    const compact = this.scale.height <= 420 || this.scale.width <= 760;
+    const compact = this.scale.height <= 520 || this.scale.width <= 900;
+    const uiStage = getUiProgressSnapshot(this.saveManager.get()).stage;
+    const compactWidth = Math.max(320, Math.min(this.scale.width - 44, 560));
     return {
       compact,
-      width: compact ? 640 : WORKSHOP_PANEL_WIDTH,
-      height: compact ? 640 : WORKSHOP_PANEL_HEIGHT,
+      width: compact ? compactWidth : uiStage === "advanced" ? 820 : 780,
+      height: compact ? (uiStage === "starter" ? 404 : 452) : uiStage === "advanced" ? 776 : 752,
     };
   }
 
   private getLeaderboardPanelMetrics(): { width: number; height: number; compact: boolean } {
-    const compact = this.scale.height <= 420 || this.scale.width <= 760;
+    const compact = this.isCompactLeaderboardLayout();
+    const expandedMeta = this.shouldShowExpandedLeaderboardMeta();
     return {
       compact,
       width: compact ? 640 : 700,
-      height: compact ? 620 : 940,
+      height: compact ? 620 : expandedMeta ? 940 : 720,
     };
   }
 
+  private isCompactLeaderboardLayout(): boolean {
+    return this.scale.height <= 420 || this.scale.width <= 760;
+  }
+
   private shouldShowExpandedLeaderboardMeta(): boolean {
-    const metrics = this.getLeaderboardPanelMetrics();
-    return getUiProgressSnapshot(this.saveManager.get()).stage === "advanced" && !metrics.compact && this.scale.width >= 1440 && this.scale.height >= 960;
+    return (
+      getUiProgressSnapshot(this.saveManager.get()).stage === "advanced" &&
+      !this.isCompactLeaderboardLayout() &&
+      this.scale.width >= 1440 &&
+      this.scale.height >= 960
+    );
   }
 
   private layoutWorkshop(): void {
@@ -2758,46 +2786,87 @@ export class MenuScene extends Phaser.Scene {
     this.workshopDim.setSize(width, height);
     panel?.setSize(metrics.width, metrics.height);
     accent?.setPosition(0, -halfHeight + 48).setSize(metrics.width - 96, 2);
-    title?.setPosition(0, -halfHeight + 22).setStyle({ fontSize: metrics.compact ? "24px" : "28px" });
+    title?.setPosition(0, -halfHeight + 24).setStyle({ fontSize: metrics.compact ? "22px" : "30px" });
     this.workshopWalletText
-      .setPosition(-halfWidth + 40, -halfHeight + 60)
-      .setStyle({ fontSize: metrics.compact ? "16px" : "18px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 54 : 62))
+      .setStyle({ fontSize: metrics.compact ? "15px" : "18px", wordWrap: { width: metrics.width - 96 } });
     this.workshopRecommendationText
-      .setPosition(-halfWidth + 40, -halfHeight + 90)
-      .setStyle({ fontSize: metrics.compact ? "15px" : "17px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 84 : 98))
+      .setStyle({ fontSize: metrics.compact ? "12px" : "17px", wordWrap: { width: metrics.width - 96 } });
     this.workshopHintText
-      .setPosition(-halfWidth + 40, -halfHeight + 118)
-      .setStyle({ fontSize: metrics.compact ? "12px" : "13px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 112 : 136))
+      .setStyle({ fontSize: metrics.compact ? "11px" : "13px", wordWrap: { width: metrics.width - 96 } });
     this.workshopFooterText
-      .setPosition(-halfWidth + 40, halfHeight - 48)
-      .setStyle({ fontSize: metrics.compact ? "12px" : "13px", wordWrap: { width: metrics.width - 96 } });
-    btnClose?.setPosition(halfWidth - 52, -halfHeight + 22);
-    labelClose?.setPosition(halfWidth - 52, -halfHeight + 22);
+      .setPosition(-halfWidth + 40, halfHeight - (metrics.compact ? 22 : 42))
+      .setStyle({ fontSize: metrics.compact ? "11px" : "13px", wordWrap: { width: metrics.width - 96 } });
+    const pagerButtonWidth = metrics.compact ? 44 : 52;
+    const pagerButtonHeight = metrics.compact ? 30 : 34;
+    const pagerY = metrics.compact ? halfHeight - 28 : halfHeight - 88;
+    this.workshopPagePrevButton.setPosition(-56, pagerY).setSize(pagerButtonWidth, pagerButtonHeight);
+    this.workshopPagePrevLabel.setPosition(-56, pagerY).setStyle({ fontSize: metrics.compact ? "15px" : "16px" });
+    this.workshopPageLabel.setPosition(0, pagerY).setStyle({ fontSize: metrics.compact ? "12px" : "13px" });
+    this.workshopPageNextButton.setPosition(56, pagerY).setSize(pagerButtonWidth, pagerButtonHeight);
+    this.workshopPageNextLabel.setPosition(56, pagerY).setStyle({ fontSize: metrics.compact ? "15px" : "16px" });
+    btnClose?.setPosition(halfWidth - 52, -halfHeight + 24);
+    labelClose?.setPosition(halfWidth - 52, -halfHeight + 24);
     fitTextScaleToWidth(this.workshopWalletText, metrics.width - 96, 0.78);
     fitTextScaleToWidth(this.workshopRecommendationText, metrics.width - 96, 0.8);
     fitTextScaleToWidth(this.workshopHintText, metrics.width - 96, 0.78);
     fitTextScaleToWidth(this.workshopFooterText, metrics.width - 96, 0.78);
+    fitTextScaleToWidth(this.workshopPageLabel, 96, 0.8);
     const scale = Math.min(1, (width - 24) / metrics.width, (height - 24) / metrics.height);
     this.workshopBox.setScale(scale).setPosition(width / 2, height / 2);
+  }
+
+  private setWorkshopPagerState(
+    button: Phaser.GameObjects.Rectangle,
+    label: Phaser.GameObjects.Text,
+    enabled: boolean,
+    visible: boolean
+  ): void {
+    button
+      .setVisible(visible)
+      .setFillStyle(enabled ? 0x121a24 : 0x0b1118, enabled ? 0.96 : 0.82)
+      .setStrokeStyle(2, enabled ? 0x5cc8ff : 0x38566f, enabled ? 0.82 : 0.64);
+    label.setVisible(visible).setColor(enabled ? "#d9f2ff" : "#6f8596");
+  }
+
+  private changeWorkshopPage(direction: -1 | 1): void {
+    const nextPage = Phaser.Math.Clamp(this.workshopPageIndex + direction, 0, Math.max(0, this.workshopPageCount - 1));
+    if (nextPage === this.workshopPageIndex) return;
+    this.workshopPageIndex = nextPage;
+    this.refreshWorkshopSummary();
   }
 
   private layoutLeaderboard(): void {
     if (!this.leaderboardDim || !this.leaderboardBox) return;
     const { width, height } = this.scale;
     const metrics = this.getLeaderboardPanelMetrics();
+    const uiStage = getUiProgressSnapshot(this.saveManager.get()).stage;
     const halfWidth = metrics.width / 2;
     const halfHeight = metrics.height / 2;
     const headerTitleY = -halfHeight + 22;
     const headerAccentY = -halfHeight + 48;
-    const headerHintY = metrics.compact ? -halfHeight + 84 : -halfHeight + 92;
-    const filterY = metrics.compact ? -halfHeight + 136 : -halfHeight + 152;
-    const rowsStartY = metrics.compact ? -halfHeight + 182 : -halfHeight + 218;
-    const rowStep = metrics.compact ? 44 : 48;
-    const rowWidth = metrics.compact ? metrics.width - 84 : 620;
-    const rowHeight = metrics.compact ? 42 : 46;
-    const rowTextX = -rowWidth / 2 + 20;
-    const rowTextTop = metrics.compact ? 14 : 16;
     const expandedMeta = this.shouldShowExpandedLeaderboardMeta();
+    const denseDesktop = !metrics.compact && !expandedMeta;
+    const rowSlots = metrics.compact
+      ? uiStage === "advanced"
+        ? 5
+        : 3
+      : expandedMeta
+        ? getLeaderboardRowLimit(uiStage)
+        : Math.min(5, getLeaderboardRowLimit(uiStage));
+    const headerHintY = metrics.compact ? -halfHeight + 84 : denseDesktop ? -halfHeight + 84 : -halfHeight + 92;
+    const filterY = metrics.compact ? -halfHeight + 136 : denseDesktop ? -halfHeight + 134 : -halfHeight + 152;
+    const rowsStartY = metrics.compact ? -halfHeight + 182 : denseDesktop ? -halfHeight + 176 : -halfHeight + 218;
+    const rowStep = metrics.compact ? 44 : denseDesktop ? 44 : 48;
+    const rowWidth = metrics.compact ? metrics.width - 84 : 620;
+    const rowHeight = metrics.compact ? 42 : denseDesktop ? 42 : 46;
+    const rowTextX = -rowWidth / 2 + (denseDesktop ? 18 : 20);
+    const rowTextTop = metrics.compact ? 14 : denseDesktop ? 14 : 16;
+    const lastRowY = rowsStartY + Math.max(0, rowSlots - 1) * rowStep;
+    const rowBottomY = lastRowY + rowHeight / 2;
+    const footerY = metrics.compact ? halfHeight - 104 : expandedMeta ? 316 : rowBottomY + 28;
     const panel = this.leaderboardBox.list[0] as Phaser.GameObjects.Rectangle | undefined;
     const accent = this.leaderboardBox.list[1] as Phaser.GameObjects.Rectangle | undefined;
     const title = this.leaderboardBox.list[2] as Phaser.GameObjects.Text | undefined;
@@ -2815,8 +2884,8 @@ export class MenuScene extends Phaser.Scene {
     btnClose?.setPosition(halfWidth - 58, headerTitleY);
     labelClose?.setPosition(halfWidth - 58, headerTitleY);
 
-    const filterSpacing = metrics.compact ? 156 : 184;
-    const filterButtonWidth = metrics.compact ? 128 : 148;
+    const filterSpacing = metrics.compact ? 156 : denseDesktop ? 164 : 184;
+    const filterButtonWidth = metrics.compact ? 128 : denseDesktop ? 136 : 148;
     this.leaderboardFilterButtons.forEach((entry, index) => {
       const x = -filterSpacing + index * filterSpacing;
       entry.button.setPosition(x, filterY).setSize(filterButtonWidth, 38);
@@ -2829,13 +2898,15 @@ export class MenuScene extends Phaser.Scene {
       row.text.setPosition(rowTextX, y - rowTextTop).setStyle({ wordWrap: { width: rowWidth - 40 } });
     });
 
-    this.leaderboardEmptyPanel.setPosition(0, metrics.compact ? -32 : -86).setSize(rowWidth, metrics.compact ? 140 : 172);
-    this.leaderboardEmptyText.setPosition(0, metrics.compact ? -32 : -86).setStyle({
-      fontSize: metrics.compact ? "13px" : "15px",
+    this.leaderboardEmptyPanel
+      .setPosition(0, metrics.compact ? -32 : denseDesktop ? rowsStartY + 72 : -86)
+      .setSize(rowWidth, metrics.compact ? 140 : denseDesktop ? 148 : 172);
+    this.leaderboardEmptyText.setPosition(0, metrics.compact ? -32 : denseDesktop ? rowsStartY + 72 : -86).setStyle({
+      fontSize: metrics.compact ? "13px" : denseDesktop ? "14px" : "15px",
       wordWrap: { width: rowWidth - 48 },
     });
-    this.leaderboardFooterText.setPosition(0, metrics.compact ? halfHeight - 104 : expandedMeta ? 316 : 278).setStyle({
-      fontSize: metrics.compact ? "11px" : expandedMeta ? "12px" : "13px",
+    this.leaderboardFooterText.setPosition(0, footerY).setStyle({
+      fontSize: metrics.compact ? "11px" : expandedMeta ? "12px" : "12px",
       wordWrap: { width: metrics.width - 140 },
     });
     this.leaderboardCareerTitleText.setVisible(expandedMeta).setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 184 : 170);
@@ -2862,6 +2933,7 @@ export class MenuScene extends Phaser.Scene {
     if (getUiProgressSnapshot(this.saveManager.get()).stage === "starter") return;
     this.hideLeaderboard();
     this.analytics.track(ANALYTICS_EVENTS.MENU_CTA_WORKSHOP, { dateUtc: this.getCurrentDateUtc() });
+    this.workshopPageIndex = 0;
     this.refreshWorkshopSummary();
     this.workshopDim.setVisible(true);
     this.workshopBox.setVisible(true);
@@ -2936,6 +3008,20 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const rank = this.latestLeaderboardRank ?? getLeaderboardRank(filtered, this.latestLeaderboardEntryId ?? "");
+    const latestEntry = filtered.find((entry) => entry.id === this.latestLeaderboardEntryId) ?? null;
+    const hintedScore = latestEntry?.score ?? bestScore;
+    const leagueSummary =
+      save.leaderboard.entries.length > 0
+        ? nextDivision
+          ? t(this.locale, "menu.leaderboardCareerNext", {
+              division: t(this.locale, `leaderboard.division.${save.leaderboard.highestDivision}`),
+              nextDivision: t(this.locale, `leaderboard.division.${nextDivision.id}`),
+              score: formatNumber(this.locale, nextDivision.minScore),
+            })
+          : t(this.locale, "menu.leaderboardCareerTop", {
+              division: t(this.locale, `leaderboard.division.${save.leaderboard.highestDivision}`),
+            })
+        : t(this.locale, "menu.leaderboardScoring");
     this.leaderboardHintText.setText(
       expandedMeta
         ? [
@@ -2951,27 +3037,27 @@ export class MenuScene extends Phaser.Scene {
                 })
               : t(this.locale, "menu.leaderboardCareerComplete", {
                   count: formatNumber(this.locale, claimedMilestones.size),
-              total: formatNumber(this.locale, careerMilestones.length),
-            }),
+                  total: formatNumber(this.locale, careerMilestones.length),
+              }),
           ].join("\n")
         : fullLeaderboard
-          ? [
+          ? rank
+            ? [
+                `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, hintedScore)}`,
+                nextDivision
+                  ? t(this.locale, "results.nextDivision", {
+                      division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
+                      score: formatNumber(this.locale, nextDivision.minScore),
+                    })
+                  : t(this.locale, "results.topDivision"),
+              ].join("\n")
+            : leagueSummary
+          : [
               rank
-                ? `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, bestScore)}`
+                ? `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, hintedScore)}`
                 : t(this.locale, "menu.leaderboardScoring"),
               nextDivision
                 ? t(this.locale, "results.nextDivision", {
-                    division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
-                    score: formatNumber(this.locale, nextDivision.minScore),
-                  })
-                : t(this.locale, "results.topDivision"),
-            ].join("\n")
-        : [
-            rank
-              ? `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, bestScore)}`
-              : t(this.locale, "menu.leaderboardScoring"),
-            nextDivision
-              ? t(this.locale, "results.nextDivision", {
                   division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
                   score: formatNumber(this.locale, nextDivision.minScore),
                 })
@@ -2993,7 +3079,15 @@ export class MenuScene extends Phaser.Scene {
           : t(this.locale, "menu.leaderboardEmpty")
       );
 
-    const rowLimit = compactLeaderboard ? (uiStage === "advanced" ? 5 : 3) : getLeaderboardRowLimit(uiStage);
+    const rowLimit = compactLeaderboard
+      ? uiStage === "advanced"
+        ? 5
+        : 3
+      : expandedMeta
+        ? getLeaderboardRowLimit(uiStage)
+        : uiStage === "advanced"
+          ? 5
+          : getLeaderboardRowLimit(uiStage);
     for (let i = 0; i < this.leaderboardRows.length; i++) {
       const row = this.leaderboardRows[i]!;
       const entry = filtered[i];
@@ -3051,11 +3145,7 @@ export class MenuScene extends Phaser.Scene {
     this.leaderboardCareerTitleText.setVisible(expandedMeta);
     this.leaderboardCareerText.setVisible(expandedMeta);
     this.leaderboardPlatformText.setVisible(expandedMeta);
-    this.leaderboardFooterText
-      .setPosition(0, compactLeaderboard ? 206 : expandedMeta ? 316 : 278)
-      .setStyle({ fontSize: compactLeaderboard ? "11px" : expandedMeta ? "12px" : "13px" });
-
-    this.leaderboardFooterText.setText(
+    const footerText =
       this.latestPromotionDivision && (this.latestPromotionReward.bolts > 0 || this.latestPromotionReward.cores > 0)
         ? t(this.locale, "menu.leaderboardPromotion", {
             division: t(this.locale, `leaderboard.division.${this.latestPromotionDivision}`),
@@ -3067,27 +3157,17 @@ export class MenuScene extends Phaser.Scene {
               reward: formatLeaderboardReward(this.locale, this.latestCareerMilestoneReward),
             })
         : this.latestLeaderboardEntryId && this.latestLeaderboardRank
-        ? this.latestLeaderboardIsRecord
-          ? t(this.locale, "menu.leaderboardRecord", {
-              rank: formatNumber(this.locale, this.latestLeaderboardRank),
-              mode: t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`),
-            })
-          : t(this.locale, "menu.leaderboardLatest", {
-              rank: formatNumber(this.locale, this.latestLeaderboardRank),
-              mode: t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`),
-            })
-        : save.leaderboard.entries.length > 0
-          ? nextDivision
-            ? t(this.locale, "menu.leaderboardCareerNext", {
-                division: t(this.locale, `leaderboard.division.${save.leaderboard.highestDivision}`),
-                nextDivision: t(this.locale, `leaderboard.division.${nextDivision.id}`),
-                score: formatNumber(this.locale, nextDivision.minScore),
+          ? this.latestLeaderboardIsRecord
+            ? t(this.locale, "menu.leaderboardRecord", {
+                rank: formatNumber(this.locale, this.latestLeaderboardRank),
+                mode: t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`),
               })
-          : t(this.locale, "menu.leaderboardCareerTop", {
-              division: t(this.locale, `leaderboard.division.${save.leaderboard.highestDivision}`),
-            })
-        : t(this.locale, "menu.leaderboardScoring")
-    );
+            : t(this.locale, "menu.leaderboardLatest", {
+                rank: formatNumber(this.locale, this.latestLeaderboardRank),
+                mode: t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`),
+              })
+        : "";
+    this.leaderboardFooterText.setVisible(footerText.length > 0).setText(footerText);
 
     if (expandedMeta) {
       await this.refreshPlatformLeaderboardSummary(requestNonce);
@@ -3196,8 +3276,11 @@ export class MenuScene extends Phaser.Scene {
     const prioritizedVisibleNodes = recommendedNode
       ? [recommendedNode, ...visibleNodes.filter((node) => node.id !== recommendedNode.id)]
       : visibleNodes;
-    const renderedNodeLimit = compactWorkshop ? 3 : prioritizedVisibleNodes.length;
-    const renderedNodes = prioritizedVisibleNodes.slice(0, renderedNodeLimit);
+    const cardsPerPage = compactWorkshop ? 2 : uiSnapshot.stage === "growing" ? 4 : 6;
+    this.workshopPageCount = Math.max(1, Math.ceil(prioritizedVisibleNodes.length / cardsPerPage));
+    this.workshopPageIndex = Phaser.Math.Clamp(this.workshopPageIndex, 0, this.workshopPageCount - 1);
+    const pageStartIndex = this.workshopPageIndex * cardsPerPage;
+    const renderedNodes = prioritizedVisibleNodes.slice(pageStartIndex, pageStartIndex + cardsPerPage);
     const stockpileKey = uiSnapshot.stage === "starter" ? "menu.stockpileCompact" : "menu.stockpile";
     const helperCopy = compactWorkshop
       ? t(this.locale, "menu.workshopCompactViewport")
@@ -3209,6 +3292,7 @@ export class MenuScene extends Phaser.Scene {
             ? t(this.locale, "menu.installedBuild")
             : t(this.locale, "menu.installedNone");
     const panelTextWidth = workshopMetrics.width - 96;
+    const showWorkshopHint = !compactWorkshop && uiSnapshot.stage === "starter";
 
     this.workshopWalletText.setText(
       t(this.locale, stockpileKey, {
@@ -3227,15 +3311,22 @@ export class MenuScene extends Phaser.Scene {
     fitTextScaleToWidth(this.workshopRecommendationText, panelTextWidth, 0.8);
     this.workshopHintText
       .setText(
-        [
-          t(this.locale, "menu.workshopVisibleCount", {
-            visible: formatNumber(this.locale, renderedNodes.length),
-            total: formatNumber(this.locale, this.staticData.metaTree.nodes.length),
-          }),
-          helperCopy,
-        ].join("\n")
+        compactWorkshop
+          ? helperCopy
+          : uiSnapshot.stage === "starter"
+            ? [
+                t(this.locale, "menu.workshopVisibleCount", {
+                  visible: formatNumber(this.locale, visibleNodes.length),
+                  total: formatNumber(this.locale, this.staticData.metaTree.nodes.length),
+                }),
+                helperCopy,
+              ].join("\n")
+            : t(this.locale, "menu.workshopVisibleCount", {
+                visible: formatNumber(this.locale, visibleNodes.length),
+                total: formatNumber(this.locale, this.staticData.metaTree.nodes.length),
+              })
       )
-      .setVisible(true);
+      .setVisible(showWorkshopHint);
     fitTextScaleToWidth(this.workshopHintText, panelTextWidth, 0.78);
     this.workshopFooterText.setText(
       compactWorkshop
@@ -3246,14 +3337,32 @@ export class MenuScene extends Phaser.Scene {
           ? t(this.locale, "menu.workshopUnlockLaterStarter")
           : t(this.locale, "menu.workshopUnlockLaterGrowing")
     );
+    this.workshopFooterText.setVisible(!compactWorkshop);
     fitTextScaleToWidth(this.workshopFooterText, panelTextWidth, 0.78);
+    const showPager = this.workshopPageCount > 1;
+    this.workshopPageLabel.setText(`${this.workshopPageIndex + 1} / ${this.workshopPageCount}`).setVisible(showPager);
+    fitTextScaleToWidth(this.workshopPageLabel, 96, 0.8);
+    this.setWorkshopPagerState(
+      this.workshopPagePrevButton,
+      this.workshopPagePrevLabel,
+      this.workshopPageIndex > 0,
+      showPager
+    );
+    this.setWorkshopPagerState(
+      this.workshopPageNextButton,
+      this.workshopPageNextLabel,
+      this.workshopPageIndex < this.workshopPageCount - 1,
+      showPager
+    );
 
     for (const chip of this.workshopBuildChips) chip.destroy();
     this.workshopBuildChips = [];
     let chipCursorX = -workshopMetrics.width / 2 + 40;
     let chipCursorY = -workshopMetrics.height / 2 + 172;
     const chipRowWidth = workshopMetrics.width - 80;
-    if (!compactWorkshop) {
+    const allowBuildChips =
+      !compactWorkshop && uiSnapshot.stage === "advanced" && this.scale.width >= 1500 && this.scale.height >= 900;
+    if (allowBuildChips) {
       for (const entry of activeMetaEntries) {
         const badge = getMetaNodeBadgeSpecs(this.locale, entry.node.id, 1)[0];
         if (!badge) continue;
@@ -3276,20 +3385,70 @@ export class MenuScene extends Phaser.Scene {
 
     const workshopLayout =
       compactWorkshop
-        ? { columns: 1, cardWidth: 556, cardHeight: 118, cardGapX: 0, cardGapY: 12, textPad: 28, buttonWidth: 120, buttonHeight: 40 }
+        ? {
+            columns: 1,
+            cardWidth: workshopMetrics.width - 56,
+            cardHeight: 136,
+            cardGapX: 0,
+            cardGapY: 14,
+            textPad: 26,
+            buttonWidth: 138,
+            buttonHeight: 46,
+          }
         : uiSnapshot.stage === "starter"
-        ? { columns: 1, cardWidth: 624, cardHeight: 116, cardGapX: 0, cardGapY: 12, textPad: 34, buttonWidth: 132, buttonHeight: 38 }
+        ? {
+            columns: 1,
+            cardWidth: workshopMetrics.width - 72,
+            cardHeight: 132,
+            cardGapX: 0,
+            cardGapY: 14,
+            textPad: 30,
+            buttonWidth: 132,
+            buttonHeight: 42,
+          }
         : uiSnapshot.stage === "growing"
-          ? { columns: 2, cardWidth: 304, cardHeight: 108, cardGapX: 16, cardGapY: 10, textPad: 30, buttonWidth: 112, buttonHeight: 36 }
-          : prioritizedVisibleNodes.length > 8
-            ? { columns: 3, cardWidth: 206, cardHeight: 104, cardGapX: 10, cardGapY: 10, textPad: 22, buttonWidth: 92, buttonHeight: 34 }
-            : { columns: 2, cardWidth: 298, cardHeight: 112, cardGapX: 16, cardGapY: 12, textPad: 28, buttonWidth: 112, buttonHeight: 38 };
+          ? {
+              columns: 2,
+              cardWidth: 348,
+              cardHeight: 142,
+              cardGapX: 18,
+              cardGapY: 14,
+              textPad: 26,
+              buttonWidth: 132,
+              buttonHeight: 44,
+            }
+          : {
+              columns: 2,
+              cardWidth: 356,
+              cardHeight: 148,
+              cardGapX: 18,
+              cardGapY: 14,
+              textPad: 26,
+              buttonWidth: 136,
+              buttonHeight: 44,
+            };
     const gridWidth =
       workshopLayout.columns * workshopLayout.cardWidth + Math.max(0, workshopLayout.columns - 1) * workshopLayout.cardGapX;
     const gridLeft = -gridWidth / 2;
     const cardRows = Math.ceil(renderedNodes.length / workshopLayout.columns);
-    const desiredCardsStartY = this.workshopBuildChips.length > 0 ? chipCursorY + 44 : compactWorkshop ? -workshopMetrics.height / 2 + 184 : -146;
-    const maxCardsBottom = workshopMetrics.height / 2 - 70;
+    const desiredCardsStartY = this.workshopBuildChips.length > 0
+      ? chipCursorY + 44
+      : compactWorkshop
+        ? -workshopMetrics.height / 2 + 174
+        : uiSnapshot.stage === "advanced"
+          ? -workshopMetrics.height / 2 + 228
+          : -workshopMetrics.height / 2 + 224;
+    const maxCardsBottom =
+      workshopMetrics.height / 2 -
+      (compactWorkshop
+        ? showPager
+          ? 56
+          : 20
+        : showPager
+          ? 98
+          : this.workshopFooterText.visible
+            ? 58
+            : 24);
     const maxCardsStartY =
       maxCardsBottom -
       workshopLayout.cardHeight / 2 -
@@ -3323,13 +3482,14 @@ export class MenuScene extends Phaser.Scene {
       const textLeft = -workshopLayout.cardWidth / 2 + workshopLayout.textPad;
       const buttonCenterX = workshopLayout.cardWidth / 2 - (workshopLayout.buttonWidth / 2 + 18);
       const buttonLeft = buttonCenterX - workshopLayout.buttonWidth / 2;
-      const textWrapWidth = Math.max(70, Math.floor(buttonLeft - textLeft - 12));
-      const badgeNode = badge ? createMenuBadge(this, 0, -workshopLayout.cardHeight / 2 + 20, badge.label, badge.fill, badge.stroke, badge.textColor) : null;
+      const textWrapWidth = Math.max(84, Math.floor(buttonLeft - textLeft - 14));
+      const badgeTopY = -workshopLayout.cardHeight / 2 + 16;
+      const badgeNode = badge ? createMenuBadge(this, 0, badgeTopY, badge.label, badge.fill, badge.stroke, badge.textColor) : null;
       const recommendedBadgeNode = isRecommended
         ? createMenuBadge(
             this,
-            buttonCenterX,
-            -workshopLayout.cardHeight / 2 + 20,
+            0,
+            badgeTopY,
             t(this.locale, "menu.recommendedBadge"),
             0xffd166,
             0xffd166,
@@ -3338,51 +3498,51 @@ export class MenuScene extends Phaser.Scene {
         : null;
       const badgeBg = badgeNode?.list[0] as Phaser.GameObjects.Rectangle | undefined;
       const badgeWidth = badgeBg?.width ?? 0;
+      const recommendedBadgeBg = recommendedBadgeNode?.list[0] as Phaser.GameObjects.Rectangle | undefined;
+      const recommendedBadgeWidth = recommendedBadgeBg?.width ?? 0;
       const badgeX = badgeNode ? workshopLayout.cardWidth / 2 - 14 - badgeWidth / 2 : 0;
-      const titleMaxWidth = Math.max(
-        72,
-        Math.floor((badgeNode ? badgeX - badgeWidth / 2 - 8 : buttonLeft - 10) - textLeft)
-      );
+      const recommendedBadgeX = recommendedBadgeNode ? textLeft + recommendedBadgeWidth / 2 : 0;
+      const titleMaxWidth = Math.max(84, textWrapWidth + 4);
 
       const bg = this.add
         .rectangle(0, 0, workshopLayout.cardWidth, workshopLayout.cardHeight, isRecommended ? 0x16212b : 0x121a24, 0.97)
         .setStrokeStyle(2, accentColor, isRecommended ? 0.82 : maxed ? 0.72 : 0.58);
       const accent = this.add.rectangle(-workshopLayout.cardWidth / 2 + 4, 0, 6, workshopLayout.cardHeight, accentColor, 0.92);
       const title = this.add
-        .text(textLeft, -workshopLayout.cardHeight / 2 + 14, getMetaNodeName(this.locale, node.id, node.name), {
-          fontSize: compactWorkshop ? "18px" : uiSnapshot.stage === "starter" ? "18px" : uiSnapshot.stage === "growing" ? "16px" : "15px",
+        .text(textLeft, -workshopLayout.cardHeight / 2 + 30, getMetaNodeName(this.locale, node.id, node.name), {
+          fontSize: compactWorkshop ? "18px" : uiSnapshot.stage === "starter" ? "18px" : uiSnapshot.stage === "growing" ? "17px" : "18px",
           color: "#d9f2ff",
           fontStyle: "700",
         })
         .setOrigin(0, 0);
-      fitTextScaleToWidth(title, titleMaxWidth, 0.62);
+      fitTextScaleToWidth(title, titleMaxWidth, 0.76);
       const descriptionPreview = buildWorkshopDescriptionPreview(
         getMetaNodeDescription(this.locale, node.id),
         uiSnapshot.stage,
         compactWorkshop
       );
       const desc = this.add
-        .text(textLeft, -workshopLayout.cardHeight / 2 + (uiSnapshot.stage === "advanced" ? 36 : 40), descriptionPreview, {
-          fontSize: compactWorkshop ? "14px" : uiSnapshot.stage === "starter" ? "13px" : uiSnapshot.stage === "growing" ? "12px" : "12px",
+        .text(textLeft, title.y + title.displayHeight + 6, descriptionPreview, {
+          fontSize: compactWorkshop ? "14px" : uiSnapshot.stage === "starter" ? "13px" : "14px",
           color: "#98b7c7",
-          wordWrap: { width: Math.max(70, textWrapWidth + 6) },
+          wordWrap: { width: textWrapWidth + 2 },
         })
         .setOrigin(0, 0);
       desc.setLineSpacing(1);
-      const descHeightCap = compactWorkshop ? 42 : uiSnapshot.stage === "starter" ? 40 : uiSnapshot.stage === "growing" ? 32 : 32;
+      const descHeightCap = compactWorkshop ? 40 : uiSnapshot.stage === "starter" ? 38 : uiSnapshot.stage === "growing" ? 44 : 48;
       if (desc.displayHeight > descHeightCap) {
-        desc.setScale(Phaser.Math.Clamp(descHeightCap / desc.displayHeight, 0.82, 1));
+        desc.setScale(Phaser.Math.Clamp(descHeightCap / desc.displayHeight, 0.88, 1));
       }
-      const levelY = Math.max(12, Math.min(workshopLayout.cardHeight / 2 - 32, desc.y + desc.displayHeight + 8));
-      const progressY = Math.min(workshopLayout.cardHeight / 2 - 12, levelY + 16);
+      const levelY = workshopLayout.cardHeight / 2 - (compactWorkshop ? 32 : 28);
+      const progressY = workshopLayout.cardHeight / 2 - 12;
       const levelText = this.add
         .text(textLeft, levelY, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
-          fontSize: compactWorkshop ? "13px" : uiSnapshot.stage === "starter" ? "12px" : "12px",
+          fontSize: compactWorkshop ? "13px" : uiSnapshot.stage === "starter" ? "13px" : "13px",
           color: maxed ? "#57c27d" : "#7fdfff",
           fontStyle: "700",
         })
         .setOrigin(0, 0);
-      const progressWidth = Math.max(70, textWrapWidth - 8);
+      const progressWidth = Math.max(84, textWrapWidth - 2);
       fitTextScaleToWidth(levelText, progressWidth, 0.82);
       const progressBg = this.add.rectangle(textLeft, progressY, progressWidth, 6, 0x0b141d, 0.95).setOrigin(0, 0.5);
       const progressFill = this.add
@@ -3399,7 +3559,7 @@ export class MenuScene extends Phaser.Scene {
       const btn = this.add
         .rectangle(
           buttonCenterX,
-          uiSnapshot.stage === "advanced" ? 2 : 4,
+          compactWorkshop ? 4 : uiSnapshot.stage === "advanced" ? 0 : 2,
           workshopLayout.buttonWidth,
           workshopLayout.buttonHeight,
           affordable || isRecommended ? 0x1b2635 : 0x0d131b,
@@ -3410,14 +3570,14 @@ export class MenuScene extends Phaser.Scene {
       const btnLabel = this.add
         .text(
           buttonCenterX,
-          (uiSnapshot.stage === "advanced" ? 2 : 4) - 6,
+          (compactWorkshop ? 4 : uiSnapshot.stage === "advanced" ? 0 : 2) - 7,
           maxed ? t(this.locale, "menu.installedButton") : affordable ? t(this.locale, "menu.buy") : t(this.locale, "menu.locked"),
-          { fontSize: compactWorkshop ? "13px" : uiSnapshot.stage === "starter" ? "13px" : "12px", color: "#d9f2ff", fontStyle: "700" }
+          { fontSize: compactWorkshop ? "13px" : uiSnapshot.stage === "starter" ? "13px" : "13px", color: "#d9f2ff", fontStyle: "700" }
         )
         .setOrigin(0.5);
       const costLabel = this.add
-        .text(buttonCenterX, (uiSnapshot.stage === "advanced" ? 2 : 4) + 10, priceLabel, {
-          fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "11px" : "11px",
+        .text(buttonCenterX, (compactWorkshop ? 4 : uiSnapshot.stage === "advanced" ? 0 : 2) + 10, priceLabel, {
+          fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "11px" : "12px",
           color: maxed ? "#57c27d" : affordable || isRecommended ? "#ffd166" : "#98b7c7",
           fontStyle: "700",
           align: "center",
@@ -3427,6 +3587,7 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(btnLabel, workshopLayout.buttonWidth - 14, 0.74);
       fitTextScaleToWidth(costLabel, workshopLayout.buttonWidth - 12, 0.72);
       if (badgeNode) badgeNode.setPosition(badgeX, -workshopLayout.cardHeight / 2 + 18);
+      if (recommendedBadgeNode) recommendedBadgeNode.setPosition(recommendedBadgeX, -workshopLayout.cardHeight / 2 + 18);
 
       if (!maxed && affordable) {
         btn.setInteractive({ useHandCursor: true });
@@ -4217,7 +4378,7 @@ function buildWorkshopDescriptionPreview(
 
   const clipped = normalized.slice(0, Math.max(0, maxLength - 1));
   const safe = clipped.includes(" ") ? clipped.slice(0, clipped.lastIndexOf(" ")) : clipped;
-  return `${safe.trim()}…`;
+  return `${safe.trim()}...`;
 }
 
 function getLiveopsPanelMetrics(width: number, compact: boolean, height = 1080): { width: number; height: number; stacked: boolean } {
