@@ -63,6 +63,7 @@ export class UIScene extends Phaser.Scene {
   private levelBannerTitle!: Phaser.GameObjects.Text;
   private levelBannerDesc!: Phaser.GameObjects.Text;
   private levelBannerTimer = 0;
+  private levelBannerDuration = 3.2;
   private levelBannerBaseY = 96;
   private lastLevelBannerKey = "";
   private activeBannerLevel = 0;
@@ -307,10 +308,13 @@ export class UIScene extends Phaser.Scene {
     this.dailyText.setVisible(Boolean(daily));
     const waveLabel = ((this.registry.get("uiStatusPrimary") as string | undefined) ?? "").trim();
     const statusLabel = ((this.registry.get("uiStatusSecondary") as string | undefined) ?? "").trim();
+    const overlayActive = this.isBlockingOverlayActive();
+    const compactOverlayLayout = this.isCompactOverlayLayout();
+    const focusBannerVisible = this.levelBanner.visible && this.levelBannerTimer > 0;
     this.waveText.setText(waveLabel);
-    this.waveText.setVisible(Boolean(waveLabel));
+    this.waveText.setVisible(Boolean(waveLabel) && !overlayActive && !(compactOverlayLayout && focusBannerVisible));
     this.statusText.setText(statusLabel);
-    this.statusText.setVisible(Boolean(statusLabel));
+    this.statusText.setVisible(Boolean(statusLabel) && !overlayActive);
     this.layoutHud();
     this.updateLevelProgressUi(waveInLevel, this.runState.endless.wavesPerLevel);
     this.maybeShowLevelBanner();
@@ -321,6 +325,7 @@ export class UIScene extends Phaser.Scene {
     this.dashLabel.setVisible(dashEnabled);
     this.dashGlow.setVisible(dashEnabled);
     this.refreshDashHudBadges(dashEnabled);
+    this.syncGameplayOverlayVisibility(dashEnabled);
 
     let flipCd = (this.registry.get("flipCooldown") as number | undefined) ?? 0;
     let dashCd = (this.registry.get("dashCooldown") as number | undefined) ?? 0;
@@ -525,7 +530,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private maybeShowLevelBanner(): void {
-    if (!this.runState || this.isTrainingMode()) {
+    if (!this.runState || this.isTrainingMode() || this.isBlockingOverlayActive()) {
       this.levelBanner.setVisible(false).setAlpha(0);
       this.levelBannerTimer = 0;
       return;
@@ -541,18 +546,23 @@ export class UIScene extends Phaser.Scene {
     this.activeBannerLevel = level;
     this.activeBannerModifierId = modifierId;
     this.refreshLevelBannerCopy();
-    this.levelBannerTimer = 3.2;
+    this.levelBannerDuration = this.isCompactOverlayLayout() ? 2.5 : 3.2;
+    this.levelBannerTimer = this.levelBannerDuration;
     this.levelBanner.setVisible(true).setAlpha(0);
   }
 
   private updateLevelBanner(dt: number): void {
+    if (this.isBlockingOverlayActive()) {
+      this.levelBanner.setVisible(false).setAlpha(0);
+      return;
+    }
     if (this.levelBannerTimer <= 0) {
       this.levelBanner.setVisible(false).setAlpha(0);
       return;
     }
 
     this.levelBannerTimer = Math.max(0, this.levelBannerTimer - Math.max(0, dt));
-    const elapsed = 3.2 - this.levelBannerTimer;
+    const elapsed = this.levelBannerDuration - this.levelBannerTimer;
     const fadeIn = clamp(elapsed / 0.22, 0, 1);
     const fadeOut = clamp(this.levelBannerTimer / 0.4, 0, 1);
     const alpha = Math.min(fadeIn, fadeOut);
@@ -562,6 +572,7 @@ export class UIScene extends Phaser.Scene {
 
   private refreshLevelBannerCopy(): void {
     if (this.activeBannerLevel <= 0 || !this.activeBannerModifierId || !this.runState) return;
+    const compactOverlayLayout = this.isCompactOverlayLayout();
     const copy = getLevelModifierCopy(this.locale, this.activeBannerModifierId);
     const objective = this.runState.endless.current.objective;
     const objectiveCopy = getLevelObjectiveCopy(this.locale, objective.id);
@@ -572,18 +583,62 @@ export class UIScene extends Phaser.Scene {
       : "";
     this.levelBannerTitle.setText(`${t(this.locale, "hud.level")} ${formatNumber(this.locale, this.activeBannerLevel)} | ${copy.title}`);
     this.levelBannerDesc.setText(
-      [
-        copy.desc,
-        t(this.locale, "objective.progress", {
-          title: objectiveCopy.title,
-          progress: formatNumber(this.locale, Math.floor(objective.progress)),
-          target: formatNumber(this.locale, objective.target),
-        }),
-        finaleLine,
-      ]
-        .filter(Boolean)
-        .join("\n")
+      compactOverlayLayout
+        ? [copy.desc, finaleLine].filter(Boolean).join(" | ")
+        : [
+            copy.desc,
+            t(this.locale, "objective.progress", {
+              title: objectiveCopy.title,
+              progress: formatNumber(this.locale, Math.floor(objective.progress)),
+              target: formatNumber(this.locale, objective.target),
+            }),
+            finaleLine,
+          ]
+            .filter(Boolean)
+            .join("\n")
     );
+  }
+
+  private isCompactOverlayLayout(): boolean {
+    return this.scale.width <= 720 || this.scale.height <= 430;
+  }
+
+  private isBlockingOverlayActive(): boolean {
+    return this.scene.isActive("upgrade") || this.settingsVisible || this.reviveBox.visible;
+  }
+
+  private syncGameplayOverlayVisibility(dashEnabled: boolean): void {
+    const overlayActive = this.isBlockingOverlayActive();
+    const controlsVisible = !overlayActive;
+    const hudVisible = !overlayActive;
+    const progressVisible = hudVisible && !this.isTrainingMode();
+    const focusBannerVisible = this.levelBanner.visible && this.levelBannerTimer > 0;
+    const dashBadges = [this.dashBadgePrimary, this.dashBadgeSecondary];
+
+    this.hudPanel.setVisible(hudVisible);
+    this.hudText.setVisible(hudVisible);
+    this.boltsText.setVisible(hudVisible);
+    this.dailyText.setVisible(hudVisible && this.dailyText.text.length > 0);
+    this.waveText.setVisible(hudVisible && this.waveText.text.length > 0 && !(this.isCompactOverlayLayout() && focusBannerVisible));
+    this.statusText.setVisible(hudVisible && this.statusText.text.length > 0);
+    this.levelProgressFrame.setVisible(progressVisible);
+    this.levelProgressFill.setVisible(progressVisible);
+    for (const marker of this.levelProgressMarkers) marker.setVisible(progressVisible);
+    this.tutorialBox.setVisible(this.tutorialActive && !overlayActive);
+
+    this.joyBase.setVisible(controlsVisible);
+    this.joyKnob.setVisible(controlsVisible);
+    this.btnFlip.setVisible(controlsVisible);
+    this.flipLabel.setVisible(controlsVisible);
+    this.flipGlow.setVisible(controlsVisible);
+    this.btnDash.setVisible(controlsVisible && dashEnabled);
+    this.dashLabel.setVisible(controlsVisible && dashEnabled);
+    this.dashGlow.setVisible(controlsVisible && dashEnabled);
+    this.pauseButton.setVisible(!overlayActive);
+    this.pauseLabel.setVisible(!overlayActive);
+    for (const badge of dashBadges) {
+      badge.setVisible(controlsVisible && dashEnabled && badge.text.length > 0);
+    }
   }
 
   private layout(): void {
@@ -634,7 +689,7 @@ export class UIScene extends Phaser.Scene {
     this.layoutHud();
     this.layoutTutorialOverlay();
 
-    const compactOverlayLayout = width <= 720 || height <= 430;
+    const compactOverlayLayout = this.isCompactOverlayLayout();
     const tutorialHeight = this.tutorialBg.height;
     const tutorialCenterY = compactOverlayLayout
       ? this.hudPanel.y + this.hudPanel.height + tutorialHeight / 2 + 14
@@ -648,6 +703,28 @@ export class UIScene extends Phaser.Scene {
       : this.tutorialBox.visible
         ? tutorialCenterY + tutorialHeight / 2 + 18
         : margin + 84;
+    const levelBannerBg = this.levelBanner.list[0] as Phaser.GameObjects.Rectangle | undefined;
+    const levelBannerAccent = this.levelBanner.list[1] as Phaser.GameObjects.Rectangle | undefined;
+    const bannerWidth = compactOverlayLayout ? Math.max(280, Math.min(width - 72, 500)) : 560;
+    const bannerHeight = compactOverlayLayout ? 82 : 118;
+    levelBannerBg?.setSize(bannerWidth, bannerHeight);
+    levelBannerAccent?.setPosition(0, -bannerHeight / 2 + (compactOverlayLayout ? 20 : 23)).setSize(bannerWidth - 60, 2);
+    this.levelBannerTitle
+      .setStyle({
+        fontSize: compactOverlayLayout ? "17px" : "20px",
+        align: "center",
+        wordWrap: { width: bannerWidth - 52 },
+      })
+      .setPosition(0, compactOverlayLayout ? -12 : -22);
+    this.levelBannerDesc
+      .setStyle({
+        fontSize: compactOverlayLayout ? "11px" : "13px",
+        align: "center",
+        wordWrap: { width: bannerWidth - 56 },
+      })
+      .setPosition(0, compactOverlayLayout ? 12 : 16);
+    fitTextScaleToWidth(this.levelBannerTitle, bannerWidth - 52, 0.82);
+    fitTextScaleToWidth(this.levelBannerDesc, bannerWidth - 56, 0.84);
     this.levelBanner.setPosition(width / 2, this.levelBannerBaseY);
 
     this.reviveBox.setPosition(width / 2, height / 2);
@@ -656,6 +733,8 @@ export class UIScene extends Phaser.Scene {
     this.settingsBox.setPosition(width / 2, height / 2);
     this.settingsDim.setSize(width, height);
     this.layoutSettingsOverlay();
+    const dashEnabled = Boolean(this.runState?.config.dash.enabledByDefault) || Boolean((this.runState?.perks as any)?.dash_module);
+    this.syncGameplayOverlayVisibility(dashEnabled);
   }
 
   private layoutTutorialOverlay(): void {
@@ -737,19 +816,20 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const compactLayout = width <= 720 || height <= 520;
     const shortLayout = width <= 680 || height <= 400;
+    const showHint = !compactLayout;
     const panelWidth = Math.max(320, Math.min(468, width - (shortLayout ? 20 : 32)));
     const panelHeight = Math.max(324, Math.min(shortLayout ? 372 : 420, height - (shortLayout ? 16 : 24)));
     const titleY = -panelHeight / 2 + (shortLayout ? 28 : compactLayout ? 34 : 42);
     const accentY = titleY + (shortLayout ? 24 : 28);
     const hintY = accentY + (shortLayout ? 16 : 20);
     const fieldWidth = Math.max(240, panelWidth - (shortLayout ? 46 : 108));
-    const fieldHeight = shortLayout ? 38 : compactLayout ? 42 : 46;
-    const rowGap = shortLayout ? 10 : compactLayout ? 12 : 14;
+    const fieldHeight = shortLayout ? 40 : compactLayout ? 46 : 46;
+    const rowGap = shortLayout ? 12 : compactLayout ? 14 : 14;
 
     this.settingsPanel.setSize(panelWidth, panelHeight);
     this.settingsAccent.setSize(Math.min(panelWidth - 44, 380), 2).setPosition(0, accentY);
     this.settingsTitle
-      .setStyle({ fontSize: shortLayout ? "22px" : compactLayout ? "24px" : "28px" })
+      .setStyle({ fontSize: shortLayout ? "24px" : compactLayout ? "26px" : "28px" })
       .setPosition(0, titleY)
       .setWordWrapWidth(panelWidth - 36, true);
     this.settingsHint
@@ -758,9 +838,10 @@ export class UIScene extends Phaser.Scene {
         wordWrap: { width: panelWidth - 48 },
         align: "center",
       })
-      .setPosition(0, hintY);
+      .setPosition(0, hintY)
+      .setVisible(showHint);
 
-    let cursorY = hintY + this.settingsHint.height / 2 + (shortLayout ? 22 : 28);
+    let cursorY = showHint ? hintY + this.settingsHint.height / 2 + (shortLayout ? 22 : 28) : accentY + (shortLayout ? 28 : 34);
     const controls = [
       { button: this.settingsQualityButton, label: this.settingsQualityLabel },
       { button: this.settingsSfxButton, label: this.settingsSfxLabel },
@@ -770,24 +851,24 @@ export class UIScene extends Phaser.Scene {
 
     for (const control of controls) {
       control.button.setSize(fieldWidth, fieldHeight).setPosition(0, cursorY);
-      control.label.setStyle({ fontSize: shortLayout ? "15px" : "16px" }).setPosition(0, cursorY);
+      control.label.setStyle({ fontSize: shortLayout ? "16px" : compactLayout ? "17px" : "16px" }).setPosition(0, cursorY);
       fitTextScaleToWidth(control.label, fieldWidth - 22, 0.86);
       cursorY += fieldHeight + rowGap;
     }
 
     const actionWidth = Math.max(120, Math.min(172, Math.floor((fieldWidth - 12) / 2)));
-    const actionHeight = shortLayout ? 40 : 44;
+    const actionHeight = shortLayout ? 42 : 46;
     const actionY = panelHeight / 2 - actionHeight / 2 - (shortLayout ? 12 : 18);
 
     this.settingsResumeButton.setSize(actionWidth, actionHeight).setPosition(-(actionWidth / 2 + 6), actionY);
     this.settingsResumeLabel
-      .setStyle({ fontSize: shortLayout ? "15px" : "16px" })
+      .setStyle({ fontSize: shortLayout ? "16px" : compactLayout ? "17px" : "16px" })
       .setPosition(this.settingsResumeButton.x, this.settingsResumeButton.y);
     fitTextScaleToWidth(this.settingsResumeLabel, actionWidth - 20, 0.88);
 
     this.settingsMenuButton.setSize(actionWidth, actionHeight).setPosition(actionWidth / 2 + 6, actionY);
     this.settingsMenuLabel
-      .setStyle({ fontSize: shortLayout ? "15px" : "16px" })
+      .setStyle({ fontSize: shortLayout ? "16px" : compactLayout ? "17px" : "16px" })
       .setPosition(this.settingsMenuButton.x, this.settingsMenuButton.y);
     fitTextScaleToWidth(this.settingsMenuLabel, actionWidth - 20, 0.88);
   }
@@ -798,7 +879,7 @@ export class UIScene extends Phaser.Scene {
     const panelPaddingX = 12;
     const panelPaddingY = 10;
     const rowGap = 6;
-    const compactHud = this.scale.width <= 720 || this.scale.height <= 430;
+    const compactHud = this.isCompactOverlayLayout();
     const panelWidth = Math.max(
       300,
       Math.min(

@@ -67,6 +67,7 @@ export class VfxManager {
   private quality: VfxQuality;
 
   private fx: AnyFx[] = [];
+  private waveStartLabel: any | null = null;
 
   private readonly maxParticlesLow = 120;
   private readonly maxParticlesMed = 220;
@@ -199,6 +200,7 @@ export class VfxManager {
   }
 
   destroy(): void {
+    this.clearWaveStartLabel();
     for (const f of this.fx) safeCall(f.obj, "destroy");
     this.fx = [];
     for (const l of this.magLines) safeCall(l, "destroy");
@@ -679,6 +681,7 @@ export class VfxManager {
   private onWaveStart(p: any): void {
     const waveIndex = typeof p?.waveIndex === "number" ? p.waveIndex : null;
     if (!this.ui || !waveIndex) return;
+    this.clearWaveStartLabel();
     const { width } = this.ui.scale ?? { width: 0 };
     const txt = this.ui.add?.text?.(width / 2, 42, `WAVE ${waveIndex}`, {
       fontSize: "20px",
@@ -690,6 +693,7 @@ export class VfxManager {
     safeSet(txt, "setScrollFactor", 0);
     safeSet(txt, "setDepth", 1100);
     safeSet(txt, "setAlpha", 0);
+    this.waveStartLabel = txt;
     this.fx.push({
       kind: "tween",
       obj: txt,
@@ -709,6 +713,7 @@ export class VfxManager {
 
   private onUpgradeOfferShown(_p: any): void {
     if (!this.ui) return;
+    this.clearWaveStartLabel();
     const { width, height } = this.ui.scale ?? { width: 0, height: 0 };
     const glow = this.ui.add?.image?.(width / 2, height / 2, "vfx_glow_blob");
     if (!glow) return;
@@ -719,6 +724,13 @@ export class VfxManager {
     safeSet(glow, "setAlpha", 0.18);
     safeSet(glow, "setScale", 4.2);
     this.fx.push({ kind: "ring", obj: glow, age: 0, life: 0.25, x: width / 2, y: height / 2, s0: 4.2, s1: 5.1, a0: 0.18, a1: 0 });
+  }
+
+  private clearWaveStartLabel(): void {
+    if (!this.waveStartLabel) return;
+    safeCall(this.waveStartLabel, "destroy");
+    this.fx = this.fx.filter((fx) => fx.obj !== this.waveStartLabel);
+    this.waveStartLabel = null;
   }
 
   private onUpgradePicked(p: any): void {

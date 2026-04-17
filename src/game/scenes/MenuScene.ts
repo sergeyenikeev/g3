@@ -261,6 +261,11 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setLineSpacing(4);
 
+    const walletBadgeBg = this.add
+      .rectangle(0, 0, 10, 10, 0x0f1720, 0.9)
+      .setOrigin(0, 0)
+      .setStrokeStyle(2, 0x2a556d, 0.68);
+
     this.walletText = this.add
       .text(0, 0, "", {
         fontSize: "14px",
@@ -454,6 +459,14 @@ export class MenuScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     const labelPlay = this.add
       .text(0, 0, t(this.locale, "menu.play"), { fontSize: "30px", color: "#f7fbff", fontStyle: "700" })
+      .setOrigin(0.5);
+    const labelPlayMeta = this.add
+      .text(0, 0, "", {
+        fontSize: "12px",
+        color: "#b7f7d0",
+        fontStyle: "700",
+        align: "center",
+      })
       .setOrigin(0.5);
 
     btnPlay.on("pointerdown", () => {
@@ -1259,31 +1272,40 @@ export class MenuScene extends Phaser.Scene {
       const onboarding = getOnboardingBoostStatus(save, this.staticData.liveops);
       const uiStage = getUiProgressSnapshot(save).stage;
       const boostedStart = uiStage === "advanced" && boosterEnabled && rewardBoostEnabled && !onboarding.eligible;
-      const compactRewardCopy = currentLayoutMode === "minimal" || this.scale.height <= 430;
+      const showPlayMeta = onboarding.eligible || boostedStart;
+      labelPlay.setText(t(this.locale, "menu.play"));
+      labelPlayMeta.setText("");
+      labelPlayMeta.setVisible(false);
       if (uiStage === "starter") {
-        labelPlay.setText(t(this.locale, "menu.play"));
         btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
       } else if (onboarding.eligible) {
-        labelPlay.setText(
-          t(this.locale, "menu.playFreeBoost", {
+        labelPlayMeta.setText(
+          t(this.locale, "menu.playFreeBoostHint", {
             usesLeft: formatNumber(this.locale, onboarding.usesLeft),
           })
         );
+        labelPlayMeta.setVisible(true).setColor("#b7f7d0");
         btnPlay.setStrokeStyle(2, 0x57c27d, 0.94).setFillStyle(0x153325, 0.98);
       } else if (boostedStart) {
-        labelPlay.setText(getRewardedPlayCtaLabel(this.locale, getRewardedBoosterPreview(), compactRewardCopy));
+        labelPlayMeta.setText(t(this.locale, "menu.playRewardedBoostHint"));
+        labelPlayMeta.setVisible(true).setColor("#9ff1c2");
         btnPlay.setStrokeStyle(2, 0x57c27d, 0.94).setFillStyle(0x153325, 0.98);
       } else {
-        labelPlay.setText(t(this.locale, "menu.play"));
         btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
       }
       labelPlay.setStyle({
-        fontSize: uiStage === "starter" ? "24px" : onboarding.eligible ? "18px" : boostedStart ? (compactRewardCopy ? "14px" : "16px") : "24px",
+        fontSize: uiStage === "starter" ? "24px" : showPlayMeta ? "22px" : "24px",
         align: "center",
       });
-      labelPlay.setLineSpacing(uiStage === "starter" ? 0 : boostedStart ? 2 : 0);
+      labelPlayMeta.setStyle({
+        fontSize: currentLayoutMode === "minimal" || this.scale.height <= 430 ? "11px" : "12px",
+        align: "center",
+      });
+      labelPlay.setLineSpacing(0);
       labelPlay.setWordWrapWidth(Math.max(180, btnPlay.width - 28), true);
+      labelPlayMeta.setWordWrapWidth(Math.max(180, btnPlay.width - 28), true);
       fitTextScaleToWidth(labelPlay, Math.max(180, btnPlay.width - 28), 0.68);
+      fitTextScaleToWidth(labelPlayMeta, Math.max(180, btnPlay.width - 28), 0.78);
     };
     const refreshLiveopsPanel = async () => {
       const dateUtc = this.getCurrentDateUtc();
@@ -1495,7 +1517,7 @@ export class MenuScene extends Phaser.Scene {
       .setVisible(false);
     const utilityPanelHint = this.add
       .text(0, 0, t(this.locale, "menu.utilityHint"), {
-        fontSize: "11px",
+        fontSize: "13px",
         color: "#98b7c7",
         align: "center",
         wordWrap: { width: UTILITY_PANEL_WIDTH - 64 },
@@ -1589,9 +1611,19 @@ export class MenuScene extends Phaser.Scene {
           ? Math.max(contentTop + (compressedMenu ? 8 : 16), Math.round(s.height * (compressedMenu ? 0.12 : 0.14)))
           : Math.max(contentTop + 22, Math.round(s.height * 0.2));
 
-      this.walletText?.setPosition(topInset, topInset).setStyle({ fontSize: minimal ? "13px" : "14px" });
+      this.walletText?.setPosition(topInset + (minimal ? 10 : compact ? 12 : 10), topInset + (minimal ? 6 : compact ? 7 : 6)).setStyle({
+        fontSize: minimal ? "14px" : compact ? "15px" : "14px",
+      });
       if (this.walletText) {
-        fitTextScaleToWidth(this.walletText, Math.max(180, Math.min(s.width * 0.34, minimal ? 220 : 320)), 0.74);
+        fitTextScaleToWidth(this.walletText, Math.max(168, Math.min(s.width * (compact ? 0.31 : 0.34), minimal ? 220 : 320)), 0.8);
+        const badgePaddingX = minimal ? 10 : compact ? 12 : 10;
+        const badgePaddingY = minimal ? 6 : compact ? 7 : 6;
+        walletBadgeBg
+          .setPosition(topInset, topInset)
+          .setSize(this.walletText.displayWidth + badgePaddingX * 2, this.walletText.displayHeight + badgePaddingY * 2)
+          .setVisible(true);
+      } else {
+        walletBadgeBg.setVisible(false);
       }
 
       btnWorkshop.setOrigin(0, 0).setSize(146, topButtonHeight);
@@ -1698,7 +1730,9 @@ export class MenuScene extends Phaser.Scene {
       taglineText.setText(t(this.locale, `menu.stageHint.${uiStage}`));
       taglineText.setStyle({ fontSize: compressedMenu ? "12px" : minimal ? "14px" : compact ? "16px" : shortDesktop ? "13px" : "18px" });
       taglineText.setWordWrapWidth(menuInnerWidth, true);
-      bestText.setStyle({ fontSize: compressedMenu ? "11px" : minimal ? "12px" : compact ? "13px" : shortDesktop ? "12px" : "15px" });
+      bestText.setStyle({
+        fontSize: compressedMenu ? "11px" : minimal ? "12px" : compact ? "13px" : advancedUi ? "16px" : shortDesktop ? "12px" : "15px",
+      });
       bestText.setWordWrapWidth(menuInnerWidth, true);
       controlsText.setStyle({ fontSize: compressedMenu ? "12px" : compact ? "14px" : "15px", align: "center" });
       controlsText.setWordWrapWidth(Math.max(260, this.dailyPanel.width - 28), true);
@@ -1719,7 +1753,7 @@ export class MenuScene extends Phaser.Scene {
       const liveopsPanel = getLiveopsPanelMetrics(s.width, compact, s.height);
       const stackedMissions = liveopsPanel.stacked;
       const summaryWidth = Math.min(minimal ? s.width - 24 : showPreview ? 560 : liveopsPanel.width, s.width - 24);
-      const summaryHeight = hideSummaryPanel ? 0 : minimal ? 168 : compact ? 132 : 140;
+      const summaryHeight = hideSummaryPanel ? 0 : minimal ? 184 : compact ? 144 : 140;
       const summaryBottom = s.height - (hideSummaryPanel ? 14 : minimal ? 12 : 18);
       const summaryTop = summaryBottom - summaryHeight;
       const summaryCenterY = summaryTop + summaryHeight / 2;
@@ -1730,10 +1764,17 @@ export class MenuScene extends Phaser.Scene {
       labelDailyBoost.setVisible(false);
 
       const ctaWidth = Math.min(this.menuPanel.width - 48, minimal ? 320 : compact ? 336 : 352);
-      btnPlay.setSize(ctaWidth, compressedMenu ? 46 : minimal ? 52 : shortDesktop ? 50 : 56);
+      const showPlayMeta = labelPlayMeta.text.length > 0;
+      btnPlay.setSize(ctaWidth, showPlayMeta ? (compressedMenu ? 56 : minimal ? 62 : shortDesktop ? 64 : 72) : compressedMenu ? 46 : minimal ? 52 : shortDesktop ? 50 : 56);
       btnTraining.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : shortDesktop ? 38 : 40);
       btnDaily.setSize(ctaWidth, compressedMenu ? 38 : minimal ? 40 : shortDesktop ? 42 : 46);
       btnMissions.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : shortDesktop ? 38 : 40);
+      labelPlay.setStyle({ fontSize: showPlayMeta ? (compressedMenu ? "18px" : minimal ? "20px" : "22px") : minimal ? "22px" : "24px", align: "center" });
+      labelPlayMeta.setStyle({ fontSize: compressedMenu ? "10px" : minimal ? "11px" : "12px", align: "center" });
+      labelPlay.setWordWrapWidth(btnPlay.width - 26, true);
+      labelPlayMeta.setWordWrapWidth(btnPlay.width - 26, true);
+      fitTextScaleToWidth(labelPlay, btnPlay.width - 26, 0.74);
+      fitTextScaleToWidth(labelPlayMeta, btnPlay.width - 26, 0.8);
       labelTraining.setStyle({ fontSize: compressedMenu ? "14px" : minimal ? "15px" : "16px", align: "center" });
       fitTextScaleToWidth(labelTraining, btnTraining.width - 22, 0.76);
       labelDaily.setStyle({ fontSize: compressedMenu ? "13px" : minimal ? "14px" : "15px", align: "center" });
@@ -1741,8 +1782,8 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(labelDaily, btnDaily.width - 24, 0.76);
       labelMissions.setStyle({ fontSize: compressedMenu ? "14px" : minimal ? "15px" : "16px", align: "center" });
       fitTextScaleToWidth(labelMissions, btnMissions.width - 22, 0.76);
-      boostToggleTitle.setStyle({ fontSize: compressedMenu ? "10px" : minimal ? "11px" : "12px", align: "left" });
-      boostToggleHint.setStyle({ fontSize: compressedMenu ? "9px" : minimal ? "9px" : "10px", align: "left" });
+      boostToggleTitle.setStyle({ fontSize: compressedMenu ? "11px" : minimal ? "12px" : "13px", align: "left" });
+      boostToggleHint.setStyle({ fontSize: compressedMenu ? "10px" : minimal ? "11px" : "12px", align: "left" });
       const showBoostToggle =
         advancedUi &&
         boosterEnabled &&
@@ -1753,6 +1794,7 @@ export class MenuScene extends Phaser.Scene {
       this.menuPanel.setVisible(!missionsExpanded);
       btnPlay.setVisible(!missionsExpanded);
       labelPlay.setVisible(!missionsExpanded);
+      labelPlayMeta.setVisible(!missionsExpanded && labelPlayMeta.text.length > 0);
       btnDaily.setVisible(!missionsExpanded && !starterUi);
       labelDaily.setVisible(!missionsExpanded && !starterUi);
       btnTraining.setVisible(!missionsExpanded && starterUi);
@@ -1767,7 +1809,7 @@ export class MenuScene extends Phaser.Scene {
       boostToggleHint.setVisible(showBoostToggle);
       const ctaEntries = [
         { kind: "button" as const, button: btnPlay, label: labelPlay, height: btnPlay.height },
-        ...(showBoostToggle ? [{ kind: "boost" as const, height: 44 }] : []),
+        ...(showBoostToggle ? [{ kind: "boost" as const, height: compressedMenu ? 46 : minimal ? 50 : 52 }] : []),
         ...(!starterUi ? [{ kind: "button" as const, button: btnDaily, label: labelDaily, height: btnDaily.height }] : []),
         ...(starterUi ? [{ kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height }] : []),
         ...(!starterUi ? [{ kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height }] : []),
@@ -1803,16 +1845,22 @@ export class MenuScene extends Phaser.Scene {
         const y = ctaCursor + entry.height / 2;
         if (entry.kind === "button") {
           entry.button.setPosition(leftX, y);
-          entry.label.setPosition(entry.button.x, y);
+          if (entry.button === btnPlay && labelPlayMeta.visible) {
+            entry.label.setPosition(entry.button.x, y - 9);
+            labelPlayMeta.setPosition(entry.button.x, y + 12);
+          } else {
+            entry.label.setPosition(entry.button.x, y);
+          }
         } else {
-          boostToggleBg.setSize(Math.min(ctaWidth, 312), 40).setPosition(leftX, y);
+          const boostHeight = compressedMenu ? 42 : minimal ? 46 : 48;
+          boostToggleBg.setSize(Math.min(ctaWidth, 312), boostHeight).setPosition(leftX, y);
           boostToggleTrack.setPosition(boostToggleBg.x - boostToggleBg.width / 2 + 34, boostToggleBg.y);
           boostToggleFill.setPosition(boostToggleTrack.x, boostToggleTrack.y).setSize(boostToggleTrack.width, boostToggleTrack.height);
           boostToggleKnob.setPosition(boostToggleTrack.x + (rewardBoostEnabled ? 10 : -10), boostToggleTrack.y);
-          boostToggleTitle.setPosition(boostToggleTrack.x + 30, boostToggleBg.y - 8);
-          boostToggleHint.setPosition(boostToggleTrack.x + 30, boostToggleBg.y + 10);
-          fitTextScaleToWidth(boostToggleTitle, boostToggleBg.width - 84, 0.72);
-          fitTextScaleToWidth(boostToggleHint, boostToggleBg.width - 84, 0.72);
+          boostToggleTitle.setPosition(boostToggleTrack.x + 30, boostToggleBg.y - (compressedMenu ? 9 : 11));
+          boostToggleHint.setPosition(boostToggleTrack.x + 30, boostToggleBg.y + (compressedMenu ? 10 : 12));
+          fitTextScaleToWidth(boostToggleTitle, boostToggleBg.width - 84, 0.78);
+          fitTextScaleToWidth(boostToggleHint, boostToggleBg.width - 84, 0.78);
         }
         ctaCursor += entry.height + ctaGap;
       }
@@ -1900,12 +1948,12 @@ export class MenuScene extends Phaser.Scene {
 
         liveopsCardBg.setVisible(false);
         liveopsInfo.setVisible(false);
-        summaryRewardsTitle.setStyle({ fontSize: minimal ? "10px" : "11px" });
-        summaryDailyTitle.setStyle({ fontSize: minimal ? "10px" : "11px" });
-        summaryWeeklyTitle.setStyle({ fontSize: minimal ? "10px" : "11px" });
-        summaryRewardsValue.setStyle({ fontSize: minimal ? "12px" : "13px" });
-        summaryDailyValue.setStyle({ fontSize: minimal ? "12px" : "13px" });
-        summaryWeeklyValue.setStyle({ fontSize: minimal ? "12px" : "13px" });
+        summaryRewardsTitle.setStyle({ fontSize: minimal ? "12px" : "12px" });
+        summaryDailyTitle.setStyle({ fontSize: minimal ? "12px" : "12px" });
+        summaryWeeklyTitle.setStyle({ fontSize: minimal ? "12px" : "12px" });
+        summaryRewardsValue.setStyle({ fontSize: minimal ? "15px" : "14px" });
+        summaryDailyValue.setStyle({ fontSize: minimal ? "15px" : "14px" });
+        summaryWeeklyValue.setStyle({ fontSize: minimal ? "15px" : "14px" });
 
         summaryRewardsCardBg.setVisible(true);
         summaryDailyCardBg.setVisible(true);
@@ -1919,34 +1967,34 @@ export class MenuScene extends Phaser.Scene {
 
         if (minimal) {
           const cardWidth = summaryWidth - 24;
-          const cardHeight = 34;
+          const cardHeight = 40;
           const rows = [
-            { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, y: summaryTop + 66 },
-            { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, y: summaryTop + 104 },
-            { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, y: summaryTop + 142 },
+            { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, y: summaryTop + 72 },
+            { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, y: summaryTop + 118 },
+            { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, y: summaryTop + 164 },
           ];
           for (const entry of rows) {
             entry.bg.setPosition(leftX, entry.y).setSize(cardWidth, cardHeight);
-            entry.title.setPosition(summaryLeft + 14, entry.y - 8);
-            entry.value.setPosition(summaryLeft + 14, entry.y + 8);
-            fitTextScaleToWidth(entry.title, cardWidth - 18, 0.72);
-            fitTextScaleToWidth(entry.value, cardWidth - 18, 0.72);
+            entry.title.setPosition(summaryLeft + 14, entry.y - 11);
+            entry.value.setPosition(summaryLeft + 14, entry.y + 11);
+            fitTextScaleToWidth(entry.title, cardWidth - 18, 0.78);
+            fitTextScaleToWidth(entry.value, cardWidth - 18, 0.78);
           }
         } else {
           const cardGap = 10;
           const cardWidth = Math.floor((summaryWidth - 24 - cardGap * 2) / 3);
-          const cardY = summaryTop + 88;
+          const cardY = summaryTop + 94;
           const cards = [
             { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, x: summaryLeft + 12 + cardWidth / 2 },
             { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, x: summaryLeft + 12 + cardWidth * 1.5 + cardGap },
             { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, x: summaryLeft + 12 + cardWidth * 2.5 + cardGap * 2 },
           ];
           for (const entry of cards) {
-            entry.bg.setPosition(entry.x, cardY).setSize(cardWidth, 54);
-            entry.title.setPosition(entry.x - cardWidth / 2 + 12, cardY - 12);
-            entry.value.setPosition(entry.x - cardWidth / 2 + 12, cardY + 9);
-            fitTextScaleToWidth(entry.title, cardWidth - 18, 0.72);
-            fitTextScaleToWidth(entry.value, cardWidth - 16, 0.72);
+            entry.bg.setPosition(entry.x, cardY).setSize(cardWidth, 60);
+            entry.title.setPosition(entry.x - cardWidth / 2 + 12, cardY - 15);
+            entry.value.setPosition(entry.x - cardWidth / 2 + 12, cardY + 11);
+            fitTextScaleToWidth(entry.title, cardWidth - 18, 0.78);
+            fitTextScaleToWidth(entry.value, cardWidth - 16, 0.78);
           }
         }
 
@@ -2015,7 +2063,7 @@ export class MenuScene extends Phaser.Scene {
       summaryWeeklyValue.setVisible(false);
       controlsText.setVisible(false);
       const denseDesktop = !stackedMissions && shortDesktop;
-      const missionsPanelHeight = stackedMissions ? 720 : denseDesktop ? 520 : 560;
+      const missionsPanelHeight = stackedMissions ? 720 : denseDesktop ? 548 : 560;
       this.dailyPanel
         .setVisible(true)
         .setPosition(s.width / 2, s.height / 2)
@@ -2103,12 +2151,12 @@ export class MenuScene extends Phaser.Scene {
         .setFillStyle(0x162330, 0.98);
       liveopsInfo.setText(detailSummaryLine);
       liveopsInfo.setOrigin(0, 0.5).setPosition(panelLeft + 16, liveopsCardY);
-      liveopsInfo.setStyle({ fontSize: stackedMissions ? "13px" : denseDesktop ? "12px" : "13px", align: "left" });
+      liveopsInfo.setStyle({ fontSize: stackedMissions ? "13px" : denseDesktop ? "13px" : "13px", align: "left" });
       liveopsInfo.setWordWrapWidth(innerWidth - 32, true);
       liveopsInfo.setLineSpacing(3);
       liveopsInfo.setColor("#d9f2ff");
-      dailyMissionsTitle.setStyle({ fontSize: denseDesktop ? "13px" : "14px" });
-      weeklyMissionsTitle.setStyle({ fontSize: denseDesktop ? "13px" : "14px" });
+      dailyMissionsTitle.setStyle({ fontSize: denseDesktop ? "14px" : "14px" });
+      weeklyMissionsTitle.setStyle({ fontSize: denseDesktop ? "14px" : "14px" });
       fitTextScaleToWidth(dailyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.82);
       fitTextScaleToWidth(weeklyMissionsTitle, stackedMissions ? innerWidth - 32 : columnWidth - 12, 0.72);
 
@@ -2203,14 +2251,14 @@ export class MenuScene extends Phaser.Scene {
           .setFillStyle(0x14222d, 0.98);
         dailyInfoTitle.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 116 : 124));
         dailyInfo.setPosition(panelLeft + 16, detailPanelTop + (denseDesktop ? 130 : 140));
-        dailyInfo.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
+        dailyInfo.setStyle({ fontSize: denseDesktop ? "13px" : "13px" });
         dailyInfo.setWordWrapWidth(columnWidth - 24, true);
         dailyInfo.setColor("#d6e6ef");
 
         weeklyRaceCardBg.setPosition(rightColumnCenter, detailPanelTop + (denseDesktop ? 176 : 188)).setSize(columnWidth, denseDesktop ? 138 : 152);
         weeklyRaceTitle.setPosition(rightColumnLeft + 4, detailPanelTop + 126);
         weeklyRaceInfo.setPosition(rightColumnLeft + 4, detailPanelTop + (denseDesktop ? 158 : 166));
-        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
+        weeklyRaceInfo.setStyle({ fontSize: denseDesktop ? "13px" : "13px" });
         weeklyRaceInfo.setWordWrapWidth(columnWidth - 24, true);
         weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - 12 - weeklyRaceBadgeBg.width / 2, detailPanelTop + 126);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
@@ -2235,31 +2283,31 @@ export class MenuScene extends Phaser.Scene {
           weeklyRaceProgressTrack.setPosition(rightColumnLeft + 4, progressY).setSize(columnWidth - 24, 10);
           weeklyRaceProgressFill.setPosition(weeklyRaceProgressTrack.x, weeklyRaceProgressTrack.y).setSize(weeklyRaceProgressFill.width, 10);
           weeklyRaceProgressText.setPosition(weeklyRaceProgressTrack.x + weeklyRaceProgressTrack.width / 2, weeklyRaceProgressTrack.y);
-          weeklyRaceProgressText.setStyle({ fontSize: denseDesktop ? "10px" : "11px" });
+          weeklyRaceProgressText.setStyle({ fontSize: denseDesktop ? "12px" : "11px" });
           const cardBottom = progressY + 12;
           weeklyRaceCardBg.setPosition(rightColumnCenter, (weeklyCardTop + cardBottom) / 2).setSize(columnWidth, cardBottom - weeklyCardTop);
 
           const missionTitleY = cardBottom + (denseDesktop ? 13 : 10);
 
-          const dailyMissionYs = denseDesktop ? [missionTitleY + 34, missionTitleY + 80] : [missionTitleY + 42, missionTitleY + 96];
+          const dailyMissionYs = denseDesktop ? [missionTitleY + 36, missionTitleY + 86] : [missionTitleY + 42, missionTitleY + 96];
           dailyMissionRows.forEach((row, index) => {
-            row.bg.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 40 : 46);
+            row.bg.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 44 : 46);
             row.text.setPosition(leftColumnCenter, dailyMissionYs[index] ?? dailyMissionYs[dailyMissionYs.length - 1]);
-            row.text.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
+            row.text.setStyle({ fontSize: denseDesktop ? "13px" : "13px" });
             row.text.setWordWrapWidth(columnWidth - 16, true);
           });
-          dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? missionTitleY + (denseDesktop ? 34 : 42)) - (denseDesktop ? 34 : 42));
+          dailyMissionsTitle.setPosition(panelLeft + 16, (dailyMissionYs[0] ?? missionTitleY + (denseDesktop ? 36 : 42)) - (denseDesktop ? 36 : 42));
 
-          const weeklyMissionYs = denseDesktop ? [missionTitleY + 34, missionTitleY + 80, missionTitleY + 126] : [missionTitleY + 42, missionTitleY + 96, missionTitleY + 150];
+          const weeklyMissionYs = denseDesktop ? [missionTitleY + 36, missionTitleY + 86, missionTitleY + 136] : [missionTitleY + 42, missionTitleY + 96, missionTitleY + 150];
           weeklyMissionRows.forEach((row, index) => {
-            row.bg.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 40 : 46);
+            row.bg.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]).setSize(columnWidth, denseDesktop ? 44 : 46);
             row.text.setPosition(rightColumnCenter, weeklyMissionYs[index] ?? weeklyMissionYs[weeklyMissionYs.length - 1]);
-            row.text.setStyle({ fontSize: denseDesktop ? "12px" : "13px" });
+            row.text.setStyle({ fontSize: denseDesktop ? "13px" : "13px" });
             row.text.setWordWrapWidth(columnWidth - 16, true);
           });
           weeklyMissionsTitle.setPosition(
             panelLeft + 28 + columnWidth,
-            (weeklyMissionYs[0] ?? missionTitleY + (denseDesktop ? 34 : 42)) - (denseDesktop ? 36 : 44)
+            (weeklyMissionYs[0] ?? missionTitleY + (denseDesktop ? 36 : 42)) - (denseDesktop ? 38 : 44)
           );
           const lastWeeklyMissionBottom =
             (weeklyMissionRows[weeklyMissionRows.length - 1]?.bg.y ?? missionTitleY) +
@@ -2500,7 +2548,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0, 0);
     this.workshopHintText = this.add
       .text(-halfWidth + 40, -halfHeight + 128, t(this.locale, "menu.installedBuild"), {
-        fontSize: "12px",
+        fontSize: "13px",
         color: "#98b7c7",
         fontStyle: "700",
         wordWrap: { width: WORKSHOP_PANEL_WIDTH - 96 },
@@ -2513,7 +2561,7 @@ export class MenuScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     const labelClose = this.add
       .text(halfWidth - 52, -halfHeight + 22, t(this.locale, "menu.close"), {
-        fontSize: "12px",
+        fontSize: "13px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -2522,7 +2570,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.workshopFooterText = this.add
       .text(-halfWidth + 40, halfHeight - 52, t(this.locale, "menu.workshopFooter"), {
-        fontSize: "12px",
+        fontSize: "13px",
         color: "#98b7c7",
         wordWrap: { width: WORKSHOP_PANEL_WIDTH - 96 },
       })
@@ -2540,7 +2588,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
     this.workshopPageLabel = this.add
       .text(0, halfHeight - 86, "", {
-        fontSize: "12px",
+        fontSize: "13px",
         color: "#d9f2ff",
         fontStyle: "700",
       })
@@ -2737,14 +2785,23 @@ export class MenuScene extends Phaser.Scene {
     this.leaderboardBox.setVisible(false);
   }
 
+  private isCompactWorkshopLayout(): boolean {
+    return this.scale.height <= 520 || this.scale.width <= 900;
+  }
+
+  private isDenseWorkshopDesktopLayout(): boolean {
+    return !this.isCompactWorkshopLayout() && (this.scale.height <= 780 || this.scale.width <= 1240);
+  }
+
   private getWorkshopPanelMetrics(): { width: number; height: number; compact: boolean } {
-    const compact = this.scale.height <= 520 || this.scale.width <= 900;
+    const compact = this.isCompactWorkshopLayout();
+    const denseDesktop = this.isDenseWorkshopDesktopLayout();
     const uiStage = getUiProgressSnapshot(this.saveManager.get()).stage;
     const compactWidth = Math.max(320, Math.min(this.scale.width - 44, 560));
     return {
       compact,
-      width: compact ? compactWidth : uiStage === "advanced" ? 820 : 780,
-      height: compact ? (uiStage === "starter" ? 404 : 452) : uiStage === "advanced" ? 776 : 752,
+      width: compact ? compactWidth : denseDesktop ? (uiStage === "advanced" ? 780 : 760) : uiStage === "advanced" ? 840 : 804,
+      height: compact ? (uiStage === "starter" ? 420 : 468) : denseDesktop ? (uiStage === "advanced" ? 712 : 696) : uiStage === "advanced" ? 748 : 728,
     };
   }
 
@@ -2753,8 +2810,8 @@ export class MenuScene extends Phaser.Scene {
     const expandedMeta = this.shouldShowExpandedLeaderboardMeta();
     return {
       compact,
-      width: compact ? 640 : 700,
-      height: compact ? 620 : expandedMeta ? 940 : 720,
+      width: compact ? 580 : expandedMeta ? 700 : 680,
+      height: compact ? 452 : expandedMeta ? 940 : 640,
     };
   }
 
@@ -2775,6 +2832,7 @@ export class MenuScene extends Phaser.Scene {
     if (!this.workshopDim || !this.workshopBox) return;
     const { width, height } = this.scale;
     const metrics = this.getWorkshopPanelMetrics();
+    const denseDesktop = !metrics.compact && this.isDenseWorkshopDesktopLayout();
     const halfWidth = metrics.width / 2;
     const halfHeight = metrics.height / 2;
     const panel = this.workshopBox.list[0] as Phaser.GameObjects.Rectangle | undefined;
@@ -2786,29 +2844,29 @@ export class MenuScene extends Phaser.Scene {
     this.workshopDim.setSize(width, height);
     panel?.setSize(metrics.width, metrics.height);
     accent?.setPosition(0, -halfHeight + 48).setSize(metrics.width - 96, 2);
-    title?.setPosition(0, -halfHeight + 24).setStyle({ fontSize: metrics.compact ? "22px" : "30px" });
+    title?.setPosition(0, -halfHeight + 24).setStyle({ fontSize: metrics.compact ? "22px" : denseDesktop ? "28px" : "30px" });
     this.workshopWalletText
-      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 54 : 62))
-      .setStyle({ fontSize: metrics.compact ? "15px" : "18px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 54 : denseDesktop ? 64 : 66))
+      .setStyle({ fontSize: metrics.compact ? "16px" : denseDesktop ? "19px" : "18px", wordWrap: { width: metrics.width - 96 } });
     this.workshopRecommendationText
-      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 84 : 98))
-      .setStyle({ fontSize: metrics.compact ? "12px" : "17px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 86 : denseDesktop ? 102 : 100))
+      .setStyle({ fontSize: metrics.compact ? "14px" : denseDesktop ? "15px" : "17px", wordWrap: { width: metrics.width - 96 } });
     this.workshopHintText
-      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 112 : 136))
-      .setStyle({ fontSize: metrics.compact ? "11px" : "13px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 118 : denseDesktop ? 138 : 138))
+      .setStyle({ fontSize: metrics.compact ? "12px" : denseDesktop ? "13px" : "13px", wordWrap: { width: metrics.width - 96 } });
     this.workshopFooterText
-      .setPosition(-halfWidth + 40, halfHeight - (metrics.compact ? 22 : 42))
-      .setStyle({ fontSize: metrics.compact ? "11px" : "13px", wordWrap: { width: metrics.width - 96 } });
-    const pagerButtonWidth = metrics.compact ? 44 : 52;
-    const pagerButtonHeight = metrics.compact ? 30 : 34;
-    const pagerY = metrics.compact ? halfHeight - 28 : halfHeight - 88;
+      .setPosition(-halfWidth + 40, halfHeight - (metrics.compact ? 22 : denseDesktop ? 34 : 42))
+      .setStyle({ fontSize: metrics.compact ? "12px" : denseDesktop ? "13px" : "13px", wordWrap: { width: metrics.width - 96 } });
+    const pagerButtonWidth = metrics.compact ? 44 : denseDesktop ? 60 : 56;
+    const pagerButtonHeight = metrics.compact ? 30 : denseDesktop ? 38 : 36;
+    const pagerY = metrics.compact ? halfHeight - 28 : this.workshopFooterText.visible ? halfHeight - 88 : denseDesktop ? halfHeight - 46 : halfHeight - 50;
     this.workshopPagePrevButton.setPosition(-56, pagerY).setSize(pagerButtonWidth, pagerButtonHeight);
-    this.workshopPagePrevLabel.setPosition(-56, pagerY).setStyle({ fontSize: metrics.compact ? "15px" : "16px" });
-    this.workshopPageLabel.setPosition(0, pagerY).setStyle({ fontSize: metrics.compact ? "12px" : "13px" });
+    this.workshopPagePrevLabel.setPosition(-56, pagerY).setStyle({ fontSize: metrics.compact ? "15px" : denseDesktop ? "18px" : "17px" });
+    this.workshopPageLabel.setPosition(0, pagerY).setStyle({ fontSize: metrics.compact ? "13px" : denseDesktop ? "16px" : "15px" });
     this.workshopPageNextButton.setPosition(56, pagerY).setSize(pagerButtonWidth, pagerButtonHeight);
-    this.workshopPageNextLabel.setPosition(56, pagerY).setStyle({ fontSize: metrics.compact ? "15px" : "16px" });
+    this.workshopPageNextLabel.setPosition(56, pagerY).setStyle({ fontSize: metrics.compact ? "15px" : denseDesktop ? "18px" : "17px" });
     btnClose?.setPosition(halfWidth - 52, -halfHeight + 24);
-    labelClose?.setPosition(halfWidth - 52, -halfHeight + 24);
+    labelClose?.setPosition(halfWidth - 52, -halfHeight + 24).setStyle({ fontSize: metrics.compact ? "13px" : "13px" });
     fitTextScaleToWidth(this.workshopWalletText, metrics.width - 96, 0.78);
     fitTextScaleToWidth(this.workshopRecommendationText, metrics.width - 96, 0.8);
     fitTextScaleToWidth(this.workshopHintText, metrics.width - 96, 0.78);
@@ -2851,22 +2909,22 @@ export class MenuScene extends Phaser.Scene {
     const denseDesktop = !metrics.compact && !expandedMeta;
     const rowSlots = metrics.compact
       ? uiStage === "advanced"
-        ? 5
+        ? 4
         : 3
       : expandedMeta
         ? getLeaderboardRowLimit(uiStage)
-        : Math.min(5, getLeaderboardRowLimit(uiStage));
-    const headerHintY = metrics.compact ? -halfHeight + 84 : denseDesktop ? -halfHeight + 84 : -halfHeight + 92;
-    const filterY = metrics.compact ? -halfHeight + 136 : denseDesktop ? -halfHeight + 134 : -halfHeight + 152;
-    const rowsStartY = metrics.compact ? -halfHeight + 182 : denseDesktop ? -halfHeight + 176 : -halfHeight + 218;
-    const rowStep = metrics.compact ? 44 : denseDesktop ? 44 : 48;
-    const rowWidth = metrics.compact ? metrics.width - 84 : 620;
-    const rowHeight = metrics.compact ? 42 : denseDesktop ? 42 : 46;
-    const rowTextX = -rowWidth / 2 + (denseDesktop ? 18 : 20);
-    const rowTextTop = metrics.compact ? 14 : denseDesktop ? 14 : 16;
+        : Math.min(4, getLeaderboardRowLimit(uiStage));
+    const headerHintY = metrics.compact ? -halfHeight + 80 : denseDesktop ? -halfHeight + 82 : -halfHeight + 92;
+    const filterY = metrics.compact ? -halfHeight + 126 : denseDesktop ? -halfHeight + 128 : -halfHeight + 152;
+    const rowsStartY = metrics.compact ? -halfHeight + 168 : denseDesktop ? -halfHeight + 166 : -halfHeight + 218;
+    const rowStep = metrics.compact ? 58 : denseDesktop ? 60 : 48;
+    const rowWidth = metrics.compact ? metrics.width - 64 : denseDesktop ? 600 : 620;
+    const rowHeight = metrics.compact ? 54 : denseDesktop ? 56 : 46;
+    const rowTextX = -rowWidth / 2 + (metrics.compact ? 18 : denseDesktop ? 18 : 20);
+    const rowTextTop = metrics.compact ? 18 : denseDesktop ? 18 : 16;
     const lastRowY = rowsStartY + Math.max(0, rowSlots - 1) * rowStep;
     const rowBottomY = lastRowY + rowHeight / 2;
-    const footerY = metrics.compact ? halfHeight - 104 : expandedMeta ? 316 : rowBottomY + 28;
+    const footerY = expandedMeta ? 316 : rowBottomY + 28;
     const panel = this.leaderboardBox.list[0] as Phaser.GameObjects.Rectangle | undefined;
     const accent = this.leaderboardBox.list[1] as Phaser.GameObjects.Rectangle | undefined;
     const title = this.leaderboardBox.list[2] as Phaser.GameObjects.Text | undefined;
@@ -2878,35 +2936,39 @@ export class MenuScene extends Phaser.Scene {
     accent?.setPosition(0, headerAccentY).setSize(metrics.width - 108, 2);
     title?.setPosition(0, headerTitleY).setStyle({ fontSize: metrics.compact ? "24px" : "28px" });
     this.leaderboardHintText.setPosition(0, headerHintY).setStyle({
-      fontSize: metrics.compact ? "12px" : expandedMeta ? "13px" : "14px",
+      fontSize: metrics.compact ? "14px" : expandedMeta ? "13px" : "14px",
+      color: metrics.compact ? "#ffd78a" : "#98b7c7",
       wordWrap: { width: metrics.width - 140 },
     });
     btnClose?.setPosition(halfWidth - 58, headerTitleY);
     labelClose?.setPosition(halfWidth - 58, headerTitleY);
 
     const filterSpacing = metrics.compact ? 156 : denseDesktop ? 164 : 184;
-    const filterButtonWidth = metrics.compact ? 128 : denseDesktop ? 136 : 148;
+    const filterButtonWidth = metrics.compact ? 120 : denseDesktop ? 136 : 148;
     this.leaderboardFilterButtons.forEach((entry, index) => {
       const x = -filterSpacing + index * filterSpacing;
-      entry.button.setPosition(x, filterY).setSize(filterButtonWidth, 38);
-      entry.label.setPosition(x, filterY).setStyle({ fontSize: metrics.compact ? "13px" : "14px" });
+      entry.button.setPosition(x, filterY).setSize(filterButtonWidth, metrics.compact ? 36 : 38);
+      entry.label.setPosition(x, filterY).setStyle({ fontSize: metrics.compact ? "12px" : "14px" });
     });
 
     this.leaderboardRows.forEach((row, index) => {
       const y = rowsStartY + index * rowStep;
       row.bg.setPosition(0, y).setSize(rowWidth, rowHeight);
-      row.text.setPosition(rowTextX, y - rowTextTop).setStyle({ wordWrap: { width: rowWidth - 40 } });
+      row.text.setPosition(rowTextX, y - rowTextTop).setStyle({
+        fontSize: metrics.compact ? "15px" : "13px",
+        wordWrap: { width: rowWidth - 40 },
+      });
     });
 
     this.leaderboardEmptyPanel
-      .setPosition(0, metrics.compact ? -32 : denseDesktop ? rowsStartY + 72 : -86)
-      .setSize(rowWidth, metrics.compact ? 140 : denseDesktop ? 148 : 172);
-    this.leaderboardEmptyText.setPosition(0, metrics.compact ? -32 : denseDesktop ? rowsStartY + 72 : -86).setStyle({
-      fontSize: metrics.compact ? "13px" : denseDesktop ? "14px" : "15px",
+      .setPosition(0, metrics.compact ? rowsStartY + 58 : denseDesktop ? rowsStartY + 72 : -86)
+      .setSize(rowWidth, metrics.compact ? 132 : denseDesktop ? 148 : 172);
+    this.leaderboardEmptyText.setPosition(0, metrics.compact ? rowsStartY + 58 : denseDesktop ? rowsStartY + 72 : -86).setStyle({
+      fontSize: metrics.compact ? "14px" : denseDesktop ? "14px" : "15px",
       wordWrap: { width: rowWidth - 48 },
     });
     this.leaderboardFooterText.setPosition(0, footerY).setStyle({
-      fontSize: metrics.compact ? "11px" : expandedMeta ? "12px" : "12px",
+      fontSize: metrics.compact ? "12px" : expandedMeta ? "12px" : "12px",
       wordWrap: { width: metrics.width - 140 },
     });
     this.leaderboardCareerTitleText.setVisible(expandedMeta).setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 184 : 170);
@@ -3052,6 +3114,15 @@ export class MenuScene extends Phaser.Scene {
                   : t(this.locale, "results.topDivision"),
               ].join("\n")
             : leagueSummary
+        : compactLeaderboard
+          ? nextDivision
+            ? t(this.locale, "results.nextDivision", {
+                division: t(this.locale, `leaderboard.division.${nextDivision.id}`),
+                score: formatNumber(this.locale, nextDivision.minScore),
+              })
+            : rank
+              ? t(this.locale, "results.topDivision")
+              : t(this.locale, "menu.leaderboardScoring")
           : [
               rank
                 ? `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${t(this.locale, "results.score")}: ${formatNumber(this.locale, hintedScore)}`
@@ -3064,7 +3135,10 @@ export class MenuScene extends Phaser.Scene {
               : t(this.locale, "results.topDivision"),
           ].join("\n")
     );
-    this.leaderboardHintText.setStyle({ fontSize: compactLeaderboard ? "12px" : expandedMeta ? "13px" : "14px" });
+    this.leaderboardHintText.setStyle({
+      fontSize: compactLeaderboard ? "14px" : expandedMeta ? "13px" : "14px",
+      color: compactLeaderboard ? "#ffd78a" : "#98b7c7",
+    });
     if (expandedMeta && this.leaderboardHintText.height > 46) {
       this.leaderboardHintText.setStyle({ fontSize: "12px" });
     }
@@ -3081,13 +3155,14 @@ export class MenuScene extends Phaser.Scene {
 
     const rowLimit = compactLeaderboard
       ? uiStage === "advanced"
-        ? 5
+        ? 4
         : 3
       : expandedMeta
         ? getLeaderboardRowLimit(uiStage)
         : uiStage === "advanced"
-          ? 5
-          : getLeaderboardRowLimit(uiStage);
+          ? 4
+          : Math.min(4, getLeaderboardRowLimit(uiStage));
+    const rowTextWidth = compactLeaderboard ? 476 : fullLeaderboard && !expandedMeta ? 540 : 560;
     for (let i = 0; i < this.leaderboardRows.length; i++) {
       const row = this.leaderboardRows[i]!;
       const entry = filtered[i];
@@ -3112,7 +3187,19 @@ export class MenuScene extends Phaser.Scene {
       const modeLabel = entry.mode === "daily" ? t(this.locale, "leaderboard.mode.daily") : t(this.locale, "leaderboard.mode.run");
       const divisionLabel = t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`);
       const badge = isLatest ? (this.latestLeaderboardIsRecord ? t(this.locale, "leaderboard.recordBadge") : t(this.locale, "leaderboard.lastRun")) : "";
-      const secondary = entry.mode === "daily" && entry.dailyDateUtc ? entry.dailyDateUtc : `${t(this.locale, "hud.level")} ${formatNumber(this.locale, entry.level)}`;
+      const scoreText = formatNumber(this.locale, entry.score);
+      const primaryLine = `${rank}. ${entry.pilot}   ${scoreText}`;
+      const detailParts = [
+        fullLeaderboard && effectiveFilter === "all" ? modeLabel : null,
+        divisionLabel,
+        `${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`,
+        badge || null,
+      ].filter(Boolean);
+      const compactParts = [
+        divisionLabel,
+        `${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`,
+        badge || null,
+      ].filter(Boolean);
 
       row.bg
         .setVisible(true)
@@ -3122,10 +3209,11 @@ export class MenuScene extends Phaser.Scene {
         .setVisible(true)
         .setText(
           fullLeaderboard
-            ? `${rank}. ${entry.pilot} [${modeLabel} | ${divisionLabel}]  ${formatNumber(this.locale, entry.score)}\n${secondary} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)} | ${t(this.locale, "hud.bolts")} ${formatNumber(this.locale, entry.bolts)} | ${t(this.locale, "results.cores")} ${formatNumber(this.locale, entry.cores)}${badge ? ` | ${badge}` : ""}`
-            : `${rank}. ${entry.pilot} | ${formatNumber(this.locale, entry.score)}\n${divisionLabel} | ${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}${badge ? ` | ${badge}` : ""}`
+            ? `${primaryLine}\n${detailParts.join(" | ")}`
+            : `${primaryLine}\n${compactParts.join(" | ")}`
         )
-        .setStyle({ fontSize: compactLeaderboard ? "12px" : fullLeaderboard && !expandedMeta ? "14px" : fullLeaderboard ? "13px" : "14px" });
+        .setStyle({ fontSize: compactLeaderboard ? "16px" : fullLeaderboard && !expandedMeta ? "15px" : fullLeaderboard ? "13px" : "15px" });
+      fitTextScaleToWidth(row.text, rowTextWidth, compactLeaderboard ? 0.86 : 0.88);
     }
 
     this.leaderboardCareerTitleText.setText(t(this.locale, "menu.careerMilestonesTitle"));
@@ -3246,7 +3334,8 @@ export class MenuScene extends Phaser.Scene {
     this.saveData = save;
     const wallet = save.meta.wallet;
     const uiStage = getUiProgressSnapshot(save).stage;
-    const walletKey = uiStage === "starter" ? "menu.walletCompact" : "menu.wallet";
+    const compactWallet = this.scale.width <= 900 || this.scale.height <= 560;
+    const walletKey = uiStage === "starter" || compactWallet ? "menu.walletCompact" : "menu.wallet";
     this.walletText?.setText(
       t(this.locale, walletKey, {
         bolts: formatResource(this.locale, "bolts", wallet.bolts ?? 0),
@@ -3273,10 +3362,11 @@ export class MenuScene extends Phaser.Scene {
       .filter((entry) => entry.level > 0);
     const workshopMetrics = this.getWorkshopPanelMetrics();
     const compactWorkshop = workshopMetrics.compact;
+    const denseDesktopWorkshop = !compactWorkshop && this.isDenseWorkshopDesktopLayout();
     const prioritizedVisibleNodes = recommendedNode
       ? [recommendedNode, ...visibleNodes.filter((node) => node.id !== recommendedNode.id)]
       : visibleNodes;
-    const cardsPerPage = compactWorkshop ? 2 : uiSnapshot.stage === "growing" ? 4 : 6;
+    const cardsPerPage = compactWorkshop ? 2 : denseDesktopWorkshop ? 2 : 4;
     this.workshopPageCount = Math.max(1, Math.ceil(prioritizedVisibleNodes.length / cardsPerPage));
     this.workshopPageIndex = Phaser.Math.Clamp(this.workshopPageIndex, 0, this.workshopPageCount - 1);
     const pageStartIndex = this.workshopPageIndex * cardsPerPage;
@@ -3292,7 +3382,9 @@ export class MenuScene extends Phaser.Scene {
             ? t(this.locale, "menu.installedBuild")
             : t(this.locale, "menu.installedNone");
     const panelTextWidth = workshopMetrics.width - 96;
+    const showRecommendationText = false;
     const showWorkshopHint = !compactWorkshop && uiSnapshot.stage === "starter";
+    const showFooterText = !compactWorkshop && !denseDesktopWorkshop && uiSnapshot.stage === "advanced" && this.workshopPageCount === 1;
 
     this.workshopWalletText.setText(
       t(this.locale, stockpileKey, {
@@ -3307,6 +3399,7 @@ export class MenuScene extends Phaser.Scene {
           })
         : t(this.locale, "menu.workshopRecommendationDone")
     );
+    this.workshopRecommendationText.setVisible(showRecommendationText);
     fitTextScaleToWidth(this.workshopWalletText, panelTextWidth, 0.78);
     fitTextScaleToWidth(this.workshopRecommendationText, panelTextWidth, 0.8);
     this.workshopHintText
@@ -3337,7 +3430,7 @@ export class MenuScene extends Phaser.Scene {
           ? t(this.locale, "menu.workshopUnlockLaterStarter")
           : t(this.locale, "menu.workshopUnlockLaterGrowing")
     );
-    this.workshopFooterText.setVisible(!compactWorkshop);
+    this.workshopFooterText.setVisible(showFooterText);
     fitTextScaleToWidth(this.workshopFooterText, panelTextWidth, 0.78);
     const showPager = this.workshopPageCount > 1;
     this.workshopPageLabel.setText(`${this.workshopPageIndex + 1} / ${this.workshopPageCount}`).setVisible(showPager);
@@ -3388,56 +3481,49 @@ export class MenuScene extends Phaser.Scene {
         ? {
             columns: 1,
             cardWidth: workshopMetrics.width - 56,
-            cardHeight: 136,
+            cardHeight: 156,
             cardGapX: 0,
-            cardGapY: 14,
+            cardGapY: 16,
             textPad: 26,
-            buttonWidth: 138,
-            buttonHeight: 46,
+            buttonWidth: 148,
+            buttonHeight: 48,
           }
-        : uiSnapshot.stage === "starter"
-        ? {
-            columns: 1,
-            cardWidth: workshopMetrics.width - 72,
-            cardHeight: 132,
-            cardGapX: 0,
-            cardGapY: 14,
-            textPad: 30,
-            buttonWidth: 132,
-            buttonHeight: 42,
-          }
-        : uiSnapshot.stage === "growing"
+        : denseDesktopWorkshop
           ? {
-              columns: 2,
-              cardWidth: 348,
-              cardHeight: 142,
-              cardGapX: 18,
-              cardGapY: 14,
-              textPad: 26,
-              buttonWidth: 132,
-              buttonHeight: 44,
+              columns: 1,
+              cardWidth: workshopMetrics.width - 72,
+              cardHeight: uiSnapshot.stage === "advanced" ? 172 : 166,
+              cardGapX: 0,
+              cardGapY: 18,
+              textPad: 30,
+              buttonWidth: 156,
+              buttonHeight: 50,
             }
           : {
               columns: 2,
-              cardWidth: 356,
-              cardHeight: 148,
-              cardGapX: 18,
-              cardGapY: 14,
-              textPad: 26,
-              buttonWidth: 136,
-              buttonHeight: 44,
+              cardWidth: uiSnapshot.stage === "advanced" ? 374 : 362,
+              cardHeight: uiSnapshot.stage === "advanced" ? 160 : 156,
+              cardGapX: 20,
+              cardGapY: 18,
+              textPad: 28,
+              buttonWidth: 148,
+              buttonHeight: 46,
             };
     const gridWidth =
       workshopLayout.columns * workshopLayout.cardWidth + Math.max(0, workshopLayout.columns - 1) * workshopLayout.cardGapX;
     const gridLeft = -gridWidth / 2;
     const cardRows = Math.ceil(renderedNodes.length / workshopLayout.columns);
+    const walletTopY = -workshopMetrics.height / 2 + (compactWorkshop ? 54 : denseDesktopWorkshop ? 64 : 66);
+    const walletBottomY = walletTopY + this.workshopWalletText.displayHeight;
+    const recommendationTopY = walletBottomY + 12;
+    const recommendationBottomY = showRecommendationText
+      ? recommendationTopY + this.workshopRecommendationText.displayHeight
+      : walletBottomY;
+    const hintTopY = recommendationBottomY + 12;
+    const hintBottomY = showWorkshopHint ? hintTopY + this.workshopHintText.displayHeight : recommendationBottomY;
     const desiredCardsStartY = this.workshopBuildChips.length > 0
       ? chipCursorY + 44
-      : compactWorkshop
-        ? -workshopMetrics.height / 2 + 174
-        : uiSnapshot.stage === "advanced"
-          ? -workshopMetrics.height / 2 + 228
-          : -workshopMetrics.height / 2 + 224;
+      : hintBottomY + (compactWorkshop ? 22 : denseDesktopWorkshop ? 28 : 30) + workshopLayout.cardHeight / 2;
     const maxCardsBottom =
       workshopMetrics.height / 2 -
       (compactWorkshop
@@ -3445,10 +3531,16 @@ export class MenuScene extends Phaser.Scene {
           ? 56
           : 20
         : showPager
-          ? 98
+          ? this.workshopFooterText.visible
+            ? 98
+            : denseDesktopWorkshop
+              ? 62
+              : 68
           : this.workshopFooterText.visible
             ? 58
-            : 24);
+            : denseDesktopWorkshop
+              ? 26
+              : 24);
     const maxCardsStartY =
       maxCardsBottom -
       workshopLayout.cardHeight / 2 -
@@ -3510,7 +3602,7 @@ export class MenuScene extends Phaser.Scene {
       const accent = this.add.rectangle(-workshopLayout.cardWidth / 2 + 4, 0, 6, workshopLayout.cardHeight, accentColor, 0.92);
       const title = this.add
         .text(textLeft, -workshopLayout.cardHeight / 2 + 30, getMetaNodeName(this.locale, node.id, node.name), {
-          fontSize: compactWorkshop ? "18px" : uiSnapshot.stage === "starter" ? "18px" : uiSnapshot.stage === "growing" ? "17px" : "18px",
+          fontSize: compactWorkshop ? "19px" : denseDesktopWorkshop ? "20px" : "19px",
           color: "#d9f2ff",
           fontStyle: "700",
         })
@@ -3523,13 +3615,13 @@ export class MenuScene extends Phaser.Scene {
       );
       const desc = this.add
         .text(textLeft, title.y + title.displayHeight + 6, descriptionPreview, {
-          fontSize: compactWorkshop ? "14px" : uiSnapshot.stage === "starter" ? "13px" : "14px",
+          fontSize: compactWorkshop ? "15px" : denseDesktopWorkshop ? "15px" : "15px",
           color: "#98b7c7",
           wordWrap: { width: textWrapWidth + 2 },
         })
         .setOrigin(0, 0);
       desc.setLineSpacing(1);
-      const descHeightCap = compactWorkshop ? 40 : uiSnapshot.stage === "starter" ? 38 : uiSnapshot.stage === "growing" ? 44 : 48;
+      const descHeightCap = compactWorkshop ? 46 : denseDesktopWorkshop ? 54 : uiSnapshot.stage === "growing" ? 48 : 50;
       if (desc.displayHeight > descHeightCap) {
         desc.setScale(Phaser.Math.Clamp(descHeightCap / desc.displayHeight, 0.88, 1));
       }
@@ -3537,7 +3629,7 @@ export class MenuScene extends Phaser.Scene {
       const progressY = workshopLayout.cardHeight / 2 - 12;
       const levelText = this.add
         .text(textLeft, levelY, t(this.locale, "menu.level", { level, maxLevel: node.maxLevel }), {
-          fontSize: compactWorkshop ? "13px" : uiSnapshot.stage === "starter" ? "13px" : "13px",
+          fontSize: compactWorkshop ? "14px" : denseDesktopWorkshop ? "15px" : "14px",
           color: maxed ? "#57c27d" : "#7fdfff",
           fontStyle: "700",
         })
@@ -3559,7 +3651,7 @@ export class MenuScene extends Phaser.Scene {
       const btn = this.add
         .rectangle(
           buttonCenterX,
-          compactWorkshop ? 4 : uiSnapshot.stage === "advanced" ? 0 : 2,
+          compactWorkshop ? 4 : denseDesktopWorkshop ? 0 : uiSnapshot.stage === "advanced" ? 0 : 2,
           workshopLayout.buttonWidth,
           workshopLayout.buttonHeight,
           affordable || isRecommended ? 0x1b2635 : 0x0d131b,
@@ -3570,14 +3662,14 @@ export class MenuScene extends Phaser.Scene {
       const btnLabel = this.add
         .text(
           buttonCenterX,
-          (compactWorkshop ? 4 : uiSnapshot.stage === "advanced" ? 0 : 2) - 7,
+          (compactWorkshop ? 4 : denseDesktopWorkshop ? 0 : uiSnapshot.stage === "advanced" ? 0 : 2) - 7,
           maxed ? t(this.locale, "menu.installedButton") : affordable ? t(this.locale, "menu.buy") : t(this.locale, "menu.locked"),
-          { fontSize: compactWorkshop ? "13px" : uiSnapshot.stage === "starter" ? "13px" : "13px", color: "#d9f2ff", fontStyle: "700" }
+          { fontSize: compactWorkshop ? "14px" : denseDesktopWorkshop ? "15px" : "14px", color: "#d9f2ff", fontStyle: "700" }
         )
         .setOrigin(0.5);
       const costLabel = this.add
-        .text(buttonCenterX, (compactWorkshop ? 4 : uiSnapshot.stage === "advanced" ? 0 : 2) + 10, priceLabel, {
-          fontSize: compactWorkshop ? "12px" : uiSnapshot.stage === "starter" ? "11px" : "12px",
+        .text(buttonCenterX, (compactWorkshop ? 4 : denseDesktopWorkshop ? 0 : uiSnapshot.stage === "advanced" ? 0 : 2) + 10, priceLabel, {
+          fontSize: compactWorkshop ? "13px" : denseDesktopWorkshop ? "14px" : "13px",
           color: maxed ? "#57c27d" : affordable || isRecommended ? "#ffd166" : "#98b7c7",
           fontStyle: "700",
           align: "center",
@@ -4023,16 +4115,6 @@ function buildMenuBestText(
   const bestScore = sorted.reduce((best, entry) => Math.max(best, entry.score), 0);
   const currentDivision = getLeaderboardDivision(bestScore);
   const nextDivision = getLeaderboardNextDivision(bestScore);
-
-  const leader = sorted[0];
-  if (stage === "advanced" && summaryEntries > 1 && leader) {
-    lines.push(
-      t(locale, "menu.leaderboardLeaderLine", {
-        pilot: leader.pilot,
-        score: formatNumber(locale, leader.score),
-      })
-    );
-  }
 
   lines.push(
     nextDivision
