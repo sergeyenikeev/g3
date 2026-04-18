@@ -1273,25 +1273,20 @@ export class MenuScene extends Phaser.Scene {
       const uiStage = getUiProgressSnapshot(save).stage;
       const boostedStart = uiStage === "advanced" && boosterEnabled && rewardBoostEnabled && !onboarding.eligible;
       const showPlayMeta = onboarding.eligible || boostedStart;
+      btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
       labelPlay.setText(t(this.locale, "menu.play"));
       labelPlayMeta.setText("");
       labelPlayMeta.setVisible(false);
-      if (uiStage === "starter") {
-        btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
-      } else if (onboarding.eligible) {
+      if (onboarding.eligible) {
         labelPlayMeta.setText(
           t(this.locale, "menu.playFreeBoostHint", {
             usesLeft: formatNumber(this.locale, onboarding.usesLeft),
           })
         );
         labelPlayMeta.setVisible(true).setColor("#b7f7d0");
-        btnPlay.setStrokeStyle(2, 0x57c27d, 0.94).setFillStyle(0x153325, 0.98);
       } else if (boostedStart) {
         labelPlayMeta.setText(t(this.locale, "menu.playRewardedBoostHint"));
         labelPlayMeta.setVisible(true).setColor("#9ff1c2");
-        btnPlay.setStrokeStyle(2, 0x57c27d, 0.94).setFillStyle(0x153325, 0.98);
-      } else {
-        btnPlay.setStrokeStyle(2, 0xffd166, 0.94).setFillStyle(0x13283d, 0.98);
       }
       labelPlay.setStyle({
         fontSize: uiStage === "starter" ? "24px" : showPlayMeta ? "22px" : "24px",
@@ -1477,13 +1472,22 @@ export class MenuScene extends Phaser.Scene {
       this.scene.launch("ui");
     };
 
-    btnDaily.on("pointerdown", () => void this.startDaily(rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled));
-    btnDailyBoost.disableInteractive();
-    btnMissions.on("pointerdown", () => {
+    const openMissionsPanel = () => {
+      if (getUiProgressSnapshot(this.saveManager.get()).stage === "starter") return;
+      if (missionsExpanded) return;
       missionsExpanded = true;
       utilityOpen = false;
       layoutMenu(this.scale);
       void refreshDailyAndLiveops();
+    };
+
+    btnDaily.on("pointerdown", () => void this.startDaily(rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled));
+    btnDailyBoost.disableInteractive();
+    btnMissions.on("pointerdown", openMissionsPanel);
+    this.dailyPanel.on("pointerdown", () => {
+      if (!this.dailyPanel.visible) return;
+      if (missionsExpanded || utilityOpen) return;
+      openMissionsPanel();
     });
     btnCloseMissions.on("pointerdown", () => {
       missionsExpanded = false;
@@ -1500,6 +1504,11 @@ export class MenuScene extends Phaser.Scene {
     this.createLeaderboardUi();
 
     const utilityDepthBase = 80;
+    const utilityBackdrop = this.add
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0x02060a, 0.48)
+      .setDepth(utilityDepthBase - 1)
+      .setInteractive()
+      .setVisible(false);
     const utilityPanelBg = this.add
       .rectangle(0, 0, UTILITY_PANEL_WIDTH, UTILITY_PANEL_HEIGHT, 0x0f1720, 0.98)
       .setStrokeStyle(2, 0x5cc8ff, 0.8)
@@ -1546,6 +1555,8 @@ export class MenuScene extends Phaser.Scene {
       labelWorkshop,
       btnLeaderboard,
       labelLeaderboard,
+      btnPilot,
+      labelPilot,
       btnQuality,
       labelQuality,
       btnSfx,
@@ -1556,6 +1567,7 @@ export class MenuScene extends Phaser.Scene {
       labelLanguage,
     ].forEach((entry) => entry.setDepth(utilityDepthBase + 2));
     const setUtilityVisible = (visible: boolean) => {
+      utilityBackdrop.setVisible(visible);
       utilityPanelBg.setVisible(visible);
       utilityPanelAccent.setVisible(visible);
       utilityPanelTitle.setVisible(visible);
@@ -1576,6 +1588,7 @@ export class MenuScene extends Phaser.Scene {
       setUtilityVisible(false);
       layoutMenu(this.scale);
     };
+    utilityBackdrop.on("pointerdown", closeUtility);
     btnUtility.on("pointerdown", () => {
       utilityOpen = !utilityOpen;
       if (missionsExpanded) missionsExpanded = false;
@@ -1596,7 +1609,7 @@ export class MenuScene extends Phaser.Scene {
       const compact = mode !== "full";
       const minimal = mode === "minimal";
       const compressedMenu = s.height <= 520;
-      const hideSummaryPanel = !missionsExpanded;
+      const hideSummaryPanel = starterUi || missionsExpanded;
       const topInset = minimal ? 14 : 18;
       const fullDesktopGrowth =
         mode === "full"
@@ -1619,6 +1632,10 @@ export class MenuScene extends Phaser.Scene {
       const contentTop = topInset + topButtonHeight + (minimal ? 18 : compact ? 26 : 34);
       const shortDesktop = mode === "compact" && s.height <= 820;
       const utilityVisible = utilityOpen && !missionsExpanded;
+      utilityBackdrop
+        .setPosition(s.width / 2, s.height / 2)
+        .setSize(s.width, s.height)
+        .setFillStyle(0x02060a, minimal ? 0.58 : compact ? 0.52 : 0.44);
       const showPreview = !missionsExpanded && mode === "full" && (starterUi || wideDesktop);
       const leftX = showPreview ? Math.round(s.width * (starterUi ? 0.28 : 0.305)) : s.width / 2;
       const titleY = minimal
@@ -1683,22 +1700,10 @@ export class MenuScene extends Phaser.Scene {
       };
 
       let navCursorX = s.width - topInset;
-      navCursorX = placeTopButton(btnUtility, labelUtility, btnUtility.width, navCursorX, !missionsExpanded);
-      navCursorX = placeTopButton(
-        btnLeaderboard,
-        labelLeaderboard,
-        btnLeaderboard.width,
-        navCursorX,
-        !starterUi && !missionsExpanded && !utilityVisible && !minimal
-      );
-      navCursorX = placeTopButton(
-        btnWorkshop,
-        labelWorkshop,
-        btnWorkshop.width,
-        navCursorX,
-        !starterUi && !missionsExpanded && !utilityVisible && !minimal
-      );
-      placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, advancedUi && !missionsExpanded);
+      navCursorX = placeTopButton(btnUtility, labelUtility, btnUtility.width, navCursorX, !missionsExpanded && !utilityVisible);
+      navCursorX = placeTopButton(btnLeaderboard, labelLeaderboard, btnLeaderboard.width, navCursorX, false);
+      navCursorX = placeTopButton(btnWorkshop, labelWorkshop, btnWorkshop.width, navCursorX, false);
+      placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, advancedUi && !missionsExpanded && !minimal && !utilityVisible);
 
       setUtilityVisible(utilityVisible);
       if (utilityVisible) {
@@ -1710,7 +1715,8 @@ export class MenuScene extends Phaser.Scene {
         const panelTop = panelCenterY - panelHeight / 2;
         const settingsButtonWidth = Math.floor((panelWidth - 52) / 2);
         const utilityFeatureRowVisible = !starterUi;
-        const settingsStartY = utilityFeatureRowVisible ? panelTop + 142 : panelTop + 106;
+        const utilityPilotVisible = advancedUi;
+        const settingsStartY = utilityFeatureRowVisible ? (utilityPilotVisible ? panelTop + 188 : panelTop + 142) : panelTop + 106;
 
         utilityPanelBg.setSize(panelWidth, panelHeight).setPosition(panelCenterX, panelCenterY);
         utilityPanelAccent.setSize(panelWidth - 48, 2).setPosition(panelCenterX, panelTop + 48);
@@ -1732,6 +1738,15 @@ export class MenuScene extends Phaser.Scene {
         if (utilityFeatureRowVisible) {
           fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 18, 0.72);
           fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 18, 0.72);
+        }
+
+        btnPilot.setVisible(utilityPilotVisible);
+        labelPilot.setVisible(utilityPilotVisible);
+        if (utilityPilotVisible) {
+          btnPilot.setPosition(panelLeft + 18, panelTop + 136).setSize(panelWidth - 36, 38);
+          labelPilot.setPosition(btnPilot.x + btnPilot.width / 2, btnPilot.y + btnPilot.height / 2);
+          labelPilot.setStyle({ fontSize: "13px" });
+          fitTextScaleToWidth(labelPilot, btnPilot.width - 20, 0.72);
         }
 
         const settingsButtons = [
@@ -1857,6 +1872,10 @@ export class MenuScene extends Phaser.Scene {
         this.menuPanel.width - (mode === "full" ? Math.round(86 + fullDesktopGrowth * 64) : 48),
         minimal ? 320 : compact ? 336 : mode === "full" ? Math.round(390 + fullDesktopGrowth * 290) : 352
       );
+      const secondaryCtaWidth = Math.max(
+        minimal ? 220 : 232,
+        Math.min(ctaWidth - (minimal ? 18 : 24), Math.round(ctaWidth * (starterUi ? 0.9 : 0.88)))
+      );
       const showPlayMeta = labelPlayMeta.text.length > 0;
       btnPlay.setSize(
         ctaWidth,
@@ -1880,9 +1899,18 @@ export class MenuScene extends Phaser.Scene {
                   ? 50
                   : 56
       );
-      btnTraining.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40);
-      btnDaily.setSize(ctaWidth, compressedMenu ? 38 : minimal ? 40 : mode === "full" ? Math.round(50 + fullDesktopGrowth * 16) : shortDesktop ? 42 : 46);
-      btnMissions.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40);
+      btnTraining.setSize(
+        secondaryCtaWidth,
+        compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40
+      );
+      btnDaily.setSize(
+        secondaryCtaWidth,
+        compressedMenu ? 38 : minimal ? 40 : mode === "full" ? Math.round(50 + fullDesktopGrowth * 16) : shortDesktop ? 42 : 46
+      );
+      btnMissions.setSize(
+        secondaryCtaWidth,
+        compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40
+      );
       labelPlay.setStyle({
         fontSize: showPlayMeta
           ? compressedMenu
@@ -1946,8 +1974,8 @@ export class MenuScene extends Phaser.Scene {
       labelDaily.setVisible(!missionsExpanded && !starterUi);
       btnTraining.setVisible(!missionsExpanded && starterUi);
       labelTraining.setVisible(!missionsExpanded && starterUi);
-      btnMissions.setVisible(!missionsExpanded && !starterUi);
-      labelMissions.setVisible(!missionsExpanded && !starterUi);
+      btnMissions.setVisible(false);
+      labelMissions.setVisible(false);
       boostToggleBg.setVisible(showBoostToggle);
       boostToggleTrack.setVisible(showBoostToggle);
       boostToggleFill.setVisible(showBoostToggle && rewardBoostEnabled);
@@ -1966,7 +1994,6 @@ export class MenuScene extends Phaser.Scene {
           : []),
         ...(!starterUi ? [{ kind: "button" as const, button: btnDaily, label: labelDaily, height: btnDaily.height }] : []),
         ...(starterUi ? [{ kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height }] : []),
-        ...(!starterUi ? [{ kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height }] : []),
       ];
       const ctaGap = compressedMenu ? 4 : minimal ? 6 : compact ? 6 : wideStarterDesktop ? Math.round(12 + fullDesktopGrowth * 4) : 8;
       const ctaStackHeight =
@@ -2117,6 +2144,36 @@ export class MenuScene extends Phaser.Scene {
         liveopsReadyBadgeBg.setPosition(btnClaimOps.x - btnClaimOps.width - 12 - liveopsReadyBadgeBg.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
         liveopsReadyBadgeText.setPosition(liveopsReadyBadgeBg.x, liveopsReadyBadgeBg.y);
         updateReadyBadge(liveopsReadyCount);
+
+        const quickActionsRight = liveopsReadyCount > 0
+          ? liveopsReadyBadgeBg.x - liveopsReadyBadgeBg.width / 2 - 12
+          : btnClaimOps.x - btnClaimOps.width - 12;
+        const quickActionsLeft = summaryLeft + Math.max(148, liveopsTitle.width + 32);
+        const quickActionsGap = 8;
+        const quickActionsAvailableWidth = quickActionsRight - quickActionsLeft;
+        const showSummaryQuickActions = !minimal && !utilityVisible && quickActionsAvailableWidth >= 184;
+
+        if (!utilityVisible) {
+          btnWorkshop.setVisible(showSummaryQuickActions);
+          labelWorkshop.setVisible(showSummaryQuickActions);
+          btnLeaderboard.setVisible(showSummaryQuickActions);
+          labelLeaderboard.setVisible(showSummaryQuickActions);
+        }
+        if (showSummaryQuickActions) {
+          const quickButtonWidth = Math.floor((quickActionsAvailableWidth - quickActionsGap) / 2);
+          const quickButtonY = summaryTop + 12;
+          const quickButtonHeight = 30;
+          btnWorkshop.setPosition(quickActionsLeft, quickButtonY).setSize(quickButtonWidth, quickButtonHeight);
+          labelWorkshop.setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
+          btnLeaderboard
+            .setPosition(quickActionsLeft + quickButtonWidth + quickActionsGap, quickButtonY)
+            .setSize(quickButtonWidth, quickButtonHeight);
+          labelLeaderboard.setPosition(btnLeaderboard.x + btnLeaderboard.width / 2, btnLeaderboard.y + btnLeaderboard.height / 2);
+          labelWorkshop.setStyle({ fontSize: "12px" });
+          labelLeaderboard.setStyle({ fontSize: "12px" });
+          fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 14, 0.72);
+          fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 14, 0.72);
+        }
 
         liveopsCardBg.setVisible(false);
         liveopsInfo.setVisible(false);
@@ -2618,7 +2675,11 @@ export class MenuScene extends Phaser.Scene {
       .setScale(9.4, 7.2);
 
     this.menuPanel = this.add.rectangle(0, 0, 420, 446, 0x08111a, 0.76).setDepth(-12).setStrokeStyle(2, 0x3aa4d4, 0.42);
-    this.dailyPanel = this.add.rectangle(0, 0, 420, 356, 0x0b141d, 0.84).setDepth(-12).setStrokeStyle(2, 0x5cc8ff, 0.32);
+    this.dailyPanel = this.add
+      .rectangle(0, 0, 420, 356, 0x0b141d, 0.84)
+      .setDepth(-12)
+      .setStrokeStyle(2, 0x5cc8ff, 0.32)
+      .setInteractive({ useHandCursor: true });
     this.heroPanel = this.add.rectangle(0, 0, 450, 520, 0x08111a, 0.72).setDepth(-12).setStrokeStyle(2, 0xffd166, 0.36);
 
     this.heroRecycler = this.add.image(0, 0, "recycler").setDepth(-10).setScale(1.08);

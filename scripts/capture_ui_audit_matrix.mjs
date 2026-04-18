@@ -96,6 +96,18 @@ async function captureLocaleProfile(browser, locale, profile, auditManifest) {
       locale,
       profile,
       save: makeGrowingSave(locale),
+      shotId: "02b_growing_utility",
+      title: "Growing utility panel",
+      targetDir,
+      auditManifest,
+      overlay: "utility",
+    });
+
+    await captureMenuState({
+      page,
+      locale,
+      profile,
+      save: makeGrowingSave(locale),
       shotId: "03_growing_workshop",
       title: "Growing workshop",
       targetDir,
@@ -140,6 +152,18 @@ async function captureLocaleProfile(browser, locale, profile, auditManifest) {
       locale,
       profile,
       save: makeAdvancedSave(locale),
+      shotId: "08b_advanced_utility",
+      title: "Advanced utility panel",
+      targetDir,
+      auditManifest,
+      overlay: "utility",
+    });
+
+    await captureMenuState({
+      page,
+      locale,
+      profile,
+      save: makeAdvancedSave(locale),
       shotId: "09_advanced_workshop",
       title: "Advanced workshop",
       targetDir,
@@ -167,6 +191,19 @@ async function captureMenuState({ page, locale, profile, save, shotId, title, ta
   await seedSaveAndReload(page, save);
   await waitForScene(page, "menu");
   await page.waitForTimeout(250);
+
+  if (overlay === "utility") {
+    await clickTopRightMenuButton(page, profile.viewport.width);
+    await page.waitForFunction(
+      (expected) => {
+        const menu = globalThis.__MC_GAME__?.scene?.keys?.menu;
+        const texts = menu?.children?.list?.filter((obj) => obj?.type === "Text" && obj.visible) ?? [];
+        return texts.some((obj) => String(obj.text ?? "").toLowerCase().includes(expected));
+      },
+      locale === "ru" ? "графика" : "gfx"
+    );
+    await page.waitForTimeout(250);
+  }
 
   if (overlay === "workshop") {
     await page.evaluate(() => {
@@ -196,6 +233,29 @@ async function captureMenuState({ page, locale, profile, save, shotId, title, ta
     shotId,
     path,
   });
+}
+
+async function clickTopRightMenuButton(page, viewportWidth) {
+  const target = await page.evaluate((width) => {
+    const menu = globalThis.__MC_GAME__?.scene?.keys?.menu;
+    if (!menu) return null;
+    const texts = menu.children.list
+      .filter((obj) => obj?.type === "Text" && obj.visible)
+      .map((obj) => ({
+        text: String(obj.text ?? ""),
+        x: Number(obj.x ?? 0),
+        y: Number(obj.y ?? 0),
+      }))
+      .filter((entry) => Number.isFinite(entry.x) && Number.isFinite(entry.y) && entry.y < 80 && entry.x > width * 0.6)
+      .sort((a, b) => b.x - a.x);
+    return texts[0] ?? null;
+  }, viewportWidth);
+
+  if (!target) {
+    throw new Error("top-right menu button not found");
+  }
+
+  await page.mouse.click(target.x, target.y);
 }
 
 async function captureRunFlow({ page, locale, profile, save, targetDir, auditManifest }) {
@@ -293,9 +353,21 @@ async function waitForScene(page, sceneKey) {
 }
 
 async function chooseUpgrade(page, width, height) {
-  const clickTargets = [0.49, 0.36, 0.58];
-  for (const ratio of clickTargets) {
-    await page.mouse.click(width / 2, Math.round(height * ratio));
+  const targets = await page.evaluate(() => {
+    const upgrade = globalThis.__MC_GAME__?.scene?.keys?.upgrade;
+    const cards = Array.isArray(upgrade?.cards) ? upgrade.cards : [];
+    return cards
+      .filter((card) => card?.visible && card?.active)
+      .map((card) => ({
+        x: Number(card.x ?? 0),
+        y: Number(card.y ?? 0),
+      }))
+      .filter((card) => Number.isFinite(card.x) && Number.isFinite(card.y))
+      .sort((a, b) => a.y - b.y);
+  });
+
+  for (const target of targets) {
+    await page.mouse.click(target.x, target.y);
     try {
       await page.waitForFunction(() => globalThis.__MC_GAME__?.scene?.isActive("upgrade") === false, null, {
         timeout: 1_500,

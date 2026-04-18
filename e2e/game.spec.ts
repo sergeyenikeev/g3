@@ -138,6 +138,44 @@ async function clickMenuText(page: Page, fragments: string[]) {
   await page.mouse.click(target!.x, target!.y);
 }
 
+async function clickTopRightMenuButton(page: Page, viewportWidth: number) {
+  const target = await page.evaluate((width) => {
+    const menu = (window as any).__MC_GAME__?.scene?.keys?.menu;
+    if (!menu) return null;
+    const texts = menu.children.list
+      .filter((obj: any) => obj?.type === "Text" && obj.visible)
+      .map((obj: any) => ({
+        text: String(obj.text ?? ""),
+        x: Number(obj.x ?? 0),
+        y: Number(obj.y ?? 0),
+      }))
+      .filter((entry: { x: number; y: number }) => Number.isFinite(entry.x) && Number.isFinite(entry.y) && entry.y < 80 && entry.x > width * 0.6)
+      .sort((a: { x: number }, b: { x: number }) => b.x - a.x);
+    return texts[0] ?? null;
+  }, viewportWidth);
+
+  expect(target, "top-right menu button not found").toBeTruthy();
+  await page.mouse.click(target!.x, target!.y);
+}
+
+async function waitForVisibleMenuText(page: Page, fragments: string[], visible: boolean) {
+  await page.waitForFunction(
+    ({ parts, expectedVisible }) => {
+      const menu = (window as any).__MC_GAME__?.scene?.keys?.menu;
+      if (!menu) return false;
+      const normalizedParts = parts.map((part: string) => part.toLowerCase());
+      const matches = menu.children.list.some((obj: any) => {
+        if (obj?.type !== "Text" || !obj.visible) return false;
+        const text = String(obj.text ?? "").toLowerCase();
+        return normalizedParts.some((part: string) => text.includes(part));
+      });
+      return matches === expectedVisible;
+    },
+    { parts: fragments, expectedVisible: visible },
+    { timeout: 2_000 }
+  );
+}
+
 async function expectVisibleSceneTextInBounds(page: Page, sceneKey: string, viewport: { width: number; height: number }) {
   const offenders = await page.evaluate(
     ({ key, width, height }) => {
@@ -164,6 +202,37 @@ async function expectVisibleSceneTextInBounds(page: Page, sceneKey: string, view
   );
 
   expect(offenders, `${sceneKey} has visible text outside viewport`).toEqual([]);
+}
+
+async function pickUpgradeCard(page: Page) {
+  const targets = await page.evaluate(() => {
+    const upgrade = (window as any).__MC_GAME__?.scene?.keys?.upgrade;
+    const cards = Array.isArray(upgrade?.cards) ? upgrade.cards : [];
+    return cards
+      .filter((card: any) => card?.visible && card?.active)
+      .map((card: any) => ({
+        x: Number(card.x ?? 0),
+        y: Number(card.y ?? 0),
+      }))
+      .filter((card: { x: number; y: number }) => Number.isFinite(card.x) && Number.isFinite(card.y))
+      .sort((a: { y: number }, b: { y: number }) => a.y - b.y);
+  });
+
+  expect(targets.length, "upgrade cards not found").toBeGreaterThan(0);
+
+  for (const target of targets) {
+    await page.mouse.click(target.x, target.y);
+    try {
+      await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === false, null, {
+        timeout: 1_500,
+      });
+      return;
+    } catch {
+      // try the next card
+    }
+  }
+
+  throw new Error("Unable to dismiss upgrade scene");
 }
 
 test("smoke: staged menu, training, daily, upgrade, results", async ({ page }) => {
@@ -225,8 +294,7 @@ test("smoke: staged menu, training, daily, upgrade, results", async ({ page }) =
   });
 
   await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === true);
-  await page.mouse.click(width / 2, height * 0.49);
-  await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === false);
+  await pickUpgradeCard(page);
 
   await page.waitForFunction(() => typeof (window as any).__MC_E2E__?.endRun === "function");
   await page.evaluate(() => (window as any).__MC_E2E__.endRun());
@@ -253,6 +321,12 @@ test.describe("moderation smoke: compact viewport", () => {
       const viewport = { width: vp!.width, height: vp!.height };
 
       await expectVisibleSceneTextInBounds(page, "menu", viewport);
+      await waitForVisibleMenuText(page, ["close", "закры"], false);
+      await clickTopRightMenuButton(page, viewport.width);
+      await waitForVisibleMenuText(page, ["close", "закры"], true);
+      await expectVisibleSceneTextInBounds(page, "menu", viewport);
+      await page.mouse.click(40, Math.min(120, viewport.height - 40));
+      await waitForVisibleMenuText(page, ["close", "закры"], false);
 
       await page.evaluate(() => {
         const menu = (window as any).__MC_GAME__?.scene?.keys?.menu;
@@ -279,8 +353,7 @@ test.describe("moderation smoke: compact viewport", () => {
       });
       await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === true);
       await expectVisibleSceneTextInBounds(page, "upgrade", viewport);
-      await page.mouse.click(viewport.width / 2, viewport.height * 0.48);
-      await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === false);
+      await pickUpgradeCard(page);
 
       await page.waitForFunction(() => typeof (window as any).__MC_E2E__?.endRun === "function");
       await page.evaluate(() => (window as any).__MC_E2E__.endRun());
