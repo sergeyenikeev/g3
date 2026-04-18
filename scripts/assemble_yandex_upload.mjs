@@ -26,6 +26,7 @@ const yandexPublishSmokeDir = join(rootDir, "artifacts", "yandex-publish-pass");
 const packageJson = JSON.parse(await readFile(join(rootDir, "package.json"), "utf8"));
 const version = String(packageJson.version ?? "0.0.0");
 const generatedAt = new Date().toISOString();
+const UTF8_BOM = "\uFEFF";
 const ruDoc = await readFile(ruDocPath, "utf8");
 const enDoc = await readFile(enDocPath, "utf8");
 
@@ -111,17 +112,17 @@ await copyFile(join(rootDir, "docs", "YANDEX_PUBLISH.md"), join(uploadRoot, "ins
 await cp(join(rootDir, "docs", "promo", "yandex"), join(uploadRoot, "media"), { recursive: true });
 const reviewEvidence = await copyReviewEvidence(uploadRoot);
 
-await writeFile(join(uploadRoot, "texts", "title.txt"), `${card.title}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "short_description_ru.txt"), `${card.descriptions.ru.short}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "short_description_en.txt"), `${card.descriptions.en.short}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "full_description_ru.txt"), `${card.descriptions.ru.full}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "full_description_en.txt"), `${card.descriptions.en.full}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "how_to_play_ru.txt"), `${card.descriptions.ru.howToPlay}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "how_to_play_en.txt"), `${card.descriptions.en.howToPlay}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "keywords_ru.txt"), `${card.keywords.ru}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "keywords_en.txt"), `${card.keywords.en}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "developer_comment_en.txt"), `${card.developerComment}\n`, "utf8");
-await writeFile(join(uploadRoot, "texts", "console_fields_ru.md"), buildConsoleFieldsMarkdown(card), "utf8");
+await writeTextFileWithBom(join(uploadRoot, "texts", "title.txt"), `${card.title}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "short_description_ru.txt"), `${card.descriptions.ru.short}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "short_description_en.txt"), `${card.descriptions.en.short}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "full_description_ru.txt"), `${card.descriptions.ru.full}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "full_description_en.txt"), `${card.descriptions.en.full}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "how_to_play_ru.txt"), `${card.descriptions.ru.howToPlay}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "how_to_play_en.txt"), `${card.descriptions.en.howToPlay}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "keywords_ru.txt"), `${card.keywords.ru}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "keywords_en.txt"), `${card.keywords.en}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "developer_comment_en.txt"), `${card.developerComment}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "console_fields_ru.md"), buildConsoleFieldsMarkdown(card));
 
 await writeFile(
   join(uploadRoot, "metadata", "yandex_game_card.json"),
@@ -142,9 +143,9 @@ await writeFile(
 );
 
 const archiveStat = await stat(join(uploadRoot, "game", "magnet-caravan_yandex.zip"));
-await writeFile(join(uploadRoot, "README.md"), buildReadme({ version, generatedAt, archiveSizeBytes: archiveStat.size }), "utf8");
-await writeFile(join(uploadRoot, "instructions", "UPLOAD_CHECKLIST.md"), buildUploadChecklist(), "utf8");
-await writeFile(join(uploadRoot, "instructions", "MODERATION_EVIDENCE.md"), buildModerationEvidenceMarkdown(reviewEvidence), "utf8");
+await writeTextFileWithBom(join(uploadRoot, "README.md"), buildReadme({ version, generatedAt, archiveSizeBytes: archiveStat.size }));
+await writeTextFileWithBom(join(uploadRoot, "instructions", "UPLOAD_CHECKLIST.md"), buildUploadChecklist());
+await writeTextFileWithBom(join(uploadRoot, "instructions", "MODERATION_EVIDENCE.md"), buildModerationEvidenceMarkdown(reviewEvidence));
 await writeChecksums(uploadRoot, join(uploadRoot, "metadata", "checksums.sha256"));
 
 await zipDirectory(uploadRoot, uploadZip);
@@ -364,6 +365,10 @@ function normalizeBulletSection(section) {
     .map((line) => line.replace(/^\s*-\s*/, "").trim())
     .filter(Boolean)
     .join(" ");
+}
+
+async function writeTextFileWithBom(targetPath, content) {
+  await writeFile(targetPath, `${UTF8_BOM}${content}`, "utf8");
 }
 
 async function copyReviewEvidence(uploadDir) {

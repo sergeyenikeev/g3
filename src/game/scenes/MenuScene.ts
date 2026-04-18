@@ -73,7 +73,6 @@ const WORKSHOP_PANEL_HEIGHT = 840;
 const UTILITY_PANEL_WIDTH = 472;
 const UTILITY_PANEL_HEIGHT = 360;
 const MISSIONS_PANEL_WIDTH = 760;
-const MISSIONS_PANEL_HEIGHT = 780;
 const MENU_LAYOUT_BREAKPOINTS = {
   fullWidth: 1440,
   fullHeight: 820,
@@ -161,6 +160,7 @@ export class MenuScene extends Phaser.Scene {
   private heroHintText!: Phaser.GameObjects.Text;
   private heroBaseX = 0;
   private heroBaseY = 0;
+  private heroPreviewScale = 1;
   private suspendReasons = new Set<string>();
 
   constructor() {
@@ -1598,26 +1598,49 @@ export class MenuScene extends Phaser.Scene {
       const compressedMenu = s.height <= 520;
       const hideSummaryPanel = !missionsExpanded;
       const topInset = minimal ? 14 : 18;
-      const topGap = 10;
-      const topButtonHeight = 34;
+      const fullDesktopGrowth =
+        mode === "full"
+          ? Phaser.Math.Clamp(
+              Math.min(
+                (s.width - MENU_LAYOUT_BREAKPOINTS.fullWidth) / 560,
+                (s.height - MENU_LAYOUT_BREAKPOINTS.fullHeight) / 300
+              ),
+              0,
+              1
+            )
+          : 0;
+      const wideDesktop = fullDesktopGrowth > 0.05;
+      const wideStarterDesktop = wideDesktop && starterUi;
+      const walletFontSize = minimal ? 14 : compact ? 15 : mode === "full" ? Math.round(16 + fullDesktopGrowth * 6) : 14;
+      const topButtonFontSize = mode === "full" ? Math.round(15 + fullDesktopGrowth * 5) : 14;
+      const topButtonSecondaryFontSize = mode === "full" ? Math.round(14 + fullDesktopGrowth * 4) : 13;
+      const topGap = wideDesktop ? 12 : 10;
+      const topButtonHeight = mode === "full" ? Math.round(38 + fullDesktopGrowth * 14) : 34;
       const contentTop = topInset + topButtonHeight + (minimal ? 18 : compact ? 26 : 34);
       const shortDesktop = mode === "compact" && s.height <= 820;
       const utilityVisible = utilityOpen && !missionsExpanded;
-      const showPreview = !missionsExpanded && mode === "full" && starterUi;
-      const leftX = showPreview ? Math.round(s.width * 0.31) : s.width / 2;
+      const showPreview = !missionsExpanded && mode === "full" && (starterUi || wideDesktop);
+      const leftX = showPreview ? Math.round(s.width * (starterUi ? 0.28 : 0.305)) : s.width / 2;
       const titleY = minimal
         ? contentTop + (compressedMenu ? 10 : 18)
         : compact
           ? Math.max(contentTop + (compressedMenu ? 8 : 16), Math.round(s.height * (compressedMenu ? 0.12 : 0.14)))
-          : Math.max(contentTop + 22, Math.round(s.height * 0.2));
+          : Math.max(
+              contentTop + (wideDesktop ? 42 : 22),
+              Math.round(s.height * (wideStarterDesktop ? 0.31 : wideDesktop ? 0.205 : 0.2))
+            );
 
       this.walletText?.setPosition(topInset + (minimal ? 10 : compact ? 12 : 10), topInset + (minimal ? 6 : compact ? 7 : 6)).setStyle({
-        fontSize: minimal ? "14px" : compact ? "15px" : "14px",
+        fontSize: `${walletFontSize}px`,
       });
       if (this.walletText) {
-        fitTextScaleToWidth(this.walletText, Math.max(168, Math.min(s.width * (compact ? 0.31 : 0.34), minimal ? 220 : 320)), 0.8);
-        const badgePaddingX = minimal ? 10 : compact ? 12 : 10;
-        const badgePaddingY = minimal ? 6 : compact ? 7 : 6;
+        fitTextScaleToWidth(
+          this.walletText,
+          Math.max(168, Math.min(s.width * (compact ? 0.31 : 0.34), minimal ? 220 : mode === "full" ? Math.round(320 + fullDesktopGrowth * 120) : 320)),
+          0.8
+        );
+        const badgePaddingX = minimal ? 10 : compact ? 12 : mode === "full" ? Math.round(12 + fullDesktopGrowth * 5) : 10;
+        const badgePaddingY = minimal ? 6 : compact ? 7 : mode === "full" ? Math.round(7 + fullDesktopGrowth * 3) : 6;
         walletBadgeBg
           .setPosition(topInset, topInset)
           .setSize(this.walletText.displayWidth + badgePaddingX * 2, this.walletText.displayHeight + badgePaddingY * 2)
@@ -1626,14 +1649,22 @@ export class MenuScene extends Phaser.Scene {
         walletBadgeBg.setVisible(false);
       }
 
-      btnWorkshop.setOrigin(0, 0).setSize(146, topButtonHeight);
-      btnLeaderboard.setOrigin(0, 0).setSize(156, topButtonHeight);
-      btnPilot.setOrigin(0, 0).setSize(minimal ? 136 : 164, topButtonHeight);
-      btnUtility.setOrigin(0, 0).setSize(112, topButtonHeight);
+      btnWorkshop.setOrigin(0, 0).setSize(mode === "full" ? Math.round(146 + fullDesktopGrowth * 32) : 146, topButtonHeight);
+      btnLeaderboard.setOrigin(0, 0).setSize(mode === "full" ? Math.round(156 + fullDesktopGrowth * 36) : 156, topButtonHeight);
+      btnPilot.setOrigin(0, 0).setSize(minimal ? 136 : mode === "full" ? Math.round(164 + fullDesktopGrowth * 36) : 164, topButtonHeight);
+      btnUtility.setOrigin(0, 0).setSize(mode === "full" ? Math.round(112 + fullDesktopGrowth * 24) : 112, topButtonHeight);
       btnQuality.setOrigin(0, 0);
       btnSfx.setOrigin(0, 0);
       btnMusic.setOrigin(0, 0);
       btnLanguage.setOrigin(0, 0);
+      labelWorkshop.setStyle({ fontSize: `${topButtonFontSize}px` });
+      labelLeaderboard.setStyle({ fontSize: `${topButtonFontSize}px` });
+      labelPilot.setStyle({ fontSize: `${topButtonSecondaryFontSize}px` });
+      labelUtility.setStyle({ fontSize: `${topButtonFontSize}px` });
+      labelQuality.setStyle({ fontSize: `${topButtonSecondaryFontSize}px` });
+      labelSfx.setStyle({ fontSize: `${topButtonSecondaryFontSize}px` });
+      labelMusic.setStyle({ fontSize: `${topButtonSecondaryFontSize}px` });
+      labelLanguage.setStyle({ fontSize: `${topButtonSecondaryFontSize}px` });
 
       const placeTopButton = (
         button: Phaser.GameObjects.Rectangle,
@@ -1720,27 +1751,86 @@ export class MenuScene extends Phaser.Scene {
       taglineText.setPosition(leftX, titleY + (shortDesktop ? 40 : 58));
       bestText.setPosition(leftX, titleY + (shortDesktop ? 70 : 110));
 
-      this.layoutMenuBackdrop(s.width, s.height, showPreview ? "full" : mode, showPreview ? Math.round(s.width * 0.76) : 0, showPreview ? Math.round(s.height * 0.53) : 0, showPreview);
-      const menuPanelWidth = Math.min(showPreview ? 520 : minimal ? s.width - 28 : 560, s.width - 24);
+      this.layoutMenuBackdrop(
+        s.width,
+        s.height,
+        showPreview ? "full" : mode,
+        showPreview ? Math.round(s.width * (starterUi ? 0.775 : 0.74)) : 0,
+        showPreview ? Math.round(s.height * (starterUi ? 0.555 : 0.54)) : 0,
+        showPreview
+      );
+      const menuPanelWidth = Math.min(
+        showPreview
+          ? Math.round((starterUi ? 620 : 740) + fullDesktopGrowth * 340)
+          : mode === "full"
+            ? Math.round(660 + fullDesktopGrowth * 520)
+            : minimal
+              ? s.width - 28
+              : 560,
+        s.width - 24
+      );
       this.menuPanel.setSize(menuPanelWidth, this.menuPanel.height);
       const menuInnerWidth = Math.max(280, this.menuPanel.width - 42);
-      title.setStyle({ fontSize: minimal ? (compressedMenu ? "30px" : "36px") : compressedMenu ? "34px" : shortDesktop ? "40px" : "52px" });
+      title.setStyle({
+        fontSize: minimal
+          ? (compressedMenu ? "30px" : "36px")
+          : compressedMenu
+            ? "34px"
+            : mode === "full"
+              ? `${Math.round(58 + fullDesktopGrowth * 34)}px`
+              : shortDesktop
+                ? "40px"
+                : "52px",
+      });
       title.setScale(1);
       fitTextScaleToWidth(title, menuInnerWidth, minimal ? 0.78 : compact ? 0.72 : shortDesktop ? 0.76 : 0.84);
       taglineText.setText(t(this.locale, `menu.stageHint.${uiStage}`));
-      taglineText.setStyle({ fontSize: compressedMenu ? "12px" : minimal ? "14px" : compact ? "16px" : shortDesktop ? "13px" : "18px" });
+      taglineText.setStyle({
+        fontSize: compressedMenu
+          ? "12px"
+          : minimal
+            ? "14px"
+            : compact
+              ? "16px"
+              : mode === "full"
+                ? `${Math.round(19 + fullDesktopGrowth * 7)}px`
+                : shortDesktop
+                  ? "13px"
+                  : "18px",
+      });
       taglineText.setWordWrapWidth(menuInnerWidth, true);
       bestText.setStyle({
-        fontSize: compressedMenu ? "11px" : minimal ? "12px" : compact ? "13px" : advancedUi ? "16px" : shortDesktop ? "12px" : "15px",
+        fontSize: compressedMenu
+          ? "11px"
+          : minimal
+            ? "12px"
+            : compact
+              ? "13px"
+              : mode === "full"
+                ? `${Math.round((advancedUi ? 17 : 16) + fullDesktopGrowth * 7)}px`
+                : advancedUi
+                  ? "16px"
+                  : shortDesktop
+                    ? "12px"
+                    : "15px",
       });
       bestText.setWordWrapWidth(menuInnerWidth, true);
-      controlsText.setStyle({ fontSize: compressedMenu ? "12px" : compact ? "14px" : "15px", align: "center" });
+      controlsText.setStyle({
+        fontSize: compressedMenu ? "12px" : compact ? "14px" : mode === "full" ? `${Math.round(16 + fullDesktopGrowth * 5)}px` : "15px",
+        align: "center",
+      });
       controlsText.setWordWrapWidth(Math.max(260, this.dailyPanel.width - 28), true);
-      this.heroCaptionText.setStyle({ fontSize: "16px", align: "center" });
+      this.heroCaptionText.setStyle({
+        fontSize: mode === "full" ? `${Math.round(16 + fullDesktopGrowth * 4)}px` : "16px",
+        align: "center",
+      });
       this.heroCaptionText.setWordWrapWidth(this.heroPanel.width - 42, true);
       fitTextScaleToWidth(this.heroCaptionText, this.heroPanel.width - 42, 0.78);
       this.heroHintText.setText(starterUi ? "" : t(this.locale, "menu.heroLead"));
-      this.heroHintText.setStyle({ fontSize: "12px", align: "center" });
+      this.heroHintText.setStyle({
+        fontSize: mode === "full" ? `${Math.round(12 + fullDesktopGrowth * 3)}px` : "12px",
+        align: "center",
+      });
       this.heroHintText.setWordWrapWidth(this.heroPanel.width - 54, true);
       this.heroHintText.setVisible(showPreview && !starterUi);
       fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 18, 0.8);
@@ -1763,27 +1853,84 @@ export class MenuScene extends Phaser.Scene {
       btnDailyBoost.setVisible(false);
       labelDailyBoost.setVisible(false);
 
-      const ctaWidth = Math.min(this.menuPanel.width - 48, minimal ? 320 : compact ? 336 : 352);
+      const ctaWidth = Math.min(
+        this.menuPanel.width - (mode === "full" ? Math.round(86 + fullDesktopGrowth * 64) : 48),
+        minimal ? 320 : compact ? 336 : mode === "full" ? Math.round(390 + fullDesktopGrowth * 290) : 352
+      );
       const showPlayMeta = labelPlayMeta.text.length > 0;
-      btnPlay.setSize(ctaWidth, showPlayMeta ? (compressedMenu ? 56 : minimal ? 62 : shortDesktop ? 64 : 72) : compressedMenu ? 46 : minimal ? 52 : shortDesktop ? 50 : 56);
-      btnTraining.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : shortDesktop ? 38 : 40);
-      btnDaily.setSize(ctaWidth, compressedMenu ? 38 : minimal ? 40 : shortDesktop ? 42 : 46);
-      btnMissions.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : shortDesktop ? 38 : 40);
-      labelPlay.setStyle({ fontSize: showPlayMeta ? (compressedMenu ? "18px" : minimal ? "20px" : "22px") : minimal ? "22px" : "24px", align: "center" });
-      labelPlayMeta.setStyle({ fontSize: compressedMenu ? "10px" : minimal ? "11px" : "12px", align: "center" });
+      btnPlay.setSize(
+        ctaWidth,
+        showPlayMeta
+          ? compressedMenu
+            ? 56
+            : minimal
+              ? 62
+              : mode === "full"
+                ? Math.round(82 + fullDesktopGrowth * 26)
+                : shortDesktop
+                  ? 64
+                  : 72
+          : compressedMenu
+            ? 46
+            : minimal
+              ? 52
+              : mode === "full"
+                ? Math.round(62 + fullDesktopGrowth * 20)
+                : shortDesktop
+                  ? 50
+                  : 56
+      );
+      btnTraining.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40);
+      btnDaily.setSize(ctaWidth, compressedMenu ? 38 : minimal ? 40 : mode === "full" ? Math.round(50 + fullDesktopGrowth * 16) : shortDesktop ? 42 : 46);
+      btnMissions.setSize(ctaWidth, compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40);
+      labelPlay.setStyle({
+        fontSize: showPlayMeta
+          ? compressedMenu
+            ? "18px"
+            : minimal
+              ? "20px"
+              : mode === "full"
+                ? `${Math.round(24 + fullDesktopGrowth * 14)}px`
+                : "22px"
+          : minimal
+            ? "22px"
+            : mode === "full"
+              ? `${Math.round(26 + fullDesktopGrowth * 16)}px`
+              : "24px",
+        align: "center",
+      });
+      labelPlayMeta.setStyle({
+        fontSize: compressedMenu ? "10px" : minimal ? "11px" : mode === "full" ? `${Math.round(13 + fullDesktopGrowth * 6)}px` : "12px",
+        align: "center",
+      });
       labelPlay.setWordWrapWidth(btnPlay.width - 26, true);
       labelPlayMeta.setWordWrapWidth(btnPlay.width - 26, true);
       fitTextScaleToWidth(labelPlay, btnPlay.width - 26, 0.74);
       fitTextScaleToWidth(labelPlayMeta, btnPlay.width - 26, 0.8);
-      labelTraining.setStyle({ fontSize: compressedMenu ? "14px" : minimal ? "15px" : "16px", align: "center" });
+      labelTraining.setStyle({
+        fontSize: compressedMenu ? "14px" : minimal ? "15px" : mode === "full" ? `${Math.round(17 + fullDesktopGrowth * 6)}px` : "16px",
+        align: "center",
+      });
       fitTextScaleToWidth(labelTraining, btnTraining.width - 22, 0.76);
-      labelDaily.setStyle({ fontSize: compressedMenu ? "13px" : minimal ? "14px" : "15px", align: "center" });
+      labelDaily.setStyle({
+        fontSize: compressedMenu ? "13px" : minimal ? "14px" : mode === "full" ? `${Math.round(16 + fullDesktopGrowth * 6)}px` : "15px",
+        align: "center",
+      });
       labelDaily.setWordWrapWidth(btnDaily.width - 24, true);
       fitTextScaleToWidth(labelDaily, btnDaily.width - 24, 0.76);
-      labelMissions.setStyle({ fontSize: compressedMenu ? "14px" : minimal ? "15px" : "16px", align: "center" });
+      labelMissions.setStyle({
+        fontSize: compressedMenu ? "14px" : minimal ? "15px" : mode === "full" ? `${Math.round(17 + fullDesktopGrowth * 6)}px` : "16px",
+        align: "center",
+      });
       fitTextScaleToWidth(labelMissions, btnMissions.width - 22, 0.76);
-      boostToggleTitle.setStyle({ fontSize: compressedMenu ? "11px" : minimal ? "12px" : "13px", align: "left" });
-      boostToggleHint.setStyle({ fontSize: compressedMenu ? "10px" : minimal ? "11px" : "12px", align: "left" });
+      boostToggleTitle.setStyle({
+        fontSize: compressedMenu ? "11px" : minimal ? "12px" : mode === "full" ? `${Math.round(13 + fullDesktopGrowth * 4)}px` : "13px",
+        align: "left",
+      });
+      boostToggleHint.setStyle({
+        fontSize: compressedMenu ? "10px" : minimal ? "11px" : mode === "full" ? `${Math.round(12 + fullDesktopGrowth * 4)}px` : "12px",
+        align: "left",
+      });
       const showBoostToggle =
         advancedUi &&
         boosterEnabled &&
@@ -1809,12 +1956,19 @@ export class MenuScene extends Phaser.Scene {
       boostToggleHint.setVisible(showBoostToggle);
       const ctaEntries = [
         { kind: "button" as const, button: btnPlay, label: labelPlay, height: btnPlay.height },
-        ...(showBoostToggle ? [{ kind: "boost" as const, height: compressedMenu ? 46 : minimal ? 50 : 52 }] : []),
+        ...(showBoostToggle
+          ? [
+              {
+                kind: "boost" as const,
+                height: compressedMenu ? 46 : minimal ? 50 : mode === "full" ? Math.round(58 + fullDesktopGrowth * 14) : 52,
+              },
+            ]
+          : []),
         ...(!starterUi ? [{ kind: "button" as const, button: btnDaily, label: labelDaily, height: btnDaily.height }] : []),
         ...(starterUi ? [{ kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height }] : []),
         ...(!starterUi ? [{ kind: "button" as const, button: btnMissions, label: labelMissions, height: btnMissions.height }] : []),
       ];
-      const ctaGap = compressedMenu ? 4 : minimal ? 6 : compact ? 6 : 8;
+      const ctaGap = compressedMenu ? 4 : minimal ? 6 : compact ? 6 : wideStarterDesktop ? Math.round(12 + fullDesktopGrowth * 4) : 8;
       const ctaStackHeight =
         ctaEntries.reduce((sum, entry) => sum + entry.height, 0) + Math.max(0, ctaEntries.length - 1) * ctaGap;
       const titleBottom = titleY + title.displayHeight / 2;
@@ -1836,7 +1990,13 @@ export class MenuScene extends Phaser.Scene {
         }
       }
       const bestBottom = bestText.visible ? bestText.y + bestText.displayHeight / 2 : taglineBottom;
-      const preferredCtaTop = compressedMenu ? Math.round(s.height * 0.28) : minimal ? Math.round(s.height * 0.29) : compact ? Math.round(s.height * 0.34) : Math.round(s.height * 0.39);
+      const preferredCtaTop = compressedMenu
+        ? Math.round(s.height * 0.28)
+        : minimal
+          ? Math.round(s.height * 0.29)
+          : compact
+            ? Math.round(s.height * 0.34)
+            : Math.round(s.height * (wideStarterDesktop ? 0.52 : wideDesktop ? 0.42 : 0.39));
       const minCtaTop = bestBottom + (minimal ? 12 : 16);
       const maxCtaTop = ctaBottomLimit - ctaStackHeight;
       const ctaTop = Phaser.Math.Clamp(preferredCtaTop, minCtaTop, Math.max(minCtaTop, maxCtaTop));
@@ -1846,13 +2006,13 @@ export class MenuScene extends Phaser.Scene {
         if (entry.kind === "button") {
           entry.button.setPosition(leftX, y);
           if (entry.button === btnPlay && labelPlayMeta.visible) {
-            entry.label.setPosition(entry.button.x, y - 9);
-            labelPlayMeta.setPosition(entry.button.x, y + 12);
+            entry.label.setPosition(entry.button.x, y - (mode === "full" ? Math.round(9 + fullDesktopGrowth * 3) : 9));
+            labelPlayMeta.setPosition(entry.button.x, y + (mode === "full" ? Math.round(12 + fullDesktopGrowth * 3) : 12));
           } else {
             entry.label.setPosition(entry.button.x, y);
           }
         } else {
-          const boostHeight = compressedMenu ? 42 : minimal ? 46 : 48;
+          const boostHeight = compressedMenu ? 42 : minimal ? 46 : mode === "full" ? Math.round(54 + fullDesktopGrowth * 14) : 48;
           boostToggleBg.setSize(Math.min(ctaWidth, 312), boostHeight).setPosition(leftX, y);
           boostToggleTrack.setPosition(boostToggleBg.x - boostToggleBg.width / 2 + 34, boostToggleBg.y);
           boostToggleFill.setPosition(boostToggleTrack.x, boostToggleTrack.y).setSize(boostToggleTrack.width, boostToggleTrack.height);
@@ -1867,7 +2027,19 @@ export class MenuScene extends Phaser.Scene {
       const ctaBottom = ctaCursor - ctaGap;
       const menuPanelTop = Math.max(contentTop - 20, titleY - title.displayHeight / 2 - 18);
       const menuPanelBottom = Math.min(hideSummaryPanel ? s.height - 16 : summaryTop - 12, ctaBottom + 18);
-      this.menuPanel.setPosition(leftX, (menuPanelTop + menuPanelBottom) / 2).setSize(this.menuPanel.width, Math.max(180, menuPanelBottom - menuPanelTop));
+      this.menuPanel
+        .setPosition(leftX, (menuPanelTop + menuPanelBottom) / 2)
+        .setSize(
+          this.menuPanel.width,
+          Math.max(
+            mode === "full"
+              ? showPreview
+                ? Math.round((wideStarterDesktop ? 390 : 420) + fullDesktopGrowth * (wideStarterDesktop ? 70 : 90))
+                : Math.min(860, Math.round(s.height * 0.64))
+              : 180,
+            menuPanelBottom - menuPanelTop
+          )
+        );
       refreshPlayButton();
       if (!missionsExpanded) {
         this.dailyPanel.setVisible(!hideSummaryPanel);
@@ -2393,29 +2565,30 @@ export class MenuScene extends Phaser.Scene {
 
     if (!this.heroRecycler) return;
 
+    const heroScale = this.heroPreviewScale;
     this.heroRecycler.setRotation(this.menuTime * 0.15);
     this.heroTruck.setPosition(
-      this.heroBaseX - 8 + Math.sin(this.menuTime * 1.4) * 10,
-      this.heroBaseY + 104 + Math.cos(this.menuTime * 1.1) * 6
+      this.heroBaseX - 8 * heroScale + Math.sin(this.menuTime * 1.4) * (10 + heroScale * 4),
+      this.heroBaseY + 104 * heroScale + Math.cos(this.menuTime * 1.1) * (6 + heroScale * 3)
     );
     this.heroTruck.setRotation(-0.08 + Math.sin(this.menuTime * 0.9) * 0.04);
 
     this.heroEscortA.setPosition(
-      this.heroBaseX - 82 + Math.cos(this.menuTime * 1.8) * 8,
-      this.heroBaseY + 22 + Math.sin(this.menuTime * 1.2) * 10
+      this.heroBaseX - 82 * heroScale + Math.cos(this.menuTime * 1.8) * (8 + heroScale * 3),
+      this.heroBaseY + 22 * heroScale + Math.sin(this.menuTime * 1.2) * (10 + heroScale * 3)
     );
     this.heroEscortB.setPosition(
-      this.heroBaseX + 94 + Math.cos(this.menuTime * 1.35 + 1.1) * 10,
-      this.heroBaseY - 28 + Math.sin(this.menuTime * 1.55 + 0.7) * 10
+      this.heroBaseX + 94 * heroScale + Math.cos(this.menuTime * 1.35 + 1.1) * (10 + heroScale * 4),
+      this.heroBaseY - 28 * heroScale + Math.sin(this.menuTime * 1.55 + 0.7) * (10 + heroScale * 4)
     );
     this.heroThreatA.setPosition(
-      this.heroBaseX - 122 + Math.sin(this.menuTime * 1.5) * 12,
-      this.heroBaseY - 112 + Math.cos(this.menuTime * 1.8) * 8
+      this.heroBaseX - 122 * heroScale + Math.sin(this.menuTime * 1.5) * (12 + heroScale * 5),
+      this.heroBaseY - 112 * heroScale + Math.cos(this.menuTime * 1.8) * (8 + heroScale * 3)
     );
     this.heroThreatA.setRotation(0.25 + Math.sin(this.menuTime * 1.25) * 0.1);
     this.heroThreatB.setPosition(
-      this.heroBaseX + 132 + Math.cos(this.menuTime * 1.1) * 12,
-      this.heroBaseY + 62 + Math.sin(this.menuTime * 1.6) * 10
+      this.heroBaseX + 132 * heroScale + Math.cos(this.menuTime * 1.1) * (12 + heroScale * 4),
+      this.heroBaseY + 62 * heroScale + Math.sin(this.menuTime * 1.6) * (10 + heroScale * 4)
     );
     this.heroThreatB.setRotation(-this.menuTime * 0.8);
   }
@@ -2503,10 +2676,37 @@ export class MenuScene extends Phaser.Scene {
     this.heroHintText.setVisible(showPreview);
 
     if (showPreview) {
-      this.heroPanel.setPosition(this.heroBaseX, this.heroBaseY + 18).setSize(mode === "full" ? 450 : 400, mode === "full" ? 520 : 460);
-      this.heroCaptionText.setPosition(this.heroBaseX, this.heroBaseY - (mode === "full" ? 206 : 176));
-      this.heroHintText.setPosition(this.heroBaseX, this.heroBaseY + (mode === "full" ? 206 : 176));
+      const fullDesktopGrowth =
+        mode === "full"
+          ? Phaser.Math.Clamp(
+              Math.min((width - MENU_LAYOUT_BREAKPOINTS.fullWidth) / 560, (height - MENU_LAYOUT_BREAKPOINTS.fullHeight) / 300),
+              0,
+              1
+            )
+          : 0;
+      const heroPanelWidth = mode === "full" ? Math.round(520 + fullDesktopGrowth * 180) : 400;
+      const heroPanelHeight = mode === "full" ? Math.round(590 + fullDesktopGrowth * 170) : 460;
+      const heroCaptionOffset = mode === "full" ? Math.round(236 + fullDesktopGrowth * 48) : 176;
+      const heroScale = mode === "full" ? 1.08 + fullDesktopGrowth * 0.38 : 1;
+      this.heroPreviewScale = heroScale;
+      this.heroPanel.setPosition(this.heroBaseX, this.heroBaseY + 26).setSize(heroPanelWidth, heroPanelHeight);
+      this.heroCaptionText.setPosition(this.heroBaseX, this.heroBaseY - heroCaptionOffset);
+      this.heroHintText.setPosition(this.heroBaseX, this.heroBaseY + heroCaptionOffset);
       this.heroRecycler.setPosition(this.heroBaseX, this.heroBaseY);
+      this.heroRecycler.setScale(1.08 * heroScale);
+      this.heroTruck.setScale(3.7 * heroScale);
+      this.heroEscortA.setScale(1.4 * heroScale);
+      this.heroEscortB.setScale(1.42 * heroScale);
+      this.heroThreatA.setScale(1.8 * heroScale);
+      this.heroThreatB.setScale(1.72 * heroScale);
+    } else {
+      this.heroPreviewScale = 1;
+      this.heroRecycler.setScale(1.08);
+      this.heroTruck.setScale(3.7);
+      this.heroEscortA.setScale(1.4);
+      this.heroEscortB.setScale(1.42);
+      this.heroThreatA.setScale(1.8);
+      this.heroThreatB.setScale(1.72);
     }
   }
 
@@ -4096,7 +4296,7 @@ function buildMenuBestText(
   const stats = save?.stats ?? { bestWave: 0, bestBolts: 0 };
   const entries = save?.leaderboard?.entries ?? [];
   const lines = [
-    t(locale, "menu.best", {
+    t(locale, "menu.bestShort", {
       bestWave: formatNumber(locale, stats.bestWave),
       bestBolts: formatNumber(locale, stats.bestBolts),
     }),
@@ -4107,7 +4307,7 @@ function buildMenuBestText(
   }
 
   if (entries.length <= 0) {
-    lines.push(t(locale, "menu.leaderboardEmpty"));
+    lines.push(t(locale, "menu.leaderboardEmptyShort"));
     return lines.join("\n");
   }
 
@@ -4118,12 +4318,11 @@ function buildMenuBestText(
 
   lines.push(
     nextDivision
-      ? t(locale, "menu.leaderboardLeagueLine", {
-          division: t(locale, `leaderboard.division.${currentDivision.id}`),
+      ? t(locale, "menu.leaderboardLeagueShort", {
           nextDivision: t(locale, `leaderboard.division.${nextDivision.id}`),
           score: formatNumber(locale, nextDivision.minScore),
         })
-      : t(locale, "menu.leaderboardLeagueTop", {
+      : t(locale, "menu.leaderboardLeagueTopShort", {
           division: t(locale, `leaderboard.division.${currentDivision.id}`),
         })
   );
@@ -4299,11 +4498,6 @@ function formatStartBoosterRewardLabel(locale: Locale, reward: StartBoosterPrevi
     parts.push(t(locale, "menu.rewardCoresShort", { value: formatNumber(locale, reward.cores) }));
   }
   return parts.length > 0 ? parts.join(" | ") : t(locale, "menu.rewardNone");
-}
-
-function getRewardedPlayCtaLabel(locale: Locale, reward: StartBoosterPreview, compact = false): string {
-  const rewardLabel = formatStartBoosterRewardLabel(locale, reward, compact);
-  return t(locale, "menu.rewardedPlayCta", { reward: rewardLabel });
 }
 
 function getRewardedDailyCtaLabel(locale: Locale, reward: StartBoosterPreview, compact = false): string {

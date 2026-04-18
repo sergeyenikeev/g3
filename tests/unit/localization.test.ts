@@ -45,11 +45,13 @@ describe("localization", () => {
     expect(getLiveopsEventCopy("ru", "tomorrow_offer").title).toBe("Завтрашний бонус двора");
     expect(getMetaNodeName("ru", "meta_dash_unlock", "Dash")).toBe("Тюнинг рывка");
     expect(getMetaNodeName("ru", "meta_salvage_routes", "Routes")).toBe("Маршруты добычи");
+
     expect(getLevelModifierCopy("en", "salvage_surge").title).toBe("Salvage Surge");
     expect(getLevelModifierCopy("en", "breaker_surge").title).toBe("Breaker Surge");
     expect(getLevelObjectiveCopy("en", "deflect_projectiles").title).toBe("Return Fire");
     expect(getLevelFinaleCopy("en", "ion_tempest").title).toBe("Ion Tempest");
     expect(getLevelFinaleCopy("en", "core_monsoon").title).toBe("Core Monsoon");
+
     expect(t("en", "menu.pilotButton", { name: "ORBIT-7" })).toBe("Pilot: ORBIT-7");
     expect(t("en", "leaderboard.division.elite")).toBe("Elite");
     expect(t("en", "leaderboard.milestone.legend_league")).toBe("Legend League");
@@ -57,9 +59,10 @@ describe("localization", () => {
     expect(t("en", "menu.liveopsTitle")).toBe("MISSION BOARD");
     expect(t("en", "menu.readyBadge", { count: "2" })).toBe("READY 2");
     expect(t("en", "menu.mission.use_flip", { target: "3" })).toBe("Use FLIP 3x");
-    expect(t("ru", "menu.mission.collect_heavy_scrap", { target: "8" })).toBe("Тяж. лом 8");
+    expect(t("ru", "menu.mission.collect_heavy_scrap", { target: "8" })).toBe("Тяжёлый лом 8");
     expect(t("en", "menu.careerMilestonesTitle")).toBe("Career badges");
     expect(t("en", "menu.careerUnlocked")).toBe("Unlocked");
+
     expect(
       t("en", "menu.loginRewardLine", {
         day: "3",
@@ -96,6 +99,7 @@ describe("localization", () => {
     expect(getDailyRotationCopy("ru", "caravan_week").title).not.toContain("Caravan");
     expect(getLiveopsEventCopy("ru", "tomorrow_offer").title).not.toContain("Tomorrow");
   });
+
   it("covers staged menu and weekly race copy used by redesigned menu helpers", () => {
     expect(t("en", "menu.weeklyRaceHotLine", { division: "Elite", remaining: "1200" })).toBe("One strong run to Elite | 1200");
     expect(
@@ -107,14 +111,28 @@ describe("localization", () => {
         weekly: "4/8",
       })
     ).toBe("Streak 3 READY | ready 2 | d 1/3 | w 4/8");
-    expect(t("en", "menu.weeklyRaceHeldRewardBadge", { reward: "120B" })).toBe("RESET 120B");
+    expect(t("en", "menu.weeklyRaceHeldRewardBadge", { reward: "120B" })).toBe("Reward 120B");
     expect(t("en", "menu.rewardBoltsCompact", { value: "35" })).toBe("35B");
     expect(t("en", "menu.installedLevelShort")).toBe("Lv.");
 
     expect(t("ru", "menu.weeklyRaceHotLine", { division: "Элита", remaining: "1200" })).not.toContain("One strong run");
     expect(t("ru", "menu.liveopsStatusLine", { day: "3", streakState: "ГОТОВО", ready: "2", daily: "1/3", weekly: "4/8" })).not.toContain("Streak");
-    expect(t("ru", "menu.weeklyRaceHeldRewardBadge", { reward: "120Б" })).not.toContain("RESET");
+    expect(t("ru", "menu.weeklyRaceHeldRewardBadge", { reward: "120Б" })).not.toContain("Reward");
     expect(t("ru", "menu.rewardBoltsCompact", { value: "35" })).not.toContain("B");
     expect(t("ru", "menu.installedLevelShort")).not.toBe("Lv.");
+  });
+
+  it("keeps rewarded CTA copy explicit and localized for yandex moderation", () => {
+    expect(t("en", "menu.rewardedPlayCta", { reward: "35 bolts" })).toContain("WATCH AD");
+    expect(t("en", "menu.rewardedDailyCta", { reward: "35 bolts" })).toContain("WATCH AD");
+    expect(t("en", "results.boostReward", { reward: "35 bolts" })).toContain("WATCH AD");
+
+    expect(t("ru", "menu.rewardedPlayCta", { reward: "35 болт." })).toContain("РЕКЛАМ");
+    expect(t("ru", "menu.rewardedDailyCta", { reward: "35 болт." })).toContain("РЕКЛАМ");
+    expect(t("ru", "results.boostReward", { reward: "35 болт." })).toContain("РЕКЛАМ");
+
+    expect(t("ru", "menu.rewardedPlayCta", { reward: "35 болт." })).not.toContain("WATCH AD");
+    expect(t("ru", "menu.rewardedDailyCta", { reward: "35 болт." })).not.toContain("DAILY RUN");
+    expect(t("ru", "results.boostReward", { reward: "35 болт." })).not.toContain("EXTRA REWARD");
   });
 });

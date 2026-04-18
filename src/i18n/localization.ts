@@ -784,6 +784,16 @@ Object.assign(MESSAGES.ru, {
 });
 
 Object.assign(MESSAGES.en, {
+  "menu.dailyRewarded": "DAILY RUN\nWATCH AD",
+  "menu.dailyBoost": "DAILY RUN + BONUS\nWATCH AD",
+  "menu.dailyBoostExtra": "EXTRA DAILY RUN + BONUS\nWATCH AD",
+  "menu.rewardedDailyCta": (p?: Record<string, unknown>) => `DAILY RUN + BONUS\nWATCH AD: ${p?.reward ?? ""}`,
+  "menu.bestShort": (p?: Record<string, unknown>) => `Best run: wave ${p?.bestWave ?? 0} • ${p?.bestBolts ?? 0} bolts`,
+  "menu.leaderboardEmptyShort": "Your first run will open league progress.",
+  "menu.leaderboardLeagueShort": (p?: Record<string, unknown>) =>
+    `Next league: ${p?.nextDivision ?? "Raider"} • ${p?.score ?? "0"}`,
+  "menu.leaderboardLeagueTopShort": (p?: Record<string, unknown>) =>
+    `League: ${p?.division ?? "Legend"} • top tier`,
   "menu.dailyVariantLine": (p?: Record<string, unknown>) => `Today: ${p?.title ?? ""}`,
   "menu.dailyLoginLine": (p?: Record<string, unknown>) => `Login reward: ${p?.reward ?? ""} | Day ${p?.day ?? "0"}/${p?.max ?? "0"}`,
   "menu.dailyStatusLine": (p?: Record<string, unknown>) =>
@@ -799,6 +809,16 @@ Object.assign(MESSAGES.en, {
 });
 
 Object.assign(MESSAGES.ru, {
+  "menu.dailyRewarded": "ЕЖЕДНЕВНЫЙ ЗАЕЗД\nЗА РЕКЛАМУ",
+  "menu.dailyBoost": "ЕЖЕДНЕВНЫЙ ЗАЕЗД + БОНУС\nЗА РЕКЛАМУ",
+  "menu.dailyBoostExtra": "ЕЩЁ ОДИН ЗАЕЗД + БОНУС\nЗА РЕКЛАМУ",
+  "menu.rewardedDailyCta": (p?: Record<string, unknown>) => `ЕЖЕДНЕВНЫЙ ЗАЕЗД + БОНУС\nЗА РЕКЛАМУ: ${p?.reward ?? ""}`,
+  "menu.bestShort": (p?: Record<string, unknown>) => `Лучший заезд: волна ${p?.bestWave ?? 0} • ${p?.bestBolts ?? 0} болтов`,
+  "menu.leaderboardEmptyShort": "Первый заезд откроет прогресс лиги.",
+  "menu.leaderboardLeagueShort": (p?: Record<string, unknown>) =>
+    `Следующая лига: ${p?.nextDivision ?? "Рейдер"} • ${p?.score ?? "0"}`,
+  "menu.leaderboardLeagueTopShort": (p?: Record<string, unknown>) =>
+    `Лига: ${p?.division ?? "Легенда"} • максимум`,
   "menu.dailyVariantLine": (p?: Record<string, unknown>) => `\u0421\u0435\u0433\u043e\u0434\u043d\u044f: ${p?.title ?? ""}`,
   "menu.dailyLoginLine": (p?: Record<string, unknown>) =>
     `\u041d\u0430\u0433\u0440\u0430\u0434\u0430 \u0432\u0445\u043e\u0434\u0430: ${p?.reward ?? ""} | \u0414\u0435\u043d\u044c ${p?.day ?? "0"}/${p?.max ?? "0"}`,
