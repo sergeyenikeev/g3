@@ -12,6 +12,8 @@ const INTL_LOCALES: Record<Locale, string> = {
   ru: "ru-RU",
 };
 
+const RUSSIAN_PORTAL_LANGUAGE_CODES = new Set(["ru", "be", "kk", "uk", "uz"]);
+
 const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
   en: {
     "app.title": "Magnet Caravan",
@@ -1429,11 +1431,22 @@ export function resolveLocale(setting: LanguageSetting, languages: readonly stri
   if (setting === "ru" || setting === "en") return setting;
   const nav = languages ?? getNavigatorLanguages();
   for (const language of nav) {
-    const normalized = `${language}`.toLowerCase();
-    if (normalized.startsWith("ru")) return "ru";
-    if (normalized.startsWith("en")) return "en";
+    const resolved = resolveLocaleFromLanguageTag(language);
+    if (resolved) return resolved;
   }
   return "en";
+}
+
+export function resolveLocaleFromLanguageTag(language: unknown): Locale | null {
+  if (typeof language !== "string") return null;
+
+  const normalized = language.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const code = normalized.split(/[-_]/, 1)[0] ?? normalized;
+  if (RUSSIAN_PORTAL_LANGUAGE_CODES.has(code)) return "ru";
+  if (code === "en") return "en";
+  return null;
 }
 
 export function normalizeLanguageSetting(value: unknown): LanguageSetting {

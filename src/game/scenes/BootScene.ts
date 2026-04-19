@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { getBootstrapLocale, syncDocumentLocale } from "../../app/bootstrapShell";
 import type { StaticGameData } from "../../data/staticGameData";
 import { createAnalyticsAdapter } from "../../analytics/analyticsFactory";
 import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
@@ -17,7 +18,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    const bootLocale = resolveLocale("auto");
+    const bootLocale = getBootstrapLocale();
+    syncDocumentLocale(bootLocale);
     const w = this.scale.width;
     const h = this.scale.height;
     const panelWidth = Math.min(620, w * 0.84);
@@ -169,6 +171,7 @@ export class BootScene extends Phaser.Scene {
     await analytics.init();
     const adsManager = new AdsManager(adapter, analytics, saveManager, this.game.events);
     const locale = resolveLocale(save.settings.language, platformLanguageHint ? [platformLanguageHint] : null);
+    syncDocumentLocale(locale);
 
     this.registry.set("platformAdapter", adapter);
     this.registry.set("platformLanguageHint", platformLanguageHint);

@@ -1,5 +1,5 @@
 import "./style.css";
-import { installBrowserInteractionGuards, reportFatalStartupError } from "./app/bootstrapShell";
+import { getBootstrapLocale, installBrowserInteractionGuards, reportFatalStartupError, syncDocumentLocale } from "./app/bootstrapShell";
 import { ensurePlatformSdkLoaded } from "./platform/sdk/loadPlatformSdk";
 
 // Phaser source builds still touch `global` in some code paths.
@@ -18,6 +18,7 @@ window.addEventListener("unhandledrejection", (event) => {
 void (async () => {
   try {
     await ensurePlatformSdkLoaded();
+    syncDocumentLocale(getBootstrapLocale());
     const { createGame } = await import("./app/createGame");
     const game = createGame("app");
     if (import.meta.env.DEV || import.meta.env.VITE_E2E === "1") {

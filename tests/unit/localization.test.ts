@@ -12,6 +12,7 @@ import {
   getRarityLabel,
   normalizeLanguageSetting,
   resolveLocale,
+  resolveLocaleFromLanguageTag,
   t,
 } from "../../src/i18n/localization";
 
@@ -23,7 +24,16 @@ describe("localization", () => {
 
   it("resolves auto locale from browser languages", () => {
     expect(resolveLocale("auto", ["ru-RU", "en-US"])).toBe("ru");
+    expect(resolveLocale("auto", ["kk-KZ", "en-US"])).toBe("ru");
+    expect(resolveLocale("auto", ["uk-UA", "en-US"])).toBe("ru");
     expect(resolveLocale("auto", ["de-DE", "en-US"])).toBe("en");
+  });
+
+  it("maps platform language tags to supported locales", () => {
+    expect(resolveLocaleFromLanguageTag("be-BY")).toBe("ru");
+    expect(resolveLocaleFromLanguageTag("uz-UZ")).toBe("ru");
+    expect(resolveLocaleFromLanguageTag("en-GB")).toBe("en");
+    expect(resolveLocaleFromLanguageTag("tr-TR")).toBeNull();
   });
 
   it("normalizes invalid language settings to auto", () => {

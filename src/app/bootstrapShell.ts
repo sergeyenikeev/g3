@@ -1,4 +1,5 @@
-import { type Locale, t } from "../i18n/localization";
+import { type Locale, resolveLocale, t } from "../i18n/localization";
+import { getPlatformBootstrapLocaleHint } from "../platform/sdk/loadPlatformSdk";
 
 type BootstrapLocale = Locale;
 
@@ -27,7 +28,22 @@ export function installBrowserInteractionGuards(target: Window = window): void {
 
 export function reportFatalStartupError(error: unknown): void {
   console.error("[Magnet Caravan] fatal bootstrap/runtime error", error);
-  renderFatalOverlay(detectBootstrapLocale());
+  const locale = getBootstrapLocale();
+  syncDocumentLocale(locale);
+  renderFatalOverlay(locale);
+}
+
+export function getBootstrapLocale(): BootstrapLocale {
+  const platformHint = getPlatformBootstrapLocaleHint();
+  if (platformHint) return platformHint;
+  return resolveLocale("auto", getNavigatorLanguages());
+}
+
+export function syncDocumentLocale(locale: BootstrapLocale): void {
+  if (typeof document === "undefined") return;
+
+  if (document.documentElement) document.documentElement.lang = locale;
+  document.title = t(locale, "app.title");
 }
 
 function renderFatalOverlay(locale: BootstrapLocale): void {
@@ -127,14 +143,6 @@ function getFatalOverlayCopy(locale: BootstrapLocale): FatalOverlayCopy {
     body: t(locale, "bootstrap.fatal.body"),
     action: t(locale, "bootstrap.fatal.action"),
   };
-}
-
-function detectBootstrapLocale(): BootstrapLocale {
-  const languages = getNavigatorLanguages();
-  for (const language of languages) {
-    if (`${language}`.toLowerCase().startsWith("ru")) return "ru";
-  }
-  return "en";
 }
 
 function getNavigatorLanguages(): readonly string[] {

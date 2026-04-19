@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformLifecycleListener, PlatformLeaderboardSnapshot, RewardedResult } from "../platformAdapter";
+import { getPreinitializedYandexSdk } from "../sdk/loadPlatformSdk";
 import { PLATFORM_SAVE_KEY } from "../storageKeys";
 import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "../utils/localStorage";
 
@@ -99,15 +100,14 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
   private leaderboardRequests = new Map<string, Promise<PlatformLeaderboardSnapshot | null>>();
 
   async init(): Promise<void> {
-    const api = (window as any)?.YaGames;
-    if (!api?.init) return;
-
     try {
-      this.ysdk = (await api.init()) as YandexSdk;
+      this.ysdk = (await getPreinitializedYandexSdk()) as YandexSdk | null;
     } catch {
       this.ysdk = null;
       return;
     }
+
+    if (!this.ysdk) return;
 
     await this.refreshPlayerContext();
   }

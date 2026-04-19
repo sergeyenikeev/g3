@@ -1,3 +1,6 @@
+import type { Locale } from "../../i18n/localization";
+import { resolveLocaleFromLanguageTag } from "../../i18n/localization";
+
 type PlatformMode = "auto" | "mock" | "local" | "web" | "generic" | "yandex" | "vk";
 
 type SdkScript = {
@@ -20,6 +23,10 @@ const SCRIPTS: Record<Exclude<PlatformMode, "auto" | "mock" | "local" | "web" | 
   },
 };
 
+let bootstrapLocaleHint: Locale | null = null;
+let yandexSdkInitPromise: Promise<unknown | null> | null = null;
+let yandexInitSource: unknown = null;
+
 export async function ensurePlatformSdkLoaded(): Promise<void> {
   const raw = (import.meta as any).env?.VITE_PLATFORM_ADAPTER ?? (import.meta as any).env?.VITE_PLATFORM ?? "auto";
   const mode = String(raw).toLowerCase() as PlatformMode;
@@ -34,6 +41,40 @@ export async function ensurePlatformSdkLoaded(): Promise<void> {
   } catch {
     // ignore: safe degradation if SDK isn't reachable
   }
+
+  if (mode === "yandex") {
+    try {
+      await withTimeout(getPreinitializedYandexSdk(), 400);
+    } catch {
+      // ignore: the game can continue booting while the SDK finishes initialization
+    }
+  }
+}
+
+export function getPlatformBootstrapLocaleHint(): Locale | null {
+  return bootstrapLocaleHint;
+}
+
+export async function getPreinitializedYandexSdk(): Promise<unknown | null> {
+  const api = (window as any)?.YaGames;
+  if (!api?.init) return null;
+  if (yandexInitSource !== api.init) {
+    yandexInitSource = api.init;
+    yandexSdkInitPromise = null;
+    bootstrapLocaleHint = null;
+  }
+  if (yandexSdkInitPromise) return yandexSdkInitPromise;
+
+  yandexSdkInitPromise = Promise.resolve(api.init())
+    .then((sdk: any) => {
+      bootstrapLocaleHint = resolveLocaleFromLanguageTag(sdk?.environment?.i18n?.lang) ?? bootstrapLocaleHint;
+      return sdk ?? null;
+    })
+    .catch(() => null);
+
+  const sdk = await yandexSdkInitPromise;
+  if (!sdk) yandexSdkInitPromise = null;
+  return sdk;
 }
 
 const loading = new Map<string, Promise<void>>();

@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { syncDocumentLocale } from "../../app/bootstrapShell";
 import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
 import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
 import type { MissionObjectiveType } from "../../data/types";
@@ -177,6 +178,7 @@ export class MenuScene extends Phaser.Scene {
     const save = this.saveData;
     this.languageSetting = normalizeLanguageSetting(save?.settings?.language);
     this.locale = this.resolveLocaleSetting(this.languageSetting);
+    syncDocumentLocale(this.locale);
     this.registry.set("languageSetting", this.languageSetting);
     this.registry.set("locale", this.locale);
     this.latestLeaderboardEntryId = ((this.registry.get("lastLeaderboardEntryId") as string | undefined) ?? null) || null;
