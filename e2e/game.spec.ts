@@ -204,6 +204,55 @@ async function expectVisibleSceneTextInBounds(page: Page, sceneKey: string, view
   expect(offenders, `${sceneKey} has visible text outside viewport`).toEqual([]);
 }
 
+async function expectMenuCenterStackSeparated(page: Page, viewport: { width: number; height: number }) {
+  const spacing = await page.evaluate(({ width }) => {
+    const menu = (window as any).__MC_GAME__?.scene?.keys?.menu;
+    const dailyPanel = menu?.dailyPanel;
+    if (!menu || !dailyPanel?.visible) {
+      return { error: "menu-or-summary-missing" };
+    }
+
+    const summaryTop = Number(dailyPanel.y ?? 0) - Number(dailyPanel.height ?? 0) / 2;
+    const centeredTexts = (menu.children?.list ?? [])
+      .filter((obj: any) => obj?.type === "Text" && obj.visible && obj.active)
+      .map((obj: any) => {
+        const bounds = typeof obj.getBounds === "function" ? obj.getBounds() : null;
+        return {
+          text: String(obj.text ?? "").replace(/\s+/g, " ").trim(),
+          left: Number(bounds?.x ?? NaN),
+          top: Number(bounds?.y ?? NaN),
+          right: Number((bounds?.x ?? 0) + (bounds?.width ?? 0)),
+          bottom: Number((bounds?.y ?? 0) + (bounds?.height ?? 0)),
+        };
+      })
+      .filter((entry: any) =>
+        entry.text.length > 0 &&
+        [entry.left, entry.top, entry.right, entry.bottom].every(Number.isFinite) &&
+        entry.left > width * 0.22 &&
+        entry.right < width * 0.78 &&
+        entry.bottom < summaryTop + 1
+      )
+      .sort((a: { top: number }, b: { top: number }) => a.top - b.top);
+
+    if (centeredTexts.length < 2) {
+      return { error: "not-enough-centered-text", centeredTexts };
+    }
+
+    const lower = centeredTexts[centeredTexts.length - 1];
+    const upper = centeredTexts[centeredTexts.length - 2];
+    return {
+      pairGap: lower.top - upper.bottom,
+      summaryGap: summaryTop - lower.bottom,
+      upper: upper.text,
+      lower: lower.text,
+    };
+  }, { width: viewport.width });
+
+  expect((spacing as any).error, JSON.stringify(spacing)).toBeUndefined();
+  expect((spacing as any).pairGap, JSON.stringify(spacing)).toBeGreaterThanOrEqual(2);
+  expect((spacing as any).summaryGap, JSON.stringify(spacing)).toBeGreaterThanOrEqual(2);
+}
+
 async function pickUpgradeCard(page: Page) {
   const targets = await page.evaluate(() => {
     const upgrade = (window as any).__MC_GAME__?.scene?.keys?.upgrade;
@@ -247,7 +296,6 @@ test("smoke: staged menu, training, daily, upgrade, results", async ({ page }) =
   const vp = page.viewportSize();
   expect(vp).toBeTruthy();
   const width = vp!.width;
-  const height = vp!.height;
 
   await clickMenuText(page, ["training", "обуч"]);
   await page.waitForFunction(() => {
@@ -363,4 +411,105 @@ test.describe("moderation smoke: compact viewport", () => {
       expect(errors, "page errors").toEqual([]);
     });
   }
+});
+
+test.describe("ultra-short menu viewport", () => {
+  test.use({ viewport: { width: 980, height: 310 } });
+
+  test("menu stack stays separated in a very low viewport", async ({ page }) => {
+    const errors: Error[] = [];
+    page.on("pageerror", (error) => errors.push(error));
+
+    await page.goto("/");
+    await page.waitForSelector("canvas");
+    await seedSaveAndReload(page, makeGrowingSave("ru"));
+    await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("menu") === true);
+    await waitForVisibleMenuText(page, ["daily", "ежеднев"], true);
+
+    const vp = page.viewportSize();
+    expect(vp).toBeTruthy();
+    const viewport = { width: vp!.width, height: vp!.height };
+
+    await expectVisibleSceneTextInBounds(page, "menu", viewport);
+    await expectMenuCenterStackSeparated(page, viewport);
+
+    expect(errors, "page errors").toEqual([]);
+  });
+
+  test("full flow stays readable in a very low viewport", async ({ page }) => {
+    const errors: Error[] = [];
+    page.on("pageerror", (error) => errors.push(error));
+
+    await page.goto("/");
+    await page.waitForSelector("canvas");
+    await seedSaveAndReload(page, makeGrowingSave("ru"));
+    await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("menu") === true);
+    await waitForVisibleMenuText(page, ["daily", "ежеднев"], true);
+
+    const vp = page.viewportSize();
+    expect(vp).toBeTruthy();
+    const viewport = { width: vp!.width, height: vp!.height };
+
+    await expectVisibleSceneTextInBounds(page, "menu", viewport);
+    await expectMenuCenterStackSeparated(page, viewport);
+
+    await page.evaluate(() => {
+      const menu = (window as any).__MC_GAME__?.scene?.keys?.menu;
+      void menu?.startDaily?.(false);
+    });
+    await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("ui") === true);
+    await expectVisibleSceneTextInBounds(page, "ui", viewport);
+
+    await page.evaluate(() => {
+      const gameScene = (window as any).__MC_GAME__?.scene?.keys?.game;
+      gameScene?.onWaveComplete?.();
+    });
+    await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("upgrade") === true);
+    await expectVisibleSceneTextInBounds(page, "upgrade", viewport);
+    await pickUpgradeCard(page);
+
+    await page.waitForFunction(() => typeof (window as any).__MC_E2E__?.endRun === "function");
+    await page.evaluate(() => (window as any).__MC_E2E__.endRun());
+    await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("results") === true);
+    await expectVisibleSceneTextInBounds(page, "results", viewport);
+
+    expect(errors, "page errors").toEqual([]);
+  });
+
+  test("secondary menu overlays stay readable in a very low viewport", async ({ page }) => {
+    const errors: Error[] = [];
+    page.on("pageerror", (error) => errors.push(error));
+
+    await page.goto("/");
+    await page.waitForSelector("canvas");
+    await seedSaveAndReload(page, makeGrowingSave("ru"));
+    await page.waitForFunction(() => (window as any).__MC_GAME__?.scene?.isActive("menu") === true);
+
+    const vp = page.viewportSize();
+    expect(vp).toBeTruthy();
+    const viewport = { width: vp!.width, height: vp!.height };
+
+    await clickTopRightMenuButton(page, viewport.width);
+    await waitForVisibleMenuText(page, ["close", "закры"], true);
+    await expectVisibleSceneTextInBounds(page, "menu", viewport);
+    await page.mouse.click(40, Math.min(120, viewport.height - 40));
+    await waitForVisibleMenuText(page, ["close", "закры"], false);
+
+    await page.evaluate(() => {
+      const menu = (window as any).__MC_GAME__?.scene?.keys?.menu;
+      menu?.showWorkshop?.();
+    });
+    await page.waitForFunction(() => Boolean((window as any).__MC_GAME__?.scene?.keys?.menu?.workshopBox?.visible));
+    await expectVisibleSceneTextInBounds(page, "menu", viewport);
+
+    await page.evaluate(() => {
+      const menu = (window as any).__MC_GAME__?.scene?.keys?.menu;
+      menu?.hideWorkshop?.();
+      menu?.showLeaderboard?.();
+    });
+    await page.waitForFunction(() => Boolean((window as any).__MC_GAME__?.scene?.keys?.menu?.leaderboardBox?.visible));
+    await expectVisibleSceneTextInBounds(page, "menu", viewport);
+
+    expect(errors, "page errors").toEqual([]);
+  });
 });

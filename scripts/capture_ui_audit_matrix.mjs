@@ -352,7 +352,7 @@ async function waitForScene(page, sceneKey) {
   );
 }
 
-async function chooseUpgrade(page, width, height) {
+async function chooseUpgrade(page) {
   const targets = await page.evaluate(() => {
     const upgrade = globalThis.__MC_GAME__?.scene?.keys?.upgrade;
     const cards = Array.isArray(upgrade?.cards) ? upgrade.cards : [];

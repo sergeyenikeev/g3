@@ -1606,9 +1606,11 @@ export class MenuScene extends Phaser.Scene {
       if (starterUi) missionsExpanded = false;
       const mode = getMenuLayoutMode(s.width, s.height);
       currentLayoutMode = mode;
+      refreshPlayButton();
       const compact = mode !== "full";
       const minimal = mode === "minimal";
       const compressedMenu = s.height <= 520;
+      const ultraTightMenu = minimal && s.height <= 340;
       const hideSummaryPanel = starterUi || missionsExpanded;
       const topInset = minimal ? 14 : 18;
       const fullDesktopGrowth =
@@ -1637,9 +1639,11 @@ export class MenuScene extends Phaser.Scene {
         .setSize(s.width, s.height)
         .setFillStyle(0x02060a, minimal ? 0.58 : compact ? 0.52 : 0.44);
       const showPreview = !missionsExpanded && mode === "full" && (starterUi || wideDesktop);
+      const previewX = showPreview ? Math.round(s.width * (starterUi ? 0.775 : 0.74)) : 0;
+      const heroPanelHeight = mode === "full" ? Math.round(590 + fullDesktopGrowth * 170) : 460;
       const leftX = showPreview ? Math.round(s.width * (starterUi ? 0.28 : 0.305)) : s.width / 2;
       const titleY = minimal
-        ? contentTop + (compressedMenu ? 10 : 18)
+        ? contentTop + (ultraTightMenu ? 2 : compressedMenu ? 10 : 18)
         : compact
           ? Math.max(contentTop + (compressedMenu ? 8 : 16), Math.round(s.height * (compressedMenu ? 0.12 : 0.14)))
           : Math.max(
@@ -1674,6 +1678,13 @@ export class MenuScene extends Phaser.Scene {
       btnSfx.setOrigin(0, 0);
       btnMusic.setOrigin(0, 0);
       btnLanguage.setOrigin(0, 0);
+      btnWorkshop.setFillStyle(0x0f1720, 0.95).setStrokeStyle(2, 0xffd166, 0.82).setAlpha(1);
+      btnLeaderboard
+        .setFillStyle(0x0f1720, 0.95)
+        .setStrokeStyle(2, this.latestLeaderboardIsRecord ? 0x57c27d : 0x5cc8ff, 0.82)
+        .setAlpha(1);
+      labelWorkshop.setAlpha(1);
+      labelLeaderboard.setAlpha(1);
       labelWorkshop.setStyle({ fontSize: `${topButtonFontSize}px` });
       labelLeaderboard.setStyle({ fontSize: `${topButtonFontSize}px` });
       labelPilot.setStyle({ fontSize: `${topButtonSecondaryFontSize}px` });
@@ -1703,7 +1714,7 @@ export class MenuScene extends Phaser.Scene {
       navCursorX = placeTopButton(btnUtility, labelUtility, btnUtility.width, navCursorX, !missionsExpanded && !utilityVisible);
       navCursorX = placeTopButton(btnLeaderboard, labelLeaderboard, btnLeaderboard.width, navCursorX, false);
       navCursorX = placeTopButton(btnWorkshop, labelWorkshop, btnWorkshop.width, navCursorX, false);
-      placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, advancedUi && !missionsExpanded && !minimal && !utilityVisible);
+      placeTopButton(btnPilot, labelPilot, btnPilot.width, navCursorX, false);
 
       setUtilityVisible(utilityVisible);
       if (utilityVisible) {
@@ -1766,17 +1777,9 @@ export class MenuScene extends Phaser.Scene {
       taglineText.setPosition(leftX, titleY + (shortDesktop ? 40 : 58));
       bestText.setPosition(leftX, titleY + (shortDesktop ? 70 : 110));
 
-      this.layoutMenuBackdrop(
-        s.width,
-        s.height,
-        showPreview ? "full" : mode,
-        showPreview ? Math.round(s.width * (starterUi ? 0.775 : 0.74)) : 0,
-        showPreview ? Math.round(s.height * (starterUi ? 0.555 : 0.54)) : 0,
-        showPreview
-      );
       const menuPanelWidth = Math.min(
         showPreview
-          ? Math.round((starterUi ? 620 : 740) + fullDesktopGrowth * 340)
+          ? Math.round((starterUi ? 592 : 704) + fullDesktopGrowth * 300)
           : mode === "full"
             ? Math.round(660 + fullDesktopGrowth * 520)
             : minimal
@@ -1787,12 +1790,14 @@ export class MenuScene extends Phaser.Scene {
       this.menuPanel.setSize(menuPanelWidth, this.menuPanel.height);
       const menuInnerWidth = Math.max(280, this.menuPanel.width - 42);
       title.setStyle({
-        fontSize: minimal
+        fontSize: ultraTightMenu
+          ? "28px"
+          : minimal
           ? (compressedMenu ? "30px" : "36px")
           : compressedMenu
             ? "34px"
             : mode === "full"
-              ? `${Math.round(58 + fullDesktopGrowth * 34)}px`
+              ? `${Math.round((showPreview ? 54 : 58) + fullDesktopGrowth * (showPreview ? 28 : 34))}px`
               : shortDesktop
                 ? "40px"
                 : "52px",
@@ -1801,7 +1806,9 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(title, menuInnerWidth, minimal ? 0.78 : compact ? 0.72 : shortDesktop ? 0.76 : 0.84);
       taglineText.setText(t(this.locale, `menu.stageHint.${uiStage}`));
       taglineText.setStyle({
-        fontSize: compressedMenu
+        fontSize: ultraTightMenu
+          ? "11px"
+          : compressedMenu
           ? "12px"
           : minimal
             ? "14px"
@@ -1836,18 +1843,18 @@ export class MenuScene extends Phaser.Scene {
       });
       controlsText.setWordWrapWidth(Math.max(260, this.dailyPanel.width - 28), true);
       this.heroCaptionText.setStyle({
-        fontSize: mode === "full" ? `${Math.round(16 + fullDesktopGrowth * 4)}px` : "16px",
+        fontSize: mode === "full" ? `${Math.round((showPreview ? 14 : 16) + fullDesktopGrowth * (showPreview ? 3 : 4))}px` : "16px",
+        color: showPreview ? "#dce7ee" : "#f3f7fb",
         align: "center",
       });
-      this.heroCaptionText.setWordWrapWidth(this.heroPanel.width - 42, true);
-      fitTextScaleToWidth(this.heroCaptionText, this.heroPanel.width - 42, 0.78);
+      this.heroCaptionText.setAlpha(showPreview ? (starterUi ? 0.76 : 0.68) : 1);
       this.heroHintText.setText(starterUi ? "" : t(this.locale, "menu.heroLead"));
       this.heroHintText.setStyle({
         fontSize: mode === "full" ? `${Math.round(12 + fullDesktopGrowth * 3)}px` : "12px",
+        color: showPreview ? "#90a8b8" : "#9eb6c4",
         align: "center",
       });
-      this.heroHintText.setWordWrapWidth(this.heroPanel.width - 54, true);
-      this.heroHintText.setVisible(showPreview && !starterUi);
+      this.heroHintText.setAlpha(showPreview ? 0.7 : 1);
       fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 18, 0.8);
       fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 18, 0.8);
       fitTextScaleToWidth(labelPilot, btnPilot.width - 18, 0.72);
@@ -1858,8 +1865,8 @@ export class MenuScene extends Phaser.Scene {
       const liveopsPanel = getLiveopsPanelMetrics(s.width, compact, s.height);
       const stackedMissions = liveopsPanel.stacked;
       const summaryWidth = Math.min(minimal ? s.width - 24 : showPreview ? 560 : liveopsPanel.width, s.width - 24);
-      const summaryHeight = hideSummaryPanel ? 0 : minimal ? 184 : compact ? 144 : 140;
-      const summaryBottom = s.height - (hideSummaryPanel ? 14 : minimal ? 12 : 18);
+      const summaryHeight = hideSummaryPanel ? 0 : ultraTightMenu ? 118 : minimal ? 168 : compact ? 144 : 140;
+      const summaryBottom = s.height - (hideSummaryPanel ? 14 : minimal ? 12 : showPreview ? 72 : 18);
       const summaryTop = summaryBottom - summaryHeight;
       const summaryCenterY = summaryTop + summaryHeight / 2;
       const ctaBottomLimit = hideSummaryPanel ? s.height - (minimal ? 14 : 18) : summaryTop - (minimal ? 14 : 20);
@@ -1877,9 +1884,10 @@ export class MenuScene extends Phaser.Scene {
         Math.min(ctaWidth - (minimal ? 18 : 24), Math.round(ctaWidth * (starterUi ? 0.9 : 0.88)))
       );
       const showPlayMeta = labelPlayMeta.text.length > 0;
+      const showPlayMetaLabel = showPlayMeta && !ultraTightMenu;
       btnPlay.setSize(
         ctaWidth,
-        showPlayMeta
+        showPlayMetaLabel
           ? compressedMenu
             ? 56
             : minimal
@@ -1890,9 +1898,13 @@ export class MenuScene extends Phaser.Scene {
                   ? 64
                   : 72
           : compressedMenu
-            ? 46
+            ? ultraTightMenu
+              ? 42
+              : 46
             : minimal
-              ? 52
+              ? ultraTightMenu
+                ? 42
+                : 52
               : mode === "full"
                 ? Math.round(62 + fullDesktopGrowth * 20)
                 : shortDesktop
@@ -1901,18 +1913,20 @@ export class MenuScene extends Phaser.Scene {
       );
       btnTraining.setSize(
         secondaryCtaWidth,
-        compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40
+        ultraTightMenu ? 28 : compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40
       );
       btnDaily.setSize(
         secondaryCtaWidth,
-        compressedMenu ? 38 : minimal ? 40 : mode === "full" ? Math.round(50 + fullDesktopGrowth * 16) : shortDesktop ? 42 : 46
+        ultraTightMenu ? 30 : compressedMenu ? 38 : minimal ? 40 : mode === "full" ? Math.round(50 + fullDesktopGrowth * 16) : shortDesktop ? 42 : 46
       );
       btnMissions.setSize(
         secondaryCtaWidth,
         compressedMenu ? 34 : minimal ? 36 : mode === "full" ? Math.round(44 + fullDesktopGrowth * 14) : shortDesktop ? 38 : 40
       );
       labelPlay.setStyle({
-        fontSize: showPlayMeta
+        fontSize: ultraTightMenu
+          ? "18px"
+          : showPlayMetaLabel
           ? compressedMenu
             ? "18px"
             : minimal
@@ -1928,7 +1942,7 @@ export class MenuScene extends Phaser.Scene {
         align: "center",
       });
       labelPlayMeta.setStyle({
-        fontSize: compressedMenu ? "10px" : minimal ? "11px" : mode === "full" ? `${Math.round(13 + fullDesktopGrowth * 6)}px` : "12px",
+        fontSize: ultraTightMenu ? "9px" : compressedMenu ? "10px" : minimal ? "11px" : mode === "full" ? `${Math.round(13 + fullDesktopGrowth * 6)}px` : "12px",
         align: "center",
       });
       labelPlay.setWordWrapWidth(btnPlay.width - 26, true);
@@ -1936,12 +1950,12 @@ export class MenuScene extends Phaser.Scene {
       fitTextScaleToWidth(labelPlay, btnPlay.width - 26, 0.74);
       fitTextScaleToWidth(labelPlayMeta, btnPlay.width - 26, 0.8);
       labelTraining.setStyle({
-        fontSize: compressedMenu ? "14px" : minimal ? "15px" : mode === "full" ? `${Math.round(17 + fullDesktopGrowth * 6)}px` : "16px",
+        fontSize: ultraTightMenu ? "12px" : compressedMenu ? "14px" : minimal ? "15px" : mode === "full" ? `${Math.round(17 + fullDesktopGrowth * 6)}px` : "16px",
         align: "center",
       });
       fitTextScaleToWidth(labelTraining, btnTraining.width - 22, 0.76);
       labelDaily.setStyle({
-        fontSize: compressedMenu ? "13px" : minimal ? "14px" : mode === "full" ? `${Math.round(16 + fullDesktopGrowth * 6)}px` : "15px",
+        fontSize: ultraTightMenu ? "12px" : compressedMenu ? "13px" : minimal ? "14px" : mode === "full" ? `${Math.round(16 + fullDesktopGrowth * 6)}px` : "15px",
         align: "center",
       });
       labelDaily.setWordWrapWidth(btnDaily.width - 24, true);
@@ -1965,11 +1979,11 @@ export class MenuScene extends Phaser.Scene {
         !getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops).eligible &&
         !missionsExpanded;
       title.setVisible(!missionsExpanded);
-      taglineText.setVisible(!missionsExpanded);
+      taglineText.setVisible(!missionsExpanded && !ultraTightMenu);
       this.menuPanel.setVisible(!missionsExpanded);
       btnPlay.setVisible(!missionsExpanded);
       labelPlay.setVisible(!missionsExpanded);
-      labelPlayMeta.setVisible(!missionsExpanded && labelPlayMeta.text.length > 0);
+      labelPlayMeta.setVisible(!missionsExpanded && showPlayMetaLabel);
       btnDaily.setVisible(!missionsExpanded && !starterUi);
       labelDaily.setVisible(!missionsExpanded && !starterUi);
       btnTraining.setVisible(!missionsExpanded && starterUi);
@@ -1995,13 +2009,13 @@ export class MenuScene extends Phaser.Scene {
         ...(!starterUi ? [{ kind: "button" as const, button: btnDaily, label: labelDaily, height: btnDaily.height }] : []),
         ...(starterUi ? [{ kind: "button" as const, button: btnTraining, label: labelTraining, height: btnTraining.height }] : []),
       ];
-      const ctaGap = compressedMenu ? 4 : minimal ? 6 : compact ? 6 : wideStarterDesktop ? Math.round(12 + fullDesktopGrowth * 4) : 8;
+      const ctaGap = ultraTightMenu ? 2 : compressedMenu ? 4 : minimal ? 6 : compact ? 6 : wideStarterDesktop ? Math.round(12 + fullDesktopGrowth * 4) : 8;
       const ctaStackHeight =
         ctaEntries.reduce((sum, entry) => sum + entry.height, 0) + Math.max(0, ctaEntries.length - 1) * ctaGap;
       const titleBottom = titleY + title.displayHeight / 2;
-      const desiredTaglineY = Math.round(titleBottom + (minimal ? 8 : shortDesktop ? 8 : compact ? 10 : 14) + taglineText.displayHeight / 2);
+      const desiredTaglineY = Math.round(titleBottom + (ultraTightMenu ? 4 : minimal ? 8 : shortDesktop ? 8 : compact ? 10 : 14) + taglineText.displayHeight / 2);
       taglineText.setPosition(leftX, desiredTaglineY);
-      const taglineBottom = taglineText.y + taglineText.displayHeight / 2;
+      const taglineBottom = taglineText.visible ? taglineText.y + taglineText.displayHeight / 2 : titleBottom;
       bestText.setVisible(false);
       if (!starterUi && !minimal && !compressedMenu) {
         const bestTargetY = Math.round(taglineBottom + (shortDesktop ? 8 : 12) + bestText.displayHeight / 2);
@@ -2023,8 +2037,8 @@ export class MenuScene extends Phaser.Scene {
           ? Math.round(s.height * 0.29)
           : compact
             ? Math.round(s.height * 0.34)
-            : Math.round(s.height * (wideStarterDesktop ? 0.52 : wideDesktop ? 0.42 : 0.39));
-      const minCtaTop = bestBottom + (minimal ? 12 : 16);
+            : Math.round(s.height * (wideStarterDesktop ? 0.49 : wideDesktop ? 0.4 : 0.38));
+      const minCtaTop = bestBottom + (ultraTightMenu ? 8 : minimal ? 12 : 16);
       const maxCtaTop = ctaBottomLimit - ctaStackHeight;
       const ctaTop = Phaser.Math.Clamp(preferredCtaTop, minCtaTop, Math.max(minCtaTop, maxCtaTop));
       let ctaCursor = ctaTop;
@@ -2058,16 +2072,30 @@ export class MenuScene extends Phaser.Scene {
         .setPosition(leftX, (menuPanelTop + menuPanelBottom) / 2)
         .setSize(
           this.menuPanel.width,
-          Math.max(
-            mode === "full"
-              ? showPreview
-                ? Math.round((wideStarterDesktop ? 390 : 420) + fullDesktopGrowth * (wideStarterDesktop ? 70 : 90))
-                : Math.min(860, Math.round(s.height * 0.64))
-              : 180,
-            menuPanelBottom - menuPanelTop
+            Math.max(
+              mode === "full"
+                ? showPreview
+                  ? Math.round((wideStarterDesktop ? 352 : 388) + fullDesktopGrowth * (wideStarterDesktop ? 58 : 76))
+                  : Math.min(860, Math.round(s.height * 0.64))
+                : 180,
+              menuPanelBottom - menuPanelTop
           )
         );
-      refreshPlayButton();
+      const menuPanelActualTop = this.menuPanel.y - this.menuPanel.height / 2;
+      const previewY = showPreview ? menuPanelActualTop + heroPanelHeight / 2 - 26 : 0;
+      this.layoutMenuBackdrop(s.width, s.height, showPreview ? "full" : mode, previewX, previewY, showPreview);
+      this.heroCaptionText.setWordWrapWidth(this.heroPanel.width - 42, true);
+      fitTextScaleToWidth(this.heroCaptionText, this.heroPanel.width - 42, 0.78);
+      this.heroHintText.setWordWrapWidth(this.heroPanel.width - 54, true);
+      this.heroHintText.setVisible(showPreview && !starterUi);
+      if (showPreview) {
+        const heroPanelTop = this.heroPanel.y - this.heroPanel.height / 2;
+        const heroPanelBottom = this.heroPanel.y + this.heroPanel.height / 2;
+        const heroCaptionInset = mode === "full" ? Math.round(28 + fullDesktopGrowth * 10) : 24;
+        const heroHintInset = mode === "full" ? Math.round(22 + fullDesktopGrowth * 10) : 20;
+        this.heroCaptionText.setPosition(this.heroPanel.x, heroPanelTop + heroCaptionInset + this.heroCaptionText.displayHeight / 2);
+        this.heroHintText.setPosition(this.heroPanel.x, heroPanelBottom - heroHintInset - this.heroHintText.displayHeight / 2);
+      }
       if (!missionsExpanded) {
         this.dailyPanel.setVisible(!hideSummaryPanel);
         if (hideSummaryPanel) {
@@ -2135,7 +2163,10 @@ export class MenuScene extends Phaser.Scene {
         btnClaimOps.setVisible(true);
         labelClaimOps.setVisible(true);
 
-        btnClaimOps.setSize(minimal ? 104 : 116, 30).setPosition(summaryLeft + summaryWidth - 14, summaryTop + 12).setOrigin(1, 0);
+        btnClaimOps
+          .setSize(ultraTightMenu ? 84 : minimal ? 96 : 116, ultraTightMenu ? 24 : minimal ? 28 : 30)
+          .setPosition(summaryLeft + summaryWidth - 14, summaryTop + (ultraTightMenu ? 8 : minimal ? 10 : 12))
+          .setOrigin(1, 0);
         labelClaimOps.setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
         fitTextScaleToWidth(labelClaimOps, Math.max(88, btnClaimOps.width - 16), 0.72);
         claimOpsHalo
@@ -2163,26 +2194,32 @@ export class MenuScene extends Phaser.Scene {
           const quickButtonWidth = Math.floor((quickActionsAvailableWidth - quickActionsGap) / 2);
           const quickButtonY = summaryTop + 12;
           const quickButtonHeight = 30;
+          btnWorkshop.setFillStyle(0x0d131b, 0.86).setStrokeStyle(1, 0xffd166, 0.52);
+          btnLeaderboard
+            .setFillStyle(0x0d131b, 0.86)
+            .setStrokeStyle(1, this.latestLeaderboardIsRecord ? 0x57c27d : 0x5cc8ff, 0.5);
+          labelWorkshop.setAlpha(0.82);
+          labelLeaderboard.setAlpha(0.82);
           btnWorkshop.setPosition(quickActionsLeft, quickButtonY).setSize(quickButtonWidth, quickButtonHeight);
           labelWorkshop.setPosition(btnWorkshop.x + btnWorkshop.width / 2, btnWorkshop.y + btnWorkshop.height / 2);
           btnLeaderboard
             .setPosition(quickActionsLeft + quickButtonWidth + quickActionsGap, quickButtonY)
             .setSize(quickButtonWidth, quickButtonHeight);
           labelLeaderboard.setPosition(btnLeaderboard.x + btnLeaderboard.width / 2, btnLeaderboard.y + btnLeaderboard.height / 2);
-          labelWorkshop.setStyle({ fontSize: "12px" });
-          labelLeaderboard.setStyle({ fontSize: "12px" });
+          labelWorkshop.setStyle({ fontSize: "11px" });
+          labelLeaderboard.setStyle({ fontSize: "11px" });
           fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 14, 0.72);
           fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 14, 0.72);
         }
 
         liveopsCardBg.setVisible(false);
         liveopsInfo.setVisible(false);
-        summaryRewardsTitle.setStyle({ fontSize: minimal ? "12px" : "12px" });
-        summaryDailyTitle.setStyle({ fontSize: minimal ? "12px" : "12px" });
-        summaryWeeklyTitle.setStyle({ fontSize: minimal ? "12px" : "12px" });
-        summaryRewardsValue.setStyle({ fontSize: minimal ? "15px" : "14px" });
-        summaryDailyValue.setStyle({ fontSize: minimal ? "15px" : "14px" });
-        summaryWeeklyValue.setStyle({ fontSize: minimal ? "15px" : "14px" });
+        summaryRewardsTitle.setStyle({ fontSize: ultraTightMenu ? "11px" : minimal ? "12px" : "12px" });
+        summaryDailyTitle.setStyle({ fontSize: ultraTightMenu ? "11px" : minimal ? "12px" : "12px" });
+        summaryWeeklyTitle.setStyle({ fontSize: ultraTightMenu ? "11px" : minimal ? "12px" : "12px" });
+        summaryRewardsValue.setStyle({ fontSize: ultraTightMenu ? "13px" : minimal ? "15px" : "14px" });
+        summaryDailyValue.setStyle({ fontSize: ultraTightMenu ? "13px" : minimal ? "15px" : "14px" });
+        summaryWeeklyValue.setStyle({ fontSize: ultraTightMenu ? "13px" : minimal ? "15px" : "14px" });
 
         summaryRewardsCardBg.setVisible(true);
         summaryDailyCardBg.setVisible(true);
@@ -2196,16 +2233,16 @@ export class MenuScene extends Phaser.Scene {
 
         if (minimal) {
           const cardWidth = summaryWidth - 24;
-          const cardHeight = 40;
+          const cardHeight = ultraTightMenu ? 24 : 36;
           const rows = [
-            { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, y: summaryTop + 72 },
-            { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, y: summaryTop + 118 },
-            { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, y: summaryTop + 164 },
+            { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, y: summaryTop + (ultraTightMenu ? 44 : 66) },
+            { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, y: summaryTop + (ultraTightMenu ? 72 : 106) },
+            { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, y: summaryTop + (ultraTightMenu ? 100 : 146) },
           ];
           for (const entry of rows) {
             entry.bg.setPosition(leftX, entry.y).setSize(cardWidth, cardHeight);
-            entry.title.setPosition(summaryLeft + 14, entry.y - 11);
-            entry.value.setPosition(summaryLeft + 14, entry.y + 11);
+            entry.title.setPosition(summaryLeft + 14, entry.y - (ultraTightMenu ? 6 : 9));
+            entry.value.setPosition(summaryLeft + 14, entry.y + (ultraTightMenu ? 6 : 9));
             fitTextScaleToWidth(entry.title, cardWidth - 18, 0.78);
             fitTextScaleToWidth(entry.value, cardWidth - 18, 0.78);
           }
@@ -3050,34 +3087,44 @@ export class MenuScene extends Phaser.Scene {
     return this.scale.height <= 520 || this.scale.width <= 900;
   }
 
+  private isUltraCompactWorkshopLayout(): boolean {
+    return this.scale.height <= 340;
+  }
+
   private isDenseWorkshopDesktopLayout(): boolean {
     return !this.isCompactWorkshopLayout() && (this.scale.height <= 780 || this.scale.width <= 1240);
   }
 
   private getWorkshopPanelMetrics(): { width: number; height: number; compact: boolean } {
     const compact = this.isCompactWorkshopLayout();
+    const ultraCompact = this.isUltraCompactWorkshopLayout();
     const denseDesktop = this.isDenseWorkshopDesktopLayout();
     const uiStage = getUiProgressSnapshot(this.saveManager.get()).stage;
     const compactWidth = Math.max(320, Math.min(this.scale.width - 44, 560));
     return {
       compact,
-      width: compact ? compactWidth : denseDesktop ? (uiStage === "advanced" ? 780 : 760) : uiStage === "advanced" ? 840 : 804,
-      height: compact ? (uiStage === "starter" ? 420 : 468) : denseDesktop ? (uiStage === "advanced" ? 712 : 696) : uiStage === "advanced" ? 748 : 728,
+      width: ultraCompact ? Math.max(320, Math.min(this.scale.width - 28, 500)) : compact ? compactWidth : denseDesktop ? (uiStage === "advanced" ? 780 : 760) : uiStage === "advanced" ? 840 : 804,
+      height: ultraCompact ? (uiStage === "starter" ? 300 : 348) : compact ? (uiStage === "starter" ? 420 : 468) : denseDesktop ? (uiStage === "advanced" ? 712 : 696) : uiStage === "advanced" ? 748 : 728,
     };
   }
 
   private getLeaderboardPanelMetrics(): { width: number; height: number; compact: boolean } {
     const compact = this.isCompactLeaderboardLayout();
+    const ultraCompact = this.isUltraCompactLeaderboardLayout();
     const expandedMeta = this.shouldShowExpandedLeaderboardMeta();
     return {
       compact,
-      width: compact ? 580 : expandedMeta ? 700 : 680,
-      height: compact ? 452 : expandedMeta ? 940 : 640,
+      width: ultraCompact ? 520 : compact ? 580 : expandedMeta ? 700 : 680,
+      height: ultraCompact ? 336 : compact ? 452 : expandedMeta ? 940 : 640,
     };
   }
 
   private isCompactLeaderboardLayout(): boolean {
     return this.scale.height <= 420 || this.scale.width <= 760;
+  }
+
+  private isUltraCompactLeaderboardLayout(): boolean {
+    return this.scale.height <= 340;
   }
 
   private shouldShowExpandedLeaderboardMeta(): boolean {
@@ -3093,6 +3140,7 @@ export class MenuScene extends Phaser.Scene {
     if (!this.workshopDim || !this.workshopBox) return;
     const { width, height } = this.scale;
     const metrics = this.getWorkshopPanelMetrics();
+    const ultraCompact = this.isUltraCompactWorkshopLayout();
     const denseDesktop = !metrics.compact && this.isDenseWorkshopDesktopLayout();
     const halfWidth = metrics.width / 2;
     const halfHeight = metrics.height / 2;
@@ -3104,34 +3152,34 @@ export class MenuScene extends Phaser.Scene {
 
     this.workshopDim.setSize(width, height);
     panel?.setSize(metrics.width, metrics.height);
-    accent?.setPosition(0, -halfHeight + 48).setSize(metrics.width - 96, 2);
-    title?.setPosition(0, -halfHeight + 24).setStyle({ fontSize: metrics.compact ? "22px" : denseDesktop ? "28px" : "30px" });
+    accent?.setPosition(0, -halfHeight + (ultraCompact ? 34 : 48)).setSize(metrics.width - (ultraCompact ? 72 : 96), 2);
+    title?.setPosition(0, -halfHeight + (ultraCompact ? 18 : 24)).setStyle({ fontSize: ultraCompact ? "18px" : metrics.compact ? "22px" : denseDesktop ? "28px" : "30px" });
     this.workshopWalletText
-      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 54 : denseDesktop ? 64 : 66))
-      .setStyle({ fontSize: metrics.compact ? "16px" : denseDesktop ? "19px" : "18px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + (ultraCompact ? 24 : 40), -halfHeight + (ultraCompact ? 38 : metrics.compact ? 54 : denseDesktop ? 64 : 66))
+      .setStyle({ fontSize: ultraCompact ? "13px" : metrics.compact ? "16px" : denseDesktop ? "19px" : "18px", wordWrap: { width: metrics.width - (ultraCompact ? 48 : 96) } });
     this.workshopRecommendationText
-      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 86 : denseDesktop ? 102 : 100))
-      .setStyle({ fontSize: metrics.compact ? "14px" : denseDesktop ? "15px" : "17px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + (ultraCompact ? 24 : 40), -halfHeight + (ultraCompact ? 62 : metrics.compact ? 86 : denseDesktop ? 102 : 100))
+      .setStyle({ fontSize: ultraCompact ? "11px" : metrics.compact ? "14px" : denseDesktop ? "15px" : "17px", wordWrap: { width: metrics.width - (ultraCompact ? 48 : 96) } });
     this.workshopHintText
-      .setPosition(-halfWidth + 40, -halfHeight + (metrics.compact ? 118 : denseDesktop ? 138 : 138))
-      .setStyle({ fontSize: metrics.compact ? "12px" : denseDesktop ? "13px" : "13px", wordWrap: { width: metrics.width - 96 } });
+      .setPosition(-halfWidth + (ultraCompact ? 24 : 40), -halfHeight + (ultraCompact ? 84 : metrics.compact ? 118 : denseDesktop ? 138 : 138))
+      .setStyle({ fontSize: ultraCompact ? "10px" : metrics.compact ? "12px" : denseDesktop ? "13px" : "13px", wordWrap: { width: metrics.width - (ultraCompact ? 48 : 96) } });
     this.workshopFooterText
-      .setPosition(-halfWidth + 40, halfHeight - (metrics.compact ? 22 : denseDesktop ? 34 : 42))
-      .setStyle({ fontSize: metrics.compact ? "12px" : denseDesktop ? "13px" : "13px", wordWrap: { width: metrics.width - 96 } });
-    const pagerButtonWidth = metrics.compact ? 44 : denseDesktop ? 60 : 56;
-    const pagerButtonHeight = metrics.compact ? 30 : denseDesktop ? 38 : 36;
-    const pagerY = metrics.compact ? halfHeight - 28 : this.workshopFooterText.visible ? halfHeight - 88 : denseDesktop ? halfHeight - 46 : halfHeight - 50;
+      .setPosition(-halfWidth + (ultraCompact ? 24 : 40), halfHeight - (ultraCompact ? 18 : metrics.compact ? 22 : denseDesktop ? 34 : 42))
+      .setStyle({ fontSize: ultraCompact ? "10px" : metrics.compact ? "12px" : denseDesktop ? "13px" : "13px", wordWrap: { width: metrics.width - (ultraCompact ? 48 : 96) } });
+    const pagerButtonWidth = ultraCompact ? 38 : metrics.compact ? 44 : denseDesktop ? 60 : 56;
+    const pagerButtonHeight = ultraCompact ? 24 : metrics.compact ? 30 : denseDesktop ? 38 : 36;
+    const pagerY = ultraCompact ? halfHeight - 22 : metrics.compact ? halfHeight - 28 : this.workshopFooterText.visible ? halfHeight - 88 : denseDesktop ? halfHeight - 46 : halfHeight - 50;
     this.workshopPagePrevButton.setPosition(-56, pagerY).setSize(pagerButtonWidth, pagerButtonHeight);
-    this.workshopPagePrevLabel.setPosition(-56, pagerY).setStyle({ fontSize: metrics.compact ? "15px" : denseDesktop ? "18px" : "17px" });
-    this.workshopPageLabel.setPosition(0, pagerY).setStyle({ fontSize: metrics.compact ? "13px" : denseDesktop ? "16px" : "15px" });
+    this.workshopPagePrevLabel.setPosition(-56, pagerY).setStyle({ fontSize: ultraCompact ? "12px" : metrics.compact ? "15px" : denseDesktop ? "18px" : "17px" });
+    this.workshopPageLabel.setPosition(0, pagerY).setStyle({ fontSize: ultraCompact ? "11px" : metrics.compact ? "13px" : denseDesktop ? "16px" : "15px" });
     this.workshopPageNextButton.setPosition(56, pagerY).setSize(pagerButtonWidth, pagerButtonHeight);
-    this.workshopPageNextLabel.setPosition(56, pagerY).setStyle({ fontSize: metrics.compact ? "15px" : denseDesktop ? "18px" : "17px" });
-    btnClose?.setPosition(halfWidth - 52, -halfHeight + 24);
-    labelClose?.setPosition(halfWidth - 52, -halfHeight + 24).setStyle({ fontSize: metrics.compact ? "13px" : "13px" });
-    fitTextScaleToWidth(this.workshopWalletText, metrics.width - 96, 0.78);
-    fitTextScaleToWidth(this.workshopRecommendationText, metrics.width - 96, 0.8);
-    fitTextScaleToWidth(this.workshopHintText, metrics.width - 96, 0.78);
-    fitTextScaleToWidth(this.workshopFooterText, metrics.width - 96, 0.78);
+    this.workshopPageNextLabel.setPosition(56, pagerY).setStyle({ fontSize: ultraCompact ? "12px" : metrics.compact ? "15px" : denseDesktop ? "18px" : "17px" });
+    btnClose?.setPosition(halfWidth - (ultraCompact ? 40 : 52), -halfHeight + (ultraCompact ? 18 : 24)).setSize(ultraCompact ? 56 : 72, ultraCompact ? 26 : 34);
+    labelClose?.setPosition(halfWidth - (ultraCompact ? 40 : 52), -halfHeight + (ultraCompact ? 18 : 24)).setStyle({ fontSize: ultraCompact ? "11px" : "13px" });
+    fitTextScaleToWidth(this.workshopWalletText, metrics.width - (ultraCompact ? 48 : 96), 0.78);
+    fitTextScaleToWidth(this.workshopRecommendationText, metrics.width - (ultraCompact ? 48 : 96), 0.8);
+    fitTextScaleToWidth(this.workshopHintText, metrics.width - (ultraCompact ? 48 : 96), 0.78);
+    fitTextScaleToWidth(this.workshopFooterText, metrics.width - (ultraCompact ? 48 : 96), 0.78);
     fitTextScaleToWidth(this.workshopPageLabel, 96, 0.8);
     const scale = Math.min(1, (width - 24) / metrics.width, (height - 24) / metrics.height);
     this.workshopBox.setScale(scale).setPosition(width / 2, height / 2);
@@ -3161,6 +3209,7 @@ export class MenuScene extends Phaser.Scene {
     if (!this.leaderboardDim || !this.leaderboardBox) return;
     const { width, height } = this.scale;
     const metrics = this.getLeaderboardPanelMetrics();
+    const ultraCompact = this.isUltraCompactLeaderboardLayout();
     const uiStage = getUiProgressSnapshot(this.saveManager.get()).stage;
     const halfWidth = metrics.width / 2;
     const halfHeight = metrics.height / 2;
@@ -3169,23 +3218,25 @@ export class MenuScene extends Phaser.Scene {
     const expandedMeta = this.shouldShowExpandedLeaderboardMeta();
     const denseDesktop = !metrics.compact && !expandedMeta;
     const rowSlots = metrics.compact
-      ? uiStage === "advanced"
+      ? ultraCompact
+        ? 2
+        : uiStage === "advanced"
         ? 4
         : 3
       : expandedMeta
         ? getLeaderboardRowLimit(uiStage)
         : Math.min(4, getLeaderboardRowLimit(uiStage));
-    const headerHintY = metrics.compact ? -halfHeight + 80 : denseDesktop ? -halfHeight + 82 : -halfHeight + 92;
-    const filterY = metrics.compact ? -halfHeight + 126 : denseDesktop ? -halfHeight + 128 : -halfHeight + 152;
-    const rowsStartY = metrics.compact ? -halfHeight + 168 : denseDesktop ? -halfHeight + 166 : -halfHeight + 218;
-    const rowStep = metrics.compact ? 58 : denseDesktop ? 60 : 48;
-    const rowWidth = metrics.compact ? metrics.width - 64 : denseDesktop ? 600 : 620;
-    const rowHeight = metrics.compact ? 54 : denseDesktop ? 56 : 46;
-    const rowTextX = -rowWidth / 2 + (metrics.compact ? 18 : denseDesktop ? 18 : 20);
-    const rowTextTop = metrics.compact ? 18 : denseDesktop ? 18 : 16;
+    const headerHintY = ultraCompact ? -halfHeight + 60 : metrics.compact ? -halfHeight + 80 : denseDesktop ? -halfHeight + 82 : -halfHeight + 92;
+    const filterY = ultraCompact ? -halfHeight + 100 : metrics.compact ? -halfHeight + 126 : denseDesktop ? -halfHeight + 128 : -halfHeight + 152;
+    const rowsStartY = ultraCompact ? -halfHeight + 112 : metrics.compact ? -halfHeight + 168 : denseDesktop ? -halfHeight + 166 : -halfHeight + 218;
+    const rowStep = ultraCompact ? 46 : metrics.compact ? 58 : denseDesktop ? 60 : 48;
+    const rowWidth = ultraCompact ? metrics.width - 44 : metrics.compact ? metrics.width - 64 : denseDesktop ? 600 : 620;
+    const rowHeight = ultraCompact ? 42 : metrics.compact ? 54 : denseDesktop ? 56 : 46;
+    const rowTextX = -rowWidth / 2 + (ultraCompact ? 14 : metrics.compact ? 18 : denseDesktop ? 18 : 20);
+    const rowTextTop = ultraCompact ? 13 : metrics.compact ? 18 : denseDesktop ? 18 : 16;
     const lastRowY = rowsStartY + Math.max(0, rowSlots - 1) * rowStep;
     const rowBottomY = lastRowY + rowHeight / 2;
-    const footerY = expandedMeta ? 316 : rowBottomY + 28;
+    const footerY = expandedMeta ? 316 : rowBottomY + (ultraCompact ? 18 : 28);
     const panel = this.leaderboardBox.list[0] as Phaser.GameObjects.Rectangle | undefined;
     const accent = this.leaderboardBox.list[1] as Phaser.GameObjects.Rectangle | undefined;
     const title = this.leaderboardBox.list[2] as Phaser.GameObjects.Text | undefined;
@@ -3194,43 +3245,43 @@ export class MenuScene extends Phaser.Scene {
 
     this.leaderboardDim.setSize(width, height);
     panel?.setSize(metrics.width, metrics.height);
-    accent?.setPosition(0, headerAccentY).setSize(metrics.width - 108, 2);
-    title?.setPosition(0, headerTitleY).setStyle({ fontSize: metrics.compact ? "24px" : "28px" });
+    accent?.setPosition(0, ultraCompact ? -halfHeight + 36 : headerAccentY).setSize(metrics.width - (ultraCompact ? 72 : 108), 2);
+    title?.setPosition(0, ultraCompact ? -halfHeight + 16 : headerTitleY).setStyle({ fontSize: ultraCompact ? "18px" : metrics.compact ? "24px" : "28px" });
     this.leaderboardHintText.setPosition(0, headerHintY).setStyle({
-      fontSize: metrics.compact ? "14px" : expandedMeta ? "13px" : "14px",
+      fontSize: ultraCompact ? "11px" : metrics.compact ? "14px" : expandedMeta ? "13px" : "14px",
       color: metrics.compact ? "#ffd78a" : "#98b7c7",
-      wordWrap: { width: metrics.width - 140 },
+      wordWrap: { width: metrics.width - (ultraCompact ? 72 : 140) },
     });
-    btnClose?.setPosition(halfWidth - 58, headerTitleY);
-    labelClose?.setPosition(halfWidth - 58, headerTitleY);
+    btnClose?.setPosition(halfWidth - (ultraCompact ? 42 : 58), ultraCompact ? -halfHeight + 16 : headerTitleY).setSize(ultraCompact ? 56 : 72, ultraCompact ? 26 : 34);
+    labelClose?.setPosition(halfWidth - (ultraCompact ? 42 : 58), ultraCompact ? -halfHeight + 16 : headerTitleY).setStyle({ fontSize: ultraCompact ? "10px" : "12px" });
 
-    const filterSpacing = metrics.compact ? 156 : denseDesktop ? 164 : 184;
-    const filterButtonWidth = metrics.compact ? 120 : denseDesktop ? 136 : 148;
+    const filterSpacing = ultraCompact ? 124 : metrics.compact ? 156 : denseDesktop ? 164 : 184;
+    const filterButtonWidth = ultraCompact ? 96 : metrics.compact ? 120 : denseDesktop ? 136 : 148;
     this.leaderboardFilterButtons.forEach((entry, index) => {
       const x = -filterSpacing + index * filterSpacing;
-      entry.button.setPosition(x, filterY).setSize(filterButtonWidth, metrics.compact ? 36 : 38);
-      entry.label.setPosition(x, filterY).setStyle({ fontSize: metrics.compact ? "12px" : "14px" });
+      entry.button.setPosition(x, filterY).setSize(filterButtonWidth, ultraCompact ? 28 : metrics.compact ? 36 : 38);
+      entry.label.setPosition(x, filterY).setStyle({ fontSize: ultraCompact ? "10px" : metrics.compact ? "12px" : "14px" });
     });
 
     this.leaderboardRows.forEach((row, index) => {
       const y = rowsStartY + index * rowStep;
       row.bg.setPosition(0, y).setSize(rowWidth, rowHeight);
       row.text.setPosition(rowTextX, y - rowTextTop).setStyle({
-        fontSize: metrics.compact ? "15px" : "13px",
+        fontSize: ultraCompact ? "12px" : metrics.compact ? "15px" : "13px",
         wordWrap: { width: rowWidth - 40 },
       });
     });
 
     this.leaderboardEmptyPanel
-      .setPosition(0, metrics.compact ? rowsStartY + 58 : denseDesktop ? rowsStartY + 72 : -86)
-      .setSize(rowWidth, metrics.compact ? 132 : denseDesktop ? 148 : 172);
-    this.leaderboardEmptyText.setPosition(0, metrics.compact ? rowsStartY + 58 : denseDesktop ? rowsStartY + 72 : -86).setStyle({
-      fontSize: metrics.compact ? "14px" : denseDesktop ? "14px" : "15px",
+      .setPosition(0, ultraCompact ? rowsStartY + 34 : metrics.compact ? rowsStartY + 58 : denseDesktop ? rowsStartY + 72 : -86)
+      .setSize(rowWidth, ultraCompact ? 96 : metrics.compact ? 132 : denseDesktop ? 148 : 172);
+    this.leaderboardEmptyText.setPosition(0, ultraCompact ? rowsStartY + 34 : metrics.compact ? rowsStartY + 58 : denseDesktop ? rowsStartY + 72 : -86).setStyle({
+      fontSize: ultraCompact ? "11px" : metrics.compact ? "14px" : denseDesktop ? "14px" : "15px",
       wordWrap: { width: rowWidth - 48 },
     });
     this.leaderboardFooterText.setPosition(0, footerY).setStyle({
-      fontSize: metrics.compact ? "12px" : expandedMeta ? "12px" : "12px",
-      wordWrap: { width: metrics.width - 140 },
+      fontSize: ultraCompact ? "10px" : metrics.compact ? "12px" : expandedMeta ? "12px" : "12px",
+      wordWrap: { width: metrics.width - (ultraCompact ? 84 : 140) },
     });
     this.leaderboardCareerTitleText.setVisible(expandedMeta).setPosition(-rowWidth / 2, metrics.compact ? halfHeight - 184 : 170);
     this.leaderboardCareerText
@@ -3295,6 +3346,7 @@ export class MenuScene extends Phaser.Scene {
     const requestNonce = ++this.leaderboardRefreshNonce;
     const uiStage = getUiProgressSnapshot(save).stage;
     const compactLeaderboard = this.getLeaderboardPanelMetrics().compact;
+    const ultraCompactLeaderboard = this.isUltraCompactLeaderboardLayout();
     const fullLeaderboard = uiStage === "advanced" && !compactLeaderboard;
     const expandedMeta = fullLeaderboard && this.shouldShowExpandedLeaderboardMeta();
 
@@ -3346,7 +3398,13 @@ export class MenuScene extends Phaser.Scene {
             })
         : t(this.locale, "menu.leaderboardScoring");
     this.leaderboardHintText.setText(
-      expandedMeta
+      ultraCompactLeaderboard
+        ? rank
+          ? `${t(this.locale, "results.rank", { rank: formatNumber(this.locale, rank) })} | ${formatNumber(this.locale, hintedScore)}`
+          : nextDivision
+            ? `${t(this.locale, `leaderboard.division.${nextDivision.id}`)} | ${formatNumber(this.locale, nextDivision.minScore)}`
+            : t(this.locale, "menu.leaderboardScoring")
+      : expandedMeta
         ? [
             t(this.locale, "menu.leaderboardHint", {
               mode: t(this.locale, `leaderboard.filter.${effectiveFilter}`),
@@ -3397,7 +3455,7 @@ export class MenuScene extends Phaser.Scene {
           ].join("\n")
     );
     this.leaderboardHintText.setStyle({
-      fontSize: compactLeaderboard ? "14px" : expandedMeta ? "13px" : "14px",
+      fontSize: ultraCompactLeaderboard ? "11px" : compactLeaderboard ? "14px" : expandedMeta ? "13px" : "14px",
       color: compactLeaderboard ? "#ffd78a" : "#98b7c7",
     });
     if (expandedMeta && this.leaderboardHintText.height > 46) {
@@ -3415,7 +3473,9 @@ export class MenuScene extends Phaser.Scene {
       );
 
     const rowLimit = compactLeaderboard
-      ? uiStage === "advanced"
+      ? ultraCompactLeaderboard
+        ? 2
+        : uiStage === "advanced"
         ? 4
         : 3
       : expandedMeta
@@ -3423,7 +3483,7 @@ export class MenuScene extends Phaser.Scene {
         : uiStage === "advanced"
           ? 4
           : Math.min(4, getLeaderboardRowLimit(uiStage));
-    const rowTextWidth = compactLeaderboard ? 476 : fullLeaderboard && !expandedMeta ? 540 : 560;
+    const rowTextWidth = ultraCompactLeaderboard ? 420 : compactLeaderboard ? 476 : fullLeaderboard && !expandedMeta ? 540 : 560;
     for (let i = 0; i < this.leaderboardRows.length; i++) {
       const row = this.leaderboardRows[i]!;
       const entry = filtered[i];
@@ -3469,12 +3529,14 @@ export class MenuScene extends Phaser.Scene {
       row.text
         .setVisible(true)
         .setText(
-          fullLeaderboard
+          ultraCompactLeaderboard
+            ? `${rank}. ${entry.pilot} | ${scoreText}`
+            : fullLeaderboard
             ? `${primaryLine}\n${detailParts.join(" | ")}`
             : `${primaryLine}\n${compactParts.join(" | ")}`
         )
-        .setStyle({ fontSize: compactLeaderboard ? "16px" : fullLeaderboard && !expandedMeta ? "15px" : fullLeaderboard ? "13px" : "15px" });
-      fitTextScaleToWidth(row.text, rowTextWidth, compactLeaderboard ? 0.86 : 0.88);
+        .setStyle({ fontSize: ultraCompactLeaderboard ? "12px" : compactLeaderboard ? "16px" : fullLeaderboard && !expandedMeta ? "15px" : fullLeaderboard ? "13px" : "15px" });
+      fitTextScaleToWidth(row.text, rowTextWidth, ultraCompactLeaderboard ? 0.8 : compactLeaderboard ? 0.86 : 0.88);
     }
 
     this.leaderboardCareerTitleText.setText(t(this.locale, "menu.careerMilestonesTitle"));
@@ -3516,7 +3578,7 @@ export class MenuScene extends Phaser.Scene {
                 mode: t(this.locale, `leaderboard.filter.${this.latestLeaderboardFilter}`),
               })
         : "";
-    this.leaderboardFooterText.setVisible(footerText.length > 0).setText(footerText);
+    this.leaderboardFooterText.setVisible(!ultraCompactLeaderboard && footerText.length > 0).setText(footerText);
 
     if (expandedMeta) {
       await this.refreshPlatformLeaderboardSummary(requestNonce);
