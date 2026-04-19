@@ -1,5 +1,5 @@
 import { type Locale, resolveLocale, t } from "../i18n/localization";
-import { getPlatformBootstrapLocaleHint } from "../platform/sdk/loadPlatformSdk";
+import { getPlatformBootstrapLocaleHint, getPreinitializedYandexSdk } from "../platform/sdk/loadPlatformSdk";
 
 type BootstrapLocale = Locale;
 
@@ -31,6 +31,7 @@ export function reportFatalStartupError(error: unknown): void {
   const locale = getBootstrapLocale();
   syncDocumentLocale(locale);
   renderFatalOverlay(locale);
+  void refreshFatalOverlayLocaleHint(locale);
 }
 
 export function getBootstrapLocale(): BootstrapLocale {
@@ -72,6 +73,19 @@ function renderFatalOverlay(locale: BootstrapLocale): void {
       }
     };
   }
+}
+
+async function refreshFatalOverlayLocaleHint(currentLocale: BootstrapLocale): Promise<void> {
+  try {
+    await getPreinitializedYandexSdk();
+  } catch {
+    return;
+  }
+
+  const nextLocale = getBootstrapLocale();
+  if (nextLocale === currentLocale) return;
+  syncDocumentLocale(nextLocale);
+  renderFatalOverlay(nextLocale);
 }
 
 function ensureOverlay(host: HTMLElement): HTMLElement {

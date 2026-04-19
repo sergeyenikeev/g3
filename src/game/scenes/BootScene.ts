@@ -8,7 +8,8 @@ import { AdsManager } from "../../platform/ads/adsManager";
 import { createPlatformAdapter } from "../../platform/platformFactory";
 import { getPlatformLanguageHint, resolvePlatformTimeOffsetMs } from "../../platform/platformRuntime";
 import { SaveManager } from "../../platform/save/saveManager";
-import { resolveLocale, t } from "../../i18n/localization";
+import { getPreinitializedYandexSdk } from "../../platform/sdk/loadPlatformSdk";
+import { type Locale, resolveLocale, t } from "../../i18n/localization";
 import { getUtcYyyymmdd } from "../daily/daily";
 import { normalizeLiveopsSave } from "../liveops/liveops";
 
@@ -20,6 +21,8 @@ export class BootScene extends Phaser.Scene {
   preload(): void {
     const bootLocale = getBootstrapLocale();
     syncDocumentLocale(bootLocale);
+    let activeBootLocale: Locale = bootLocale;
+    let loadingProgress = 0;
     const w = this.scale.width;
     const h = this.scale.height;
     const panelWidth = Math.min(620, w * 0.84);
@@ -35,7 +38,7 @@ export class BootScene extends Phaser.Scene {
     panel.setStrokeStyle(2, 0x29445f, 0.9);
     this.add.rectangle(w / 2, panel.y - panelHeight / 2 + 18, panelWidth - 32, 4, 0x5cc8ff, 0.92);
 
-    this.add
+    const titleText = this.add
       .text(w / 2, panel.y - 48, t(bootLocale, "bootstrap.loading.title"), {
         fontSize: `${titleSize}px`,
         color: "#f5fbff",
@@ -44,7 +47,7 @@ export class BootScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.add
+    const bodyText = this.add
       .text(w / 2, panel.y - 8, t(bootLocale, "bootstrap.loading.body"), {
         fontSize: `${bodySize}px`,
         color: "#b8d3e8",
@@ -115,8 +118,13 @@ export class BootScene extends Phaser.Scene {
 
     this.load.on("progress", (p: number) => {
       const safeProgress = Phaser.Math.Clamp(p, 0, 1);
+      loadingProgress = safeProgress;
       bar.width = Math.max(0, (barBg.width - 6) * safeProgress);
-      progressText.setText(t(bootLocale, "bootstrap.loading.progress", { value: Math.round(safeProgress * 100) }));
+      progressText.setText(t(activeBootLocale, "bootstrap.loading.progress", { value: Math.round(safeProgress * 100) }));
+    });
+
+    void this.refreshBootLocaleHint(bootLocale, titleText, bodyText, progressText, () => loadingProgress, (locale) => {
+      activeBootLocale = locale;
     });
   }
 
@@ -136,6 +144,31 @@ export class BootScene extends Phaser.Scene {
     this.registry.set("staticGameData", data);
 
     void this.bootstrap();
+  }
+
+  private async refreshBootLocaleHint(
+    initialLocale: Locale,
+    titleText: Phaser.GameObjects.Text,
+    bodyText: Phaser.GameObjects.Text,
+    progressText: Phaser.GameObjects.Text,
+    getProgress: () => number,
+    setActiveLocale: (locale: Locale) => void
+  ): Promise<void> {
+    try {
+      await getPreinitializedYandexSdk();
+    } catch {
+      return;
+    }
+
+    const nextLocale = getBootstrapLocale();
+    if (nextLocale === initialLocale) return;
+    if (!this.scene.isActive()) return;
+
+    syncDocumentLocale(nextLocale);
+    setActiveLocale(nextLocale);
+    titleText.setText(t(nextLocale, "bootstrap.loading.title"));
+    bodyText.setText(t(nextLocale, "bootstrap.loading.body"));
+    progressText.setText(t(nextLocale, "bootstrap.loading.progress", { value: Math.round(getProgress() * 100) }));
   }
 
   private async bootstrap(): Promise<void> {

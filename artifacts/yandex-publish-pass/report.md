@@ -1,6 +1,6 @@
 # Yandex Publish Smoke
 
-Generated: 2026-04-19T06:23:36.186Z
+Generated: 2026-04-19T07:20:35.717Z
 
 ## Build Targets
 - Release zip: D:\p\g3\dist\releases\magnet-caravan_yandex.zip
@@ -9,17 +9,18 @@ Generated: 2026-04-19T06:23:36.186Z
 - Local preview URL: http://127.0.0.1:4310
 
 ## Automated Checks
-- PASS: SDK script injected into release index.html — D:\p\g3\dist\platform_builds\yandex\index.html
-- PASS: Yandex build boots without fatal overlay — D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
-- PASS: LoadingAPI.ready is called on startup — D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
-- PASS: Browser context menu is prevented on the playfield — D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
-- PASS: Browser text selection is prevented on the playfield — D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
-- PASS: GameplayAPI.start is called during a run — D:\p\g3\artifacts\yandex-publish-pass\02_runtime_ui.png
-- PASS: GameplayAPI.stop is called for pauses/results — D:\p\g3\artifacts\yandex-publish-pass\04_results_before_rewarded.png
-- PASS: Rewarded flow can be completed from the results screen — D:\p\g3\artifacts\yandex-publish-pass\05_results_after_rewarded.png
-- PASS: Results exit returns to menu without fatal errors — D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
-- PASS: Interstitial SDK path can be completed on the Yandex adapter — before exit: 0, before manual smoke: 0, final: 1
-- PASS: No runtime page errors were captured during smoke — none
+- PASS: SDK script injected into release index.html - D:\p\g3\dist\platform_builds\yandex\index.html
+- PASS: Yandex build boots without fatal overlay - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
+- PASS: Platform locale hint overrides browser locale on auto language - document.lang=ru, menuLocale=ru
+- PASS: LoadingAPI.ready is called on startup - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
+- PASS: Browser context menu is prevented on the playfield - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
+- PASS: Browser text selection is prevented on the playfield - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
+- PASS: GameplayAPI.start is called during a run - D:\p\g3\artifacts\yandex-publish-pass\02_runtime_ui.png
+- PASS: GameplayAPI.stop is called for pauses/results - D:\p\g3\artifacts\yandex-publish-pass\04_results_before_rewarded.png
+- PASS: Rewarded flow can be completed from the results screen - D:\p\g3\artifacts\yandex-publish-pass\05_results_after_rewarded.png
+- PASS: Results exit returns to menu without fatal errors - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
+- PASS: Interstitial SDK path can be completed on the Yandex adapter - before exit: 0, before manual smoke: 0, final: 1
+- PASS: No runtime page errors were captured during smoke - none
 
 ## Evidence
 - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png

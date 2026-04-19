@@ -38,6 +38,7 @@ try {
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({
+      locale: "en-US",
       viewport: { width: 1600, height: 900 },
       deviceScaleFactor: 1,
     });
@@ -65,9 +66,11 @@ try {
       const stub = globalThis.window.__YA_STUB_STATE__;
       return {
         fatalOverlay,
+        documentLang: globalThis.document.documentElement.lang || null,
         loadingReadyCalls: Number(stub?.loadingReadyCalls ?? 0),
         gameplayStartCalls: Number(stub?.gameplayStartCalls ?? 0),
         gameplayStopCalls: Number(stub?.gameplayStopCalls ?? 0),
+        menuLocale: globalThis.window.__MC_GAME__?.registry?.get?.("locale") ?? null,
       };
     });
 
@@ -167,6 +170,13 @@ try {
 
     checks.push(check("SDK script injected into release index.html", sdkTagInjected, actualIndexPath));
     checks.push(check("Yandex build boots without fatal overlay", !startupState.fatalOverlay, starterShot));
+    checks.push(
+      check(
+        "Platform locale hint overrides browser locale on auto language",
+        startupState.documentLang === "ru" && startupState.menuLocale === "ru",
+        `document.lang=${startupState.documentLang}, menuLocale=${startupState.menuLocale}`
+      )
+    );
     checks.push(check("LoadingAPI.ready is called on startup", startupState.loadingReadyCalls >= 1, starterShot));
     checks.push(check("Browser context menu is prevented on the playfield", browserGuards.contextMenuPrevented, starterShot));
     checks.push(check("Browser text selection is prevented on the playfield", browserGuards.selectStartPrevented, starterShot));
@@ -416,6 +426,15 @@ function check(label, ok, details) {
 function buildReport({ releaseZip, releaseIndexPath, smokeDir, baseUrl, checks, evidence, pageErrors }) {
   const summary = checks.map((item) => `- ${item.ok ? "PASS" : "FAIL"}: ${item.label}${item.details ? ` — ${item.details}` : ""}`).join("\n");
   const evidenceList = evidence.map((item) => `- ${item}`).join("\n");
+  const summaryLines = checks
+    .map((item) => {
+      const prefix = `- ${item.ok ? "PASS" : "FAIL"}: ${item.label}`;
+      return item.details ? `${prefix} - ${item.details}` : prefix;
+    })
+    .join("\n");
+  const normalizedSummary = summary.replace(/\s+вЂ”\s+/g, " - ");
+  void summary;
+  void normalizedSummary;
   const errorsSection = pageErrors.length > 0 ? pageErrors.map((item) => `- ${item}`).join("\n") : "- none";
 
   return `# Yandex Publish Smoke
@@ -429,7 +448,7 @@ Generated: ${new Date().toISOString()}
 - Local preview URL: ${baseUrl}
 
 ## Automated Checks
-${summary}
+${summaryLines}
 
 ## Evidence
 ${evidenceList}
