@@ -134,6 +134,31 @@ try {
       };
     });
 
+    const postBootRuntimeErrorState = await smokePage.evaluate(() => {
+      try {
+        const event = new globalThis.ErrorEvent("error", {
+          message: "Synthetic post-boot runtime smoke error",
+          error: new Error("Synthetic post-boot runtime smoke error"),
+        });
+        globalThis.window.dispatchEvent(event);
+      } catch {
+        // ignore
+      }
+
+      const rawReport = globalThis.localStorage.getItem("magnet_caravan.boot_report");
+      let report = null;
+      try {
+        report = rawReport ? JSON.parse(rawReport) : null;
+      } catch {
+        report = null;
+      }
+
+      return {
+        fatalOverlay: Boolean(globalThis.document.getElementById("mc-fatal-overlay")),
+        report,
+      };
+    });
+
     await smokePage.evaluate(() => {
       globalThis.window.__YA_STUB_API__?.emit?.("game_api_pause");
       globalThis.window.__YA_STUB_API__?.emit?.("game_api_resume");
@@ -265,6 +290,15 @@ try {
     checks.push(check("LoadingAPI.ready is called on the AUTO smoke build", startupState.loadingReadyCalls >= 1, starterShot));
     checks.push(check("Browser context menu is prevented on the playfield", browserGuards.contextMenuPrevented, starterShot));
     checks.push(check("Browser text selection is prevented on the playfield", browserGuards.selectStartPrevented, starterShot));
+    checks.push(
+      check(
+        "Post-boot global runtime errors are logged without showing the fatal startup overlay",
+        !postBootRuntimeErrorState.fatalOverlay &&
+          postBootRuntimeErrorState.report?.stage === "menu-start" &&
+          postBootRuntimeErrorState.report?.status === "fatal",
+        postBootRuntimeErrorState.report ? JSON.stringify(postBootRuntimeErrorState.report) : "missing runtime report"
+      )
+    );
     checks.push(
       check(
         "Yandex stub pause/resume events can be emitted against the AUTO smoke build",

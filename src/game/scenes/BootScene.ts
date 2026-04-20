@@ -1,5 +1,15 @@
 import Phaser from "phaser";
-import { buildBootReport, clearBootReport, clearRawPlatformSave, getBootQueryFlags, persistBootReport, persistRawPlatformSave, setCurrentBootStage, type BootReport } from "../../app/bootDiagnostics";
+import {
+  buildBootReport,
+  clearBootReport,
+  clearRawPlatformSave,
+  getBootQueryFlags,
+  markBootCompleted,
+  persistBootReport,
+  persistRawPlatformSave,
+  setCurrentBootStage,
+  type BootReport,
+} from "../../app/bootDiagnostics";
 import { getBootstrapLocale, reportFatalStartupErrorWithReport, syncDocumentLocale } from "../../app/bootstrapShell";
 import type { StaticGameData } from "../../data/staticGameData";
 import { createAnalyticsAdapter } from "../../analytics/analyticsFactory";
@@ -316,6 +326,7 @@ export class BootScene extends Phaser.Scene {
 
     setCurrentBootStage("menu-start");
     this.scene.start("menu");
+    markBootCompleted();
   }
 
   private createBootReport(

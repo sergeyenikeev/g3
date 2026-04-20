@@ -1,5 +1,13 @@
 import "./style.css";
-import { buildBootReport, clearBootReport, clearRawPlatformSave, resetBootDiagnostics, setCurrentBootStage } from "./app/bootDiagnostics";
+import {
+  buildBootReport,
+  clearBootReport,
+  clearRawPlatformSave,
+  hasBootCompleted,
+  persistBootReport,
+  resetBootDiagnostics,
+  setCurrentBootStage,
+} from "./app/bootDiagnostics";
 import { getBootstrapLocale, installBrowserInteractionGuards, reportFatalStartupErrorWithReport, syncDocumentLocale } from "./app/bootstrapShell";
 import { ensurePlatformSdkLoaded } from "./platform/sdk/loadPlatformSdk";
 
@@ -12,11 +20,24 @@ clearBootReport();
 clearRawPlatformSave();
 
 window.addEventListener("error", (event) => {
-  reportFatalStartupErrorWithReport(event.error ?? event.message, buildBootReport(event.error ?? event.message));
+  const error = event.error ?? event.message;
+  const report = buildBootReport(error);
+  if (hasBootCompleted()) {
+    persistBootReport(report);
+    console.error("[Magnet Caravan] runtime error after boot", report, error);
+    return;
+  }
+  reportFatalStartupErrorWithReport(error, report);
 });
 
 window.addEventListener("unhandledrejection", (event) => {
-  reportFatalStartupErrorWithReport(event.reason, buildBootReport(event.reason));
+  const report = buildBootReport(event.reason);
+  if (hasBootCompleted()) {
+    persistBootReport(report);
+    console.error("[Magnet Caravan] unhandled rejection after boot", report, event.reason);
+    return;
+  }
+  reportFatalStartupErrorWithReport(event.reason, report);
 });
 
 void (async () => {

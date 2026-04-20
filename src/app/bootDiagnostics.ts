@@ -35,6 +35,7 @@ export const BOOT_REPORT_STORAGE_KEY = "magnet_caravan.boot_report";
 export const RAW_PLATFORM_SAVE_QUARANTINE_KEY = "magnet_caravan.boot_report.raw_platform_save";
 
 let currentBootStage: BootStage = "sdk-script";
+let bootCompleted = false;
 
 export function setCurrentBootStage(stage: BootStage): void {
   currentBootStage = stage;
@@ -46,6 +47,15 @@ export function getCurrentBootStage(): BootStage {
 
 export function resetBootDiagnostics(): void {
   currentBootStage = "sdk-script";
+  bootCompleted = false;
+}
+
+export function markBootCompleted(): void {
+  bootCompleted = true;
+}
+
+export function hasBootCompleted(): boolean {
+  return bootCompleted;
 }
 
 export function getBootQueryFlags(locationLike: Pick<Location, "search"> | null | undefined = globalThis.location): BootQueryFlags {

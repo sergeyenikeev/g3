@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { buildBootReport, persistBootReport } from "../../app/bootDiagnostics";
 import { syncDocumentLocale } from "../../app/bootstrapShell";
 import type { AnalyticsAdapter } from "../../analytics/analyticsAdapter";
 import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
@@ -125,7 +126,13 @@ export class MenuScene extends Phaser.Scene {
   }> = [];
   private leaderboardRows: Array<{
     bg: Phaser.GameObjects.Rectangle;
-    text: Phaser.GameObjects.Text;
+    rankBg: Phaser.GameObjects.Rectangle;
+    rankText: Phaser.GameObjects.Text;
+    pilotText: Phaser.GameObjects.Text;
+    scoreText: Phaser.GameObjects.Text;
+    metaText: Phaser.GameObjects.Text;
+    badgeBg: Phaser.GameObjects.Rectangle;
+    badgeText: Phaser.GameObjects.Text;
   }> = [];
   private leaderboardFilter: LeaderboardFilter = "all";
   private latestLeaderboardFilter: LeaderboardFilter = "all";
@@ -417,7 +424,8 @@ export class MenuScene extends Phaser.Scene {
     btnQuality.on("pointerdown", () => {
       const idx = order.indexOf(qualityPref);
       const next = order[(idx + 1) % order.length]!;
-      void this.setVisualQuality(next).then(() => {
+      this.runGuardedTask("setVisualQuality", async () => {
+        await this.setVisualQuality(next);
         qualityPref = next;
         applyQualityLabel(next);
         this.toast(t(this.locale, "toast.graphics", { value: formatQualityLabel(this.locale, next) }));
@@ -426,7 +434,8 @@ export class MenuScene extends Phaser.Scene {
 
     btnSfx.on("pointerdown", () => {
       const next = nextVolumeStep(sfxVolume);
-      void this.setAudioVolume("sfxVolume", next).then(() => {
+      this.runGuardedTask("setAudioVolume:sfx", async () => {
+        await this.setAudioVolume("sfxVolume", next);
         sfxVolume = next;
         applyVolumeLabel(btnSfx, labelSfx, "settings.sfx", next);
         this.toast(t(this.locale, "toast.sfx", { value: formatVolume(this.locale, next) }));
@@ -435,7 +444,8 @@ export class MenuScene extends Phaser.Scene {
 
     btnMusic.on("pointerdown", () => {
       const next = nextVolumeStep(musicVolume);
-      void this.setAudioVolume("musicVolume", next).then(() => {
+      this.runGuardedTask("setAudioVolume:music", async () => {
+        await this.setAudioVolume("musicVolume", next);
         musicVolume = next;
         applyVolumeLabel(btnMusic, labelMusic, "settings.music", next);
         this.toast(t(this.locale, "toast.music", { value: formatVolume(this.locale, next) }));
@@ -445,7 +455,8 @@ export class MenuScene extends Phaser.Scene {
     btnLanguage.on("pointerdown", () => {
       const idx = languageOrder.indexOf(this.languageSetting);
       const next = languageOrder[(idx + 1) % languageOrder.length]!;
-      void this.setLanguage(next).then(() => {
+      this.runGuardedTask("setLanguage", async () => {
+        await this.setLanguage(next);
         this.languageSetting = next;
         this.locale = this.resolveLocaleSetting(next);
         this.registry.set("languageSetting", next);
@@ -453,7 +464,7 @@ export class MenuScene extends Phaser.Scene {
         this.scene.restart();
       });
     });
-    btnPilot.on("pointerdown", () => void this.editPilotName());
+    btnPilot.on("pointerdown", () => this.runGuardedTask("editPilotName", () => this.editPilotName()));
 
     const btnPlay = this.add
       .rectangle(0, 0, 308, 68, 0x13283d, 0.98)
@@ -473,9 +484,13 @@ export class MenuScene extends Phaser.Scene {
 
     btnPlay.on("pointerdown", () => {
       const onboarding = getOnboardingBoostStatus(this.saveManager.get(), this.staticData.liveops);
-      void (rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled && !onboarding.eligible
-        ? this.startRunBoosted()
-        : startStandardRun());
+      this.runGuardedTask(
+        rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled && !onboarding.eligible ? "startRunBoosted" : "startStandardRun",
+        () =>
+          rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled && !onboarding.eligible
+            ? this.startRunBoosted()
+            : startStandardRun()
+      );
     });
 
     const btnPlayBoost = this.add
@@ -487,7 +502,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
     btnPlayBoost.setVisible(boosterEnabled);
     labelPlayBoost.setVisible(boosterEnabled);
-    btnPlayBoost.on("pointerdown", () => void this.startRunBoosted());
+    btnPlayBoost.on("pointerdown", () => this.runGuardedTask("startRunBoosted", () => this.startRunBoosted()));
 
     const btnTraining = this.add
       .rectangle(0, 0, 308, 46, 0x0f1720, 0.96)
@@ -783,7 +798,7 @@ export class MenuScene extends Phaser.Scene {
     const labelClaimOps = this.add
       .text(0, 0, t(this.locale, "menu.claimOpsIdle"), { fontSize: "13px", color: "#d9f2ff", fontStyle: "700" })
       .setOrigin(0.5);
-    btnClaimOps.on("pointerdown", () => void claimOpsRewards());
+    btnClaimOps.on("pointerdown", () => this.runGuardedTask("claimOpsRewards", claimOpsRewards));
     const liveopsLayerBase = 12;
     [
       liveopsCardBg,
@@ -1480,10 +1495,12 @@ export class MenuScene extends Phaser.Scene {
       missionsExpanded = true;
       utilityOpen = false;
       layoutMenu(this.scale);
-      void refreshDailyAndLiveops();
+      this.runGuardedTask("refreshDailyAndLiveops:openMissions", refreshDailyAndLiveops);
     };
 
-    btnDaily.on("pointerdown", () => void this.startDaily(rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled));
+    btnDaily.on("pointerdown", () =>
+      this.runGuardedTask("startDaily", () => this.startDaily(rewardedStartBoosterUnlocked() && boosterEnabled && rewardBoostEnabled))
+    );
     btnDailyBoost.disableInteractive();
     btnMissions.on("pointerdown", openMissionsPanel);
     this.dailyPanel.on("pointerdown", () => {
@@ -2632,9 +2649,9 @@ export class MenuScene extends Phaser.Scene {
     refreshWeeklyRaceResetBadge();
     this.refreshWalletSummary();
     this.time.delayedCall(0, () => {
-      void signalPlatformGameReady(this.platformAdapter, this.registry);
+      this.runGuardedTask("signalPlatformGameReady", () => signalPlatformGameReady(this.platformAdapter, this.registry));
     });
-    void refreshDailyAndLiveops();
+    this.runGuardedTask("refreshDailyAndLiveops:init", refreshDailyAndLiveops);
   }
 
   update(_time: number, dtMs: number): void {
@@ -2995,7 +3012,7 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(0.5);
       button.on("pointerdown", () => {
         this.leaderboardFilter = filter;
-        void this.refreshLeaderboardSummary();
+        this.runGuardedTask(`refreshLeaderboardSummary:${filter}`, () => this.refreshLeaderboardSummary());
       });
       this.leaderboardFilterButtons.push({ filter, button, label });
     });
@@ -3004,15 +3021,48 @@ export class MenuScene extends Phaser.Scene {
     for (let i = 0; i < 8; i++) {
       const y = rowsStartY + i * rowStep;
       const bg = this.add.rectangle(0, y, 620, 46, 0x121a24, 0.96).setStrokeStyle(2, 0x2a556d, 0.55);
-      const text = this.add
-        .text(-290, y - 16, "", {
-          fontSize: "13px",
-          color: "#d9f2ff",
-          wordWrap: { width: 580 },
+      const rankBg = this.add.rectangle(-266, y, 42, 26, 0x13283d, 0.42).setStrokeStyle(1, 0x2a556d, 0.58);
+      const rankText = this.add
+        .text(-266, y, "", {
+          fontSize: "15px",
+          color: "#ffd78a",
+          fontStyle: "700",
         })
-        .setOrigin(0, 0)
-        .setLineSpacing(3);
-      this.leaderboardRows.push({ bg, text });
+        .setOrigin(0.5);
+      const pilotText = this.add
+        .text(-236, y - 9, "", {
+          fontSize: "15px",
+          color: "#d9f2ff",
+          fontStyle: "700",
+        })
+        .setOrigin(0, 0.5);
+      const scoreText = this.add
+        .text(286, y - 9, "", {
+          fontSize: "16px",
+          color: "#f3fbff",
+          fontStyle: "700",
+        })
+        .setOrigin(1, 0.5);
+      const metaText = this.add
+        .text(-236, y + 11, "", {
+          fontSize: "11px",
+          color: "#98b7c7",
+          fontStyle: "700",
+        })
+        .setOrigin(0, 0.5);
+      const badgeBg = this.add
+        .rectangle(236, y + 11, 84, 18, 0x13283d, 0.96)
+        .setStrokeStyle(1, 0x5cc8ff, 0.62)
+        .setVisible(false);
+      const badgeText = this.add
+        .text(236, y + 11, "", {
+          fontSize: "10px",
+          color: "#d9f2ff",
+          fontStyle: "700",
+        })
+        .setOrigin(0.5)
+        .setVisible(false);
+      this.leaderboardRows.push({ bg, rankBg, rankText, pilotText, scoreText, metaText, badgeBg, badgeText });
     }
 
     this.leaderboardEmptyPanel = this.add
@@ -3078,7 +3128,16 @@ export class MenuScene extends Phaser.Scene {
       this.leaderboardEmptyPanel,
       this.leaderboardEmptyText,
       ...this.leaderboardFilterButtons.flatMap((entry) => [entry.button, entry.label]),
-      ...this.leaderboardRows.flatMap((row) => [row.bg, row.text]),
+      ...this.leaderboardRows.flatMap((row) => [
+        row.bg,
+        row.rankBg,
+        row.rankText,
+        row.pilotText,
+        row.scoreText,
+        row.metaText,
+        row.badgeBg,
+        row.badgeText,
+      ]),
     ];
 
     this.leaderboardBox = this.add.container(0, 0, children).setDepth(1451).setScrollFactor(0);
@@ -3136,6 +3195,30 @@ export class MenuScene extends Phaser.Scene {
       this.scale.width >= 1440 &&
       this.scale.height >= 960
     );
+  }
+
+  private getLeaderboardBadgeStyle(isRecord: boolean): {
+    fill: number;
+    stroke: number;
+    text: string;
+    alpha: number;
+    strokeAlpha: number;
+  } {
+    return isRecord
+      ? {
+          fill: 0x163625,
+          stroke: 0x57c27d,
+          text: "#ecfff4",
+          alpha: 0.96,
+          strokeAlpha: 0.84,
+        }
+      : {
+          fill: 0x2b210b,
+          stroke: 0xffd166,
+          text: "#fff0c7",
+          alpha: 0.94,
+          strokeAlpha: 0.82,
+        };
   }
 
   private layoutWorkshop(): void {
@@ -3234,8 +3317,6 @@ export class MenuScene extends Phaser.Scene {
     const rowStep = ultraCompact ? 46 : metrics.compact ? 58 : denseDesktop ? 60 : 48;
     const rowWidth = ultraCompact ? metrics.width - 44 : metrics.compact ? metrics.width - 64 : denseDesktop ? 600 : 620;
     const rowHeight = ultraCompact ? 42 : metrics.compact ? 54 : denseDesktop ? 56 : 46;
-    const rowTextX = -rowWidth / 2 + (ultraCompact ? 14 : metrics.compact ? 18 : denseDesktop ? 18 : 20);
-    const rowTextTop = ultraCompact ? 13 : metrics.compact ? 18 : denseDesktop ? 18 : 16;
     const lastRowY = rowsStartY + Math.max(0, rowSlots - 1) * rowStep;
     const rowBottomY = lastRowY + rowHeight / 2;
     const footerY = expandedMeta ? 316 : rowBottomY + (ultraCompact ? 18 : 28);
@@ -3267,10 +3348,34 @@ export class MenuScene extends Phaser.Scene {
 
     this.leaderboardRows.forEach((row, index) => {
       const y = rowsStartY + index * rowStep;
+      const innerPadding = ultraCompact ? 12 : metrics.compact ? 16 : 18;
+      const rankBoxWidth = ultraCompact ? 32 : metrics.compact ? 40 : 42;
+      const rankBoxHeight = ultraCompact ? 22 : 26;
+      const left = -rowWidth / 2;
+      const right = rowWidth / 2;
+      const rankCenterX = left + innerPadding + rankBoxWidth / 2;
+      const contentLeft = rankCenterX + rankBoxWidth / 2 + (ultraCompact ? 8 : 14);
+      const scoreX = right - innerPadding;
+      const primaryY = ultraCompact ? y : y - (metrics.compact ? 9 : denseDesktop ? 9 : 8);
+      const metaY = ultraCompact ? y : y + (metrics.compact ? 11 : denseDesktop ? 12 : 11);
+
       row.bg.setPosition(0, y).setSize(rowWidth, rowHeight);
-      row.text.setPosition(rowTextX, y - rowTextTop).setStyle({
-        fontSize: ultraCompact ? "12px" : metrics.compact ? "15px" : "13px",
-        wordWrap: { width: rowWidth - 40 },
+      row.rankBg.setPosition(rankCenterX, y).setSize(rankBoxWidth, rankBoxHeight);
+      row.rankText.setPosition(rankCenterX, y).setStyle({
+        fontSize: ultraCompact ? "12px" : metrics.compact ? "15px" : denseDesktop ? "15px" : "14px",
+      });
+      row.pilotText.setPosition(contentLeft, primaryY).setStyle({
+        fontSize: ultraCompact ? "12px" : metrics.compact ? "16px" : denseDesktop ? "15px" : expandedMeta ? "14px" : "15px",
+      });
+      row.scoreText.setPosition(scoreX, primaryY).setStyle({
+        fontSize: ultraCompact ? "12px" : metrics.compact ? "17px" : denseDesktop ? "17px" : expandedMeta ? "15px" : "16px",
+      });
+      row.metaText.setVisible(!ultraCompact).setPosition(contentLeft, metaY).setStyle({
+        fontSize: metrics.compact ? "12px" : denseDesktop ? "11px" : expandedMeta ? "10px" : "11px",
+      });
+      row.badgeBg.setVisible(false).setPosition(scoreX - 56, metaY);
+      row.badgeText.setVisible(false).setPosition(scoreX - 56, metaY).setStyle({
+        fontSize: metrics.compact ? "10px" : "9px",
       });
     });
 
@@ -3330,7 +3435,7 @@ export class MenuScene extends Phaser.Scene {
       boardId: getBoardId(this.staticData.leaderboards, "all_time"),
       filter: this.leaderboardFilter,
     });
-    void this.refreshLeaderboardSummary();
+    this.runGuardedTask("refreshLeaderboardSummary", () => this.refreshLeaderboardSummary());
     this.leaderboardDim.setVisible(true);
     this.leaderboardBox.setVisible(true);
     this.layoutLeaderboard();
@@ -3485,13 +3590,18 @@ export class MenuScene extends Phaser.Scene {
         : uiStage === "advanced"
           ? 4
           : Math.min(4, getLeaderboardRowLimit(uiStage));
-    const rowTextWidth = ultraCompactLeaderboard ? 420 : compactLeaderboard ? 476 : fullLeaderboard && !expandedMeta ? 540 : 560;
     for (let i = 0; i < this.leaderboardRows.length; i++) {
       const row = this.leaderboardRows[i]!;
       const entry = filtered[i];
       if (!entry || i >= rowLimit) {
         row.bg.setVisible(false);
-        row.text.setVisible(false);
+        row.rankBg.setVisible(false);
+        row.rankText.setVisible(false);
+        row.pilotText.setVisible(false);
+        row.scoreText.setVisible(false);
+        row.metaText.setVisible(false);
+        row.badgeBg.setVisible(false);
+        row.badgeText.setVisible(false);
         continue;
       }
 
@@ -3511,7 +3621,6 @@ export class MenuScene extends Phaser.Scene {
       const divisionLabel = t(this.locale, `leaderboard.division.${getLeaderboardDivision(entry.score).id}`);
       const badge = isLatest ? (this.latestLeaderboardIsRecord ? t(this.locale, "leaderboard.recordBadge") : t(this.locale, "leaderboard.lastRun")) : "";
       const scoreText = formatNumber(this.locale, entry.score);
-      const primaryLine = `${rank}. ${entry.pilot}   ${scoreText}`;
       const detailParts = [
         fullLeaderboard && effectiveFilter === "all" ? modeLabel : null,
         divisionLabel,
@@ -3523,22 +3632,71 @@ export class MenuScene extends Phaser.Scene {
         `${t(this.locale, "hud.wave")} ${formatNumber(this.locale, entry.wave)}`,
         badge || null,
       ].filter(Boolean);
+      const left = row.bg.x - row.bg.width / 2;
+      const right = row.bg.x + row.bg.width / 2;
+      const rowPadding = ultraCompactLeaderboard ? 12 : compactLeaderboard ? 16 : 18;
+      const rankColumnWidth = ultraCompactLeaderboard ? 32 : compactLeaderboard ? 40 : 42;
+      const contentLeft = left + rowPadding + rankColumnWidth + (ultraCompactLeaderboard ? 8 : 14);
+      const scoreReserveWidth = ultraCompactLeaderboard ? 112 : compactLeaderboard ? 126 : fullLeaderboard && !expandedMeta ? 138 : 122;
+      const scoreMaxWidth = ultraCompactLeaderboard ? 104 : compactLeaderboard ? 118 : fullLeaderboard && !expandedMeta ? 130 : 114;
+      const badgeMaxWidth = compactLeaderboard ? 148 : 156;
+      const badgeVisible = !ultraCompactLeaderboard && badge.length > 0;
+      const badgeStyle = this.getLeaderboardBadgeStyle(badge === t(this.locale, "leaderboard.recordBadge"));
+      const rankTextColor =
+        rank === 1
+          ? "#ffe5a0"
+          : rank === 2
+            ? "#c8f0ff"
+            : rank === 3
+              ? "#c7ffd7"
+              : isLatest
+                ? "#ffe5a0"
+                : "#b7c8d4";
+      const metaTextValue = fullLeaderboard ? detailParts.filter((part) => part !== badge).join(" • ") : compactParts.filter((part) => part !== badge).join(" • ");
 
       row.bg
         .setVisible(true)
         .setFillStyle(isLatest ? 0x173028 : 0x121a24, isLatest ? 0.98 : 0.94)
         .setStrokeStyle(2, accent, isLatest ? 0.92 : 0.72);
-      row.text
+      row.rankBg
         .setVisible(true)
-        .setText(
-          ultraCompactLeaderboard
-            ? `${rank}. ${entry.pilot} | ${scoreText}`
-            : fullLeaderboard
-            ? `${primaryLine}\n${detailParts.join(" | ")}`
-            : `${primaryLine}\n${compactParts.join(" | ")}`
-        )
-        .setStyle({ fontSize: ultraCompactLeaderboard ? "12px" : compactLeaderboard ? "16px" : fullLeaderboard && !expandedMeta ? "15px" : fullLeaderboard ? "13px" : "15px" });
-      fitTextScaleToWidth(row.text, rowTextWidth, ultraCompactLeaderboard ? 0.8 : compactLeaderboard ? 0.86 : 0.88);
+        .setFillStyle(accent, rank <= 3 || isLatest ? 0.18 : 0.12)
+        .setStrokeStyle(1, accent, rank <= 3 || isLatest ? 0.76 : 0.5);
+      row.rankText.setVisible(true).setText(String(rank)).setColor(rankTextColor);
+      row.pilotText.setVisible(true).setText(entry.pilot).setColor(isLatest ? "#ecfff4" : "#d9f2ff");
+      row.scoreText.setVisible(true).setText(scoreText).setColor(rank === 1 ? "#fff4cf" : "#f3fbff");
+      fitTextScaleToWidth(row.scoreText, scoreMaxWidth, ultraCompactLeaderboard ? 0.86 : 0.82);
+
+      const pilotMaxWidth = Math.max(120, right - rowPadding - scoreReserveWidth - contentLeft);
+      fitTextScaleToWidth(row.pilotText, pilotMaxWidth, ultraCompactLeaderboard ? 0.82 : compactLeaderboard ? 0.84 : 0.86);
+
+      if (ultraCompactLeaderboard) {
+        row.metaText.setVisible(false);
+        row.badgeBg.setVisible(false);
+        row.badgeText.setVisible(false);
+        continue;
+      }
+
+      row.metaText.setVisible(true).setText(metaTextValue).setColor(isLatest ? "#b9d8c4" : "#98b7c7");
+      if (badgeVisible) {
+        row.badgeText.setVisible(true).setText(badge).setColor(badgeStyle.text);
+        fitTextScaleToWidth(row.badgeText, badgeMaxWidth - 14, 0.76);
+        const badgeWidth = Math.max(84, Math.min(badgeMaxWidth, row.badgeText.displayWidth + 18));
+        const badgeX = right - rowPadding - badgeWidth / 2;
+        row.badgeBg
+          .setVisible(true)
+          .setPosition(badgeX, row.metaText.y)
+          .setSize(badgeWidth, compactLeaderboard ? 20 : 18)
+          .setFillStyle(badgeStyle.fill, badgeStyle.alpha)
+          .setStrokeStyle(1, badgeStyle.stroke, badgeStyle.strokeAlpha);
+        row.badgeText.setPosition(badgeX, row.metaText.y);
+        fitTextScaleToWidth(row.badgeText, badgeWidth - 14, 0.76);
+        fitTextScaleToWidth(row.metaText, Math.max(150, badgeX - badgeWidth / 2 - 10 - contentLeft), compactLeaderboard ? 0.8 : 0.78);
+      } else {
+        row.badgeBg.setVisible(false);
+        row.badgeText.setVisible(false);
+        fitTextScaleToWidth(row.metaText, Math.max(160, right - rowPadding - contentLeft), compactLeaderboard ? 0.8 : 0.78);
+      }
     }
 
     this.leaderboardCareerTitleText.setText(t(this.locale, "menu.careerMilestonesTitle"));
@@ -4008,7 +4166,7 @@ export class MenuScene extends Phaser.Scene {
 
       if (!maxed && affordable) {
         btn.setInteractive({ useHandCursor: true });
-        btn.on("pointerdown", () => void this.buyMetaNode(node.id));
+        btn.on("pointerdown", () => this.runGuardedTask(`buyMetaNode:${node.id}`, () => this.buyMetaNode(node.id)));
       }
 
       const cardContents: Phaser.GameObjects.GameObject[] = [
@@ -4306,6 +4464,22 @@ export class MenuScene extends Phaser.Scene {
       this.toastText?.destroy();
       this.toastText = null;
     });
+  }
+
+  private runGuardedTask(taskName: string, run: () => Promise<unknown>): void {
+    void run().catch((error) => {
+      this.reportGuardedTaskError(taskName, error);
+    });
+  }
+
+  private reportGuardedTaskError(taskName: string, error: unknown): void {
+    const report = buildBootReport(error, {
+      stage: "menu-start",
+      platform: this.platformAdapter?.name ?? "unknown",
+      storageScope: this.platformAdapter?.getStorageScope?.() ?? null,
+    });
+    persistBootReport(report);
+    console.error(`[Magnet Caravan] MenuScene task failed: ${taskName}`, report, error);
   }
 
   private enableAudio(): void {
