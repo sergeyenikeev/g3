@@ -1,6 +1,6 @@
 # Yandex Publish Smoke
 
-Generated: 2026-04-19T07:20:35.717Z
+Generated: 2026-04-19T07:48:07.443Z
 
 ## Build Targets
 - Release zip: D:\p\g3\dist\releases\magnet-caravan_yandex.zip

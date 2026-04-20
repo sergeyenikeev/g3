@@ -301,7 +301,7 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "menu.utilityHint": "Быстрые ссылки и настройки",
     "menu.tagline": "Переверни поле. Сдай лом. Переживи натиск.",
     "menu.heroLead": "Веди магнитный тягач сквозь штормы лома и корми переработчик, пока рой не сомкнулся.",
-    "menu.controls": "WASD/Стрелки: движение | Пробел: флип | Shift: рывок",
+    "menu.controls": "Стрелки: движение | Пробел: флип | Шифт: рывок",
     "menu.stageHint.starter": "Начни заезд, собери лом и сдай его в переработчик.",
     "menu.stageHint.growing": "Сыграй заезд, затем вложись в одно полезное улучшение.",
     "menu.stageHint.advanced": "Настраивай сборку, поднимайся в рейтинге и усиливай цикл добычи.",
@@ -376,14 +376,14 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "pause.resume": "ПРОДОЛЖИТЬ",
     "pause.menu": "В МЕНЮ",
     "results.title": "ЗАЕЗД ОКОНЧЕН",
-    "results.boost": (p) => `СМОТРЕТЬ РЕКЛАМУ И УДВОИТЬ НАГРАДУ x${p?.mult ?? "2"}`,
+    "results.boost": (p) => `СМОТРЕТЬ РЕКЛАМУ И УДВОИТЬ НАГРАДУ В ${p?.mult ?? "2"} РАЗА`,
     "results.restart": "ЗАНОВО",
     "results.menu": "МЕНЮ",
     "results.stats": (p) =>
       `Волна: ${p?.wave ?? 0}\nБолты: ${p?.bolts ?? 0}\nЯдра: ${p?.cores ?? 0}\nМастерская: +${p?.rewardBolts ?? 0} болтов | +${p?.rewardCores ?? 0} ядер`,
     "upgrade.title": (p) => `ВЫБОР УЛУЧШЕНИЯ - ВОЛНА ${p?.wave ?? 1}`,
     "upgrade.reroll": "СМОТРЕТЬ РЕКЛАМУ И ОБНОВИТЬ ВЫБОР",
-    "hud.hp": "HP",
+    "hud.hp": "ПРОЧН.",
     "hud.level": "\u0423\u0440\u043e\u0432\u0435\u043d\u044c",
     "hud.wave": "Волна",
     "hud.bolts": "Болты",
@@ -419,7 +419,7 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "wave.breather": "Передышка: собери лом и перезайди в темп",
     "wave.pressure": "Волна давления",
     "status.shield": (p) => `Щит ${p?.value ?? 0}`,
-    "status.clamp": (p) => `Зажим x${p?.value ?? 0}`,
+    "status.clamp": (p) => `Зажим: ${p?.value ?? 0}`,
     "status.anchor": (p) => `Якорь ${p?.value ?? 0}с`,
     "status.anchorReady": "Якорь готов",
     "status.vacuum": (p) => `Вакуум ${p?.value ?? 0}с`,
@@ -427,7 +427,7 @@ const MESSAGES: Record<Locale, Record<string, MessageValue>> = {
     "status.dashWake": (p) => `Шлейф ${p?.value ?? 0}с`,
     "status.drone": "Дрон в строю",
     "status.mines": (p) => `Мины ${p?.value ?? 0}`,
-    "status.corePull": (p) => `Тяга ядра x${p?.value ?? "1.00"}`,
+    "status.corePull": (p) => `Тяга ядра: ${p?.value ?? "1.00"}`,
     "tag.core": "ЯДРО",
     "tag.collection": "СБОР",
     "tag.utility": "УТИЛ",
@@ -576,7 +576,7 @@ Object.assign(MESSAGES.ru, {
   "menu.mission.bank_bolts": (p?: Record<string, unknown>) => `\u0421\u0434\u0430\u0439 ${p?.target ?? 0} \u0431\u043e\u043b\u0442.`,
   "menu.mission.collect_heavy_scrap": (p?: Record<string, unknown>) => `\u0422\u044f\u0436. \u043b\u043e\u043c ${p?.target ?? 0}`,
   "menu.mission.deflect_projectiles": (p?: Record<string, unknown>) => `\u041e\u0442\u0431\u0435\u0439 ${p?.target ?? 0} \u0432\u044b\u0441\u0442\u0440.`,
-  "menu.mission.use_flip": (p?: Record<string, unknown>) => `\u0424\u041b\u0418\u041f x${p?.target ?? 0}`,
+  "menu.mission.use_flip": (p?: Record<string, unknown>) => `\u0424\u041b\u0418\u041f: ${p?.target ?? 0}`,
   "menu.mission.complete_runs": (p?: Record<string, unknown>) => `\u0417\u0430\u0435\u0437\u0434\u043e\u0432 ${p?.target ?? 0}`,
   "menu.mission.score_points": (p?: Record<string, unknown>) => `\u041e\u0447\u043a\u0438 ${p?.target ?? 0}`,
   "menu.mission.gain_bolts": (p?: Record<string, unknown>) => `\u0411\u043e\u043b\u0442\u044b ${p?.target ?? 0}`,
@@ -888,7 +888,7 @@ const UPGRADE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     wide_field: { title: "Широкое поле", desc: "+12% к радиусу магнита за стак." },
     strong_pull: { title: "Сильная тяга", desc: "+12% к ускорению притяжения за стак." },
     vacuum_burst: { title: "Вакуумный всплеск", desc: "Каждые 8с: +30% к тяге на 1с." },
-    heavy_haul: { title: "Тяжёлый улов", desc: "Тяжёлый лом встречается чаще, а сдача heavy даёт +1 болт." },
+    heavy_haul: { title: "Тяжёлый улов", desc: "Тяжёлый лом встречается чаще, а сдача тяжёлого лома даёт +1 болт." },
     fast_flip: { title: "Быстрый флип", desc: "-12% к перезарядке ФЛИПа за стак." },
     hard_push: { title: "Жёсткий толчок", desc: "+18% к силе импульса ФЛИПа за стак." },
     flip_shield: { title: "Щит после флипа", desc: "После ФЛИПа: щит на 15 ед. на 3с." },
@@ -899,14 +899,14 @@ const UPGRADE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     tail_armor: { title: "Броня хвоста", desc: "-1 к потерям хвоста от ударов, но не ниже 1." },
     stabilizer_fins: { title: "Стабилизаторы", desc: "Хвост меньше болтает, а штраф скорости за сегмент слабее." },
     magnet_anchor: { title: "Магнитный якорь", desc: "Раз в 10с: якорь на 0.6с, чтобы не терять хвост." },
-    emergency_patch: { title: "Экстренный ремонт", desc: "+20 к макс. HP и мгновенное лечение на 20." },
+    emergency_patch: { title: "Экстренный ремонт", desc: "+20 к запасу прочности и мгновенное лечение на 20." },
     recycler_bonus: { title: "Бонус переработчика", desc: "Сдача сильнее лечит и даёт +10% болтов." },
     overclock: { title: "Разгон", desc: "+12% скорости, но входящий урон +10%." },
-    dash_module: { title: "Модуль рывка", desc: "Усиливает рывок в этом заезде: -15% кд, длиннее окно рывка и больше i-frame." },
+    dash_module: { title: "Модуль рывка", desc: "Усиливает рывок в этом заезде: -15% к перезарядке, длиннее окно рывка и больше неуязвимости." },
     ram_plating: { title: "Таранная броня", desc: "Рывок превращается в таран: сильнее удар, дольше сбивает врагов и даёт щит за каждое попадание." },
     magnet_wake: { title: "Магнитный шлейф", desc: "После рывка остаётся короткий магнитный шлейф: шире тяга и легче подбирать лом на ходу." },
     ion_ram: { title: "Ионный таран", desc: "Попадания рывком пускают ионные дуги в соседних врагов и добивают строй." },
-    salvage_siphon: { title: "Сифон добычи", desc: "Шлейф сам втягивает ценный лом, а убийства в рывке чаще роняют heavy и rare-добычу." },
+    salvage_siphon: { title: "Сифон добычи", desc: "Шлейф сам втягивает ценный лом, а убийства в рывке чаще роняют тяжёлую и редкую добычу." },
     drone_buddy: { title: "Дрон-напарник", desc: "Дрон стреляет раз в 1.4с и наносит 6 урона." },
     scrap_mine: { title: "Мины из лома", desc: "Потерянные сегменты хвоста превращаются в мины на 3с." },
     x2_results_hook: { title: "Крюк двойной выгоды", desc: "Усиливает ценность рекламного экрана наград." },
@@ -974,19 +974,19 @@ const META_NODE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   },
   ru: {
     meta_core_1: {
-      title: "Сердечник магнита I",
+      title: "Сердечник магнита 1",
       desc: "Постоянно усиливает радиус и тягу магнита для комфортных сборочных заездов.",
     },
     meta_coil_1: {
-      title: "Катушка полярности I",
+      title: "Катушка полярности 1",
       desc: "Постоянно ускоряет ФЛИП и усиливает его импульс в плотных волнах.",
     },
     meta_frame_1: {
-      title: "Усиленная рама I",
-      desc: "Постоянная броня корпуса: больше макс. HP и сильнее лечение от переработчика.",
+      title: "Усиленная рама 1",
+      desc: "Постоянная броня корпуса: больше максимальной прочности и сильнее лечение от переработчика.",
     },
     meta_tail_1: {
-      title: "Сцепка каравана I",
+      title: "Сцепка каравана 1",
       desc: "Постоянно удлиняет караван и смягчает штраф скорости за хвост.",
     },
     meta_dash_unlock: {
@@ -995,7 +995,7 @@ const META_NODE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     },
     meta_recycler_overdrive: {
       title: "Форсаж переработчика",
-      desc: "Постоянно ускоряет сдачу, усиливает heavy-доход и лечение переработчика.",
+      desc: "Постоянно ускоряет сдачу, усиливает доход с тяжёлого лома и лечение переработчика.",
     },
   },
 };
@@ -1068,19 +1068,19 @@ const EXTRA_META_NODE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
   },
   ru: {
     meta_core_2: {
-      title: "Сердечник магнита II",
+      title: "Сердечник магнита 2",
       desc: "Ещё сильнее расширяет радиус и тягу, чтобы плотные сборочные маршруты игрались мягче.",
     },
     meta_coil_2: {
-      title: "Катушка полярности II",
+      title: "Катушка полярности 2",
       desc: "Ещё ниже кд ФЛИПа и шире импульс для уверенного контроля плотных волн.",
     },
     meta_frame_2: {
-      title: "Усиленная рама II",
+      title: "Усиленная рама 2",
       desc: "Добавляет постоянный запас корпуса и устойчивости через лечение переработчика.",
     },
     meta_tail_2: {
-      title: "Сцепка каравана II",
+      title: "Сцепка каравана 2",
       desc: "Позволяет тащить ещё более длинные цепи и слабее режет скорость за хвост.",
     },
     meta_salvage_routes: {
@@ -1265,7 +1265,7 @@ const LEVEL_MODIFIER_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     },
     iron_convoy: {
       title: "\u0416\u0435\u043b\u0435\u0437\u043d\u044b\u0439 \u043a\u043e\u043d\u0432\u043e\u0439",
-      desc: "\u0412\u0440\u0430\u0433\u0438 \u0441\u0442\u0430\u043d\u043e\u0432\u044f\u0442\u0441\u044f \u043f\u0440\u043e\u0447\u043d\u0435\u0435, \u043d\u043e heavy-\u043b\u043e\u043c \u0434\u043e\u0440\u043e\u0436\u0435, \u0430 \u043f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a \u043b\u0435\u0447\u0438\u0442 \u0441\u0438\u043b\u044c\u043d\u0435\u0435.",
+      desc: "\u0412\u0440\u0430\u0433\u0438 \u0441\u0442\u0430\u043d\u043e\u0432\u044f\u0442\u0441\u044f \u043f\u0440\u043e\u0447\u043d\u0435\u0435, \u043d\u043e \u0442\u044f\u0436\u0451\u043b\u044b\u0439 \u043b\u043e\u043c \u0434\u043e\u0440\u043e\u0436\u0435, \u0430 \u043f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a \u043b\u0435\u0447\u0438\u0442 \u0441\u0438\u043b\u044c\u043d\u0435\u0435.",
     },
     ion_storm: {
       title: "\u0418\u043e\u043d\u043d\u0430\u044f \u0431\u0443\u0440\u044f",
@@ -1320,11 +1320,11 @@ const LEVEL_OBJECTIVE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     },
     heavy_scrap: {
       title: "\u0422\u044f\u0436\u0451\u043b\u044b\u0439 \u0433\u0440\u0443\u0437",
-      desc: "\u0423\u0441\u043f\u0435\u0439 \u0441\u043e\u0431\u0440\u0430\u0442\u044c \u043f\u043e\u0431\u043e\u043b\u044c\u0448\u0435 heavy-\u043b\u043e\u043c\u0430 \u0434\u043e \u043a\u043e\u043d\u0446\u0430 \u0443\u0440\u043e\u0432\u043d\u044f.",
+      desc: "\u0423\u0441\u043f\u0435\u0439 \u0441\u043e\u0431\u0440\u0430\u0442\u044c \u043f\u043e\u0431\u043e\u043b\u044c\u0448\u0435 \u0442\u044f\u0436\u0451\u043b\u043e\u0433\u043e \u043b\u043e\u043c\u0430 \u0434\u043e \u043a\u043e\u043d\u0446\u0430 \u0443\u0440\u043e\u0432\u043d\u044f.",
     },
     hull_integrity: {
       title: "\u0414\u0435\u0440\u0436\u0438 \u043a\u043e\u0440\u043f\u0443\u0441",
-      desc: "\u0414\u043e\u0439\u0434\u0438 \u0434\u043e \u043a\u043e\u043d\u0446\u0430 \u0443\u0440\u043e\u0432\u043d\u044f \u0441 \u0437\u0430\u043f\u0430\u0441\u043e\u043c HP.",
+      desc: "\u0414\u043e\u0439\u0434\u0438 \u0434\u043e \u043a\u043e\u043d\u0446\u0430 \u0443\u0440\u043e\u0432\u043d\u044f \u0441 \u0437\u0430\u043f\u0430\u0441\u043e\u043c \u043f\u0440\u043e\u0447\u043d\u043e\u0441\u0442\u0438.",
     },
   },
 };
@@ -1371,7 +1371,7 @@ const LEVEL_FINALE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     },
     scrap_juggernaut: {
       title: "\u041b\u043e\u043c\u043e\u0432\u043e\u0439 \u0434\u0436\u0430\u0433\u0433\u0435\u0440\u043d\u0430\u0443\u0442",
-      desc: "\u0422\u044f\u0436\u0451\u043b\u044b\u0439 \u0444\u0438\u043d\u0430\u043b-\u043a\u043e\u043d\u0432\u043e\u0439: \u0442\u0430\u043d\u043a\u043e\u0432\u043e\u0435 \u0434\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0438 heavy-\u0432\u044b\u0431\u0440\u043e\u0441\u044b \u043b\u043e\u043c\u0430.",
+      desc: "\u0422\u044f\u0436\u0451\u043b\u044b\u0439 \u0444\u0438\u043d\u0430\u043b-\u043a\u043e\u043d\u0432\u043e\u0439: \u0442\u0430\u043d\u043a\u043e\u0432\u043e\u0435 \u0434\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0438 \u0432\u044b\u0431\u0440\u043e\u0441\u044b \u0442\u044f\u0436\u0451\u043b\u043e\u0433\u043e \u043b\u043e\u043c\u0430.",
     },
     salvage_storm: {
       title: "\u0428\u043a\u0432\u0430\u043b \u0434\u043e\u0431\u044b\u0447\u0438",
@@ -1387,7 +1387,7 @@ const LEVEL_FINALE_COPY: Record<Locale, Record<string, UpgradeCopy>> = {
     },
     core_monsoon: {
       title: "\u041c\u0443\u0441\u0441\u043e\u043d \u044f\u0434\u0435\u0440",
-      desc: "\u0428\u043a\u0432\u0430\u043b \u0434\u043e\u0431\u044b\u0447\u0438: \u043e\u0441\u043a\u043e\u043b\u043a\u0438, heavy-\u0432\u044b\u0431\u0440\u043e\u0441\u044b \u0438 \u043f\u0435\u0440\u0435\u043a\u0440\u0451\u0441\u0442\u043d\u044b\u0439 \u043e\u0433\u043e\u043d\u044c \u0443 \u043b\u0438\u043d\u0438\u0438 \u043f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a\u0430.",
+      desc: "\u0428\u043a\u0432\u0430\u043b \u0434\u043e\u0431\u044b\u0447\u0438: \u043e\u0441\u043a\u043e\u043b\u043a\u0438, \u0432\u044b\u0431\u0440\u043e\u0441\u044b \u0442\u044f\u0436\u0451\u043b\u043e\u0433\u043e \u043b\u043e\u043c\u0430 \u0438 \u043f\u0435\u0440\u0435\u043a\u0440\u0451\u0441\u0442\u043d\u044b\u0439 \u043e\u0433\u043e\u043d\u044c \u0443 \u043b\u0438\u043d\u0438\u0438 \u043f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a\u0430.",
     },
   },
 };
@@ -1494,8 +1494,8 @@ export function formatQualityLabel(locale: Locale, quality: "auto" | "low" | "me
 }
 
 export function getLanguageSettingLabel(locale: Locale, setting: LanguageSetting): string {
-  if (setting === "ru") return "RU";
-  if (setting === "en") return "EN";
+  if (setting === "ru") return "РУ";
+  if (setting === "en") return "АНГ";
   return t(locale, "settings.auto");
 }
 

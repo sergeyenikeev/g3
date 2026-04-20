@@ -122,7 +122,7 @@ await writeTextFileWithBom(join(uploadRoot, "texts", "how_to_play_en.txt"), `${c
 await writeTextFileWithBom(join(uploadRoot, "texts", "keywords_ru.txt"), `${card.keywords.ru}\n`);
 await writeTextFileWithBom(join(uploadRoot, "texts", "keywords_en.txt"), `${card.keywords.en}\n`);
 await writeTextFileWithBom(join(uploadRoot, "texts", "developer_comment_en.txt"), `${card.developerComment}\n`);
-await writeTextFileWithBom(join(uploadRoot, "texts", "console_fields_ru.md"), buildConsoleFieldsMarkdown(card));
+await writeTextFileWithBom(join(uploadRoot, "texts", "console_fields_ru.md"), buildConsoleFieldsMarkdownRu(card));
 
 await writeFile(
   join(uploadRoot, "metadata", "yandex_game_card.json"),
@@ -156,7 +156,7 @@ console.log(`package_yandex: folder -> ${uploadRoot}`);
 console.log(`package_yandex: zip -> ${uploadZip}`);
 console.log(`package_yandex: zip sha256 -> ${uploadZipChecksum}`);
 
-function buildConsoleFieldsMarkdown(gameCard) {
+function _buildConsoleFieldsMarkdownLegacy(gameCard) {
   return `# Поля Карточки Для Яндекс Игр
 
 ## Основное
@@ -193,146 +193,195 @@ function buildConsoleFieldsMarkdown(gameCard) {
 `;
 }
 
+function buildConsoleFieldsMarkdownRu(gameCard) {
+  const languageLabels = gameCard.languages.map((language) => {
+    if (language === "ru") return "русский";
+    if (language === "en") return "английский";
+    return language;
+  });
+  const platformLabels = gameCard.platforms.map((platform) => {
+    if (platform === "desktop") return "компьютер";
+    if (platform === "mobile") return "телефон";
+    return platform;
+  });
+  const genreLabels = {
+    Arcade: "аркада",
+    Action: "экшен",
+  };
+  const tagLabels = gameCard.tags.map((tag) => {
+    if (tag === "arcade") return "аркада";
+    if (tag === "action") return "экшен";
+    if (tag === "survival") return "выживание";
+    if (tag === "mobile") return "мобильная";
+    if (tag === "skill") return "на реакцию";
+    if (tag === "daily") return "ежедневный режим";
+    return tag;
+  });
+
+  return `# Поля карточки для Яндекс Игр
+
+## Основное
+- Название: \`${gameCard.title}\`
+- Языки интерфейса: \`${languageLabels.join("`, `")}\`
+- Платформы: \`${platformLabels.join("`, `")}\`
+- Ориентация: \`горизонтальная\`
+- Облачные сохранения: \`${gameCard.cloudSave ? "включены" : "выключены"}\`
+- Возраст: \`${gameCard.ageRating}\`
+
+## Жанры
+- Основной: \`${genreLabels[gameCard.primaryGenre] ?? gameCard.primaryGenre}\`
+- Дополнительный: \`${genreLabels[gameCard.secondaryGenre] ?? gameCard.secondaryGenre}\`
+
+## Теги
+\`${tagLabels.join("`, `")}\`
+
+## Ключевые слова
+- Русские: \`${gameCard.keywords.ru}\`
+- Для второго языка: берите из отдельного файла с переводом в пакете
+
+## Медиа
+- Основная иконка: первая квадратная картинка из папки для карточки
+- Основная обложка: широкая картинка для витрины
+- Снимки экрана для компьютера: берите первые три изображения из папки для компьютера
+- Снимки экрана для телефона: берите два изображения из папки для телефона
+- Запасные изображения: дополнительные варианты иконки, обложки и итогового экрана лежат рядом
+
+## Комментарий разработчика
+Берите из отдельного файла с комментарием на втором языке в пакете.
+`;
+}
+
 function buildReadme({ version: currentVersion, generatedAt: generatedIso, archiveSizeBytes }) {
-  return `# Yandex Upload Package
+  const generatedLabel = generatedIso.replace("T", " ").replace("Z", "");
+  return `# Пакет для загрузки в Яндекс Игры
 
 Этот каталог уже собран для ручной загрузки в консоль Яндекс Игр.
 
-## Важно
-- В консоль Яндекс Игр загружайте только \`${consoleUploadArchiveName}\`.
-- Не загружайте \`../magnet-caravan_yandex_publishing-kit.zip\`: это контейнер со всеми материалами, а не игровой билд.
+## Главное
+- В консоль Яндекс Игр загружайте отдельный архив игры из корня этого пакета.
+- Общий архив со всеми материалами нужен только для хранения и передачи набора целиком.
 
 ## Что Внутри
-- \`${consoleUploadArchiveName}\` — главный файл для загрузки в консоль.
-- \`game/magnet-caravan_yandex.zip\` — игровой архив для загрузки.
-- \`texts/\` — готовые тексты по отдельным полям карточки.
-- \`texts/source/\` — исходные markdown-версии RU и EN текстов.
-- \`media/\` — иконка, обложка, desktop и mobile screenshots.
-- \`metadata/yandex_game_card.json\` — те же поля карточки в структурированном виде.
-- \`metadata/checksums.sha256\` — контрольные суммы файлов внутри пакета.
-- \`instructions/YANDEX_PUBLISH.md\` — полный publish-runbook.
-- \`instructions/UPLOAD_CHECKLIST.md\` — короткий порядок действий при ручной публикации.
+- папка с игровым архивом;
+- папка с готовыми текстами карточки;
+- папка с исходными описаниями;
+- папка с медиафайлами;
+- папка со служебными памятками;
+- папка со структурированными данными и контрольными суммами.
 
 ## Что Загружать В Консоль
-1. Архив игры: \`${consoleUploadArchiveName}\`
-2. Иконка: \`${primaryMedia.icon}\`
-3. Обложка: \`${primaryMedia.cover}\`
-4. Desktop screenshots:
-   - \`${primaryMedia.desktopScreenshots.join("`\n   - `")}\`
-5. Mobile screenshots:
-   - \`${primaryMedia.mobileScreenshots.join("`\n   - `")}\`
-6. Developer comment: \`texts/developer_comment_en.txt\`
+1. Отдельный архив игры из корня пакета.
+2. Основную иконку из папки для карточки.
+3. Основную обложку из папки для карточки.
+4. Три основных снимка для компьютера.
+5. Два основных снимка для телефона.
+6. Комментарий разработчика на втором языке из папки с текстами.
 
 ## Где Брать Тексты
-- краткие/полные описания и how to play: \`texts/*.txt\`
-- карточка целиком: \`metadata/yandex_game_card.json\`
-- исходные описания RU/EN: \`texts/source/yandex_ru.md\`, \`texts/source/yandex_en.md\`
+- отдельные поля карточки лежат в папке с текстами;
+- исходные описания на русском и втором языке лежат рядом;
+- полная структура карточки лежит в папке с данными.
 
 ## Альтернативные Медиа
-- \`${primaryMedia.alternatives.join("`\n- `")}\`
+- в папке для карточки есть запасные иконка и обложка;
+- в папке для компьютера есть дополнительный снимок экрана.
 
 ## Служебная Информация
 - Версия игры: \`${currentVersion}\`
-- Сгенерировано: \`${generatedIso}\`
-- Размер игрового архива: \`${archiveSizeBytes}\` bytes
-- Архив всего publishing-kit: \`../magnet-caravan_yandex_publishing-kit.zip\`
-- SHA256 publishing-kit: \`../magnet-caravan_yandex_publishing-kit.sha256.txt\`
+- Сгенерировано: \`${generatedLabel}\`
+- Размер игрового архива: \`${archiveSizeBytes}\` байт
+- Общий архив со всеми материалами и контрольная сумма лежат рядом с этим каталогом.
 `;
 }
 
 function buildUploadChecklist() {
-  return `# Upload Checklist
+  return `# Памятка по загрузке
 
 ## Перед Загрузкой
-1. Откройте \`metadata/yandex_game_card.json\` или \`texts/console_fields_ru.md\`.
-2. Подготовьте под рукой \`${consoleUploadArchiveName}\`.
-3. Подготовьте медиа из \`media/\`.
+1. Откройте русскую памятку по полям карточки или структурированные данные игры.
+2. Подготовьте под рукой отдельный архив игры.
+3. Подготовьте иконку, обложку и снимки экрана.
 
 ## В Консоли Яндекс Игр
-1. Создайте новый draft игры.
-2. Загрузите \`${consoleUploadArchiveName}\`.
-3. Убедитесь, что у игры включены \`landscape\`, \`desktop\`, \`mobile\`, \`cloud save\`.
-4. Вставьте название, short/full description и how to play из \`texts/\`.
-5. Добавьте keywords, жанры, теги и developer comment.
-6. Загрузите \`media/card/icon_512x512.png\`.
-7. Загрузите \`media/card/cover_800x470.png\`.
-8. Загрузите desktop screenshots:
-   - \`media/desktop/01_menu_1600x900.png\`
-   - \`media/desktop/02_gameplay_1600x900.png\`
-   - \`media/desktop/03_upgrade_1600x900.png\`
-9. Загрузите mobile screenshots:
-   - \`media/mobile/01_gameplay_1280x720.png\`
-   - \`media/mobile/02_results_1280x720.png\`
-10. Если основной icon или cover не устраивает по витрине, возьмите варианты из \`media/card/*_alt_*.png\`.
+1. Создайте новый черновик игры.
+2. Загрузите отдельный архив игры.
+3. Убедитесь, что включены горизонтальная ориентация, компьютер, телефон и облачные сохранения.
+4. Вставьте название, короткое описание, полное описание и поле «Как играть» из папки с текстами.
+5. Добавьте ключевые слова, жанры, теги и комментарий разработчика.
+6. Загрузите основную иконку.
+7. Загрузите основную обложку.
+8. Загрузите три основных снимка для компьютера.
+9. Загрузите два основных снимка для телефона.
+10. Если витрина выглядит слабее ожидаемого, возьмите запасные изображения из папки с медиафайлами.
 
 ## После Прошлых Замечаний
-1. Для \`How to play [ru]\` используйте только \`texts/how_to_play_ru.txt\`, без английских вставок и смешения языков.
-2. После загрузки архива проверьте preview и убедитесь, что SDK подключён через \`/sdk.js\` и в debug panel loader показывает \`IT\`, а не \`IF\`.
-3. Проверьте все rewarded CTA: они должны прямо указывать на рекламу, например \`за рекламу\` или \`Rewarded\`.
-4. На десктопе проверьте resize минимум на \`1600x900\`, \`1280x720\`, \`900x500\` и \`680x380\`: HUD, tutorial, settings и results не должны обрезаться или наезжать друг на друга.
+1. Для русского поля «Как играть» используйте только отдельный русский файл без смешения языков.
+2. После загрузки архива проверьте предварительный просмотр и убедитесь, что платформенный набор подключается по штатной схеме.
+3. Проверьте все кнопки с рекламой за награду: они должны прямо указывать на рекламу.
+4. На компьютере проверьте несколько узких и широких размеров окна: интерфейс, обучение, настройки и экран результатов не должны обрезаться или наезжать друг на друга.
 5. При кликах, правом клике и удержании по игре не должно открываться контекстное меню браузера или появляться выделение текста.
 
 ## Финальная Самопроверка
-1. Проверьте, что в preview корректно открывается загрузочный экран и меню.
-2. Пройдите короткий smoke test: старт run, rewarded, экран результатов, возврат из background.
-3. Сверьте файлы с \`metadata/checksums.sha256\`, если пакет переносился между машинами.
-4. Перед отправкой в модерацию при необходимости перечитайте \`instructions/YANDEX_PUBLISH.md\`.
+1. Проверьте, что корректно открывается загрузочный экран и меню.
+2. Пройдите короткую проверку: старт забега, реклама за награду, экран результатов, возврат после сворачивания.
+3. Если пакет переносился между машинами, сверьте контрольные суммы.
+4. Перед отправкой в модерацию перечитайте полную памятку по публикации.
 `;
 }
 
 function buildModerationEvidenceMarkdown(reviewEvidence) {
   const uiAuditSection = reviewEvidence.uiAudit.present
-    ? `- Included visual matrix: \`${reviewEvidence.uiAudit.path}\`\n- Gallery entry point: \`${reviewEvidence.uiAudit.indexPath}\``
-    : "- UI audit matrix was not found when the publishing kit was assembled. Run `npm run audit:ui` before `npm run package:yandex` to include it.";
+    ? "- Матрица экранов интерфейса приложена.\n- Галерея снимков интерфейса приложена."
+    : "- Матрица интерфейса не была найдена при сборке пакета. Перед новой сборкой запустите проверку интерфейса.";
 
   const publishSmokeSection = reviewEvidence.publishSmoke.present
-    ? `- Included publish smoke report: \`${reviewEvidence.publishSmoke.reportPath}\`\n- Included screenshots: \`${reviewEvidence.publishSmoke.path}\``
-    : "- Yandex publish smoke evidence was not found when the publishing kit was assembled. Run `npm run audit:yandex` before `npm run package:yandex` to include it.";
+    ? "- Отчёт публикационной проверки приложен.\n- Снимки с публикационной проверки приложены."
+    : "- Доказательства публикационной проверки не были найдены при сборке пакета. Перед новой сборкой запустите публикационную проверку.";
 
-  return `# Moderation Evidence
+  return `# Доказательства для модерации
 
-This file maps the historical Yandex moderation issues to the current automated proofs bundled with the publishing kit.
+Этот файл связывает прошлые замечания модерации с текущими проверками, которые вложены в пакет публикации.
 
-## Included Evidence
+## Что Приложено
 ${uiAuditSection}
 ${publishSmokeSection}
 
-## Historical Issues
+## Исторические Замечания
 
-### 1. Not all language-dependent texts were translated
-- Evidence: RU/EN UI matrix in \`${reviewEvidence.uiAudit.path || "review_evidence/ui_audit_matrix"}\`
-- Supporting automation: RU/EN viewport smoke in the local test suite
-- Notes: key menu, HUD, upgrade, results, and boot/fatal overlays now use the shared i18n layer.
+### 1. Не все зависящие от языка тексты были переведены
+- Доказательство: матрица интерфейса на русском и втором языке.
+- Автоматическая проверка: локальная проверка интерфейса на двух языках.
+- Примечание: меню, верхняя панель, улучшения, результаты и стартовые слои работают через общую систему локализации.
 
-### 2. Elements were clipped after window resize
-- Evidence: compact and desktop screenshots in \`${reviewEvidence.uiAudit.path || "review_evidence/ui_audit_matrix"}\`
-- Supporting automation: compact viewport bounds assertions in Playwright e2e
+### 2. Элементы обрезались после изменения размера окна
+- Доказательство: снимки интерфейса на узких и широких размерах окна.
+- Автоматическая проверка: контроль границ в узких окнах.
 
-### 3. Elements and texts overlapped each other
-- Evidence: UI matrix screenshots for menu, workshop, leaderboard, settings, upgrade, and results
-- Supporting automation: compact viewport text-bound checks in \`menu\`, \`ui\`, \`upgrade\`, and \`results\`
+### 3. Элементы и тексты наезжали друг на друга
+- Доказательство: снимки меню, мастерской, таблицы лидеров, настроек, улучшений и результатов.
+- Автоматическая проверка: контроль границ текста на компактных экранах.
 
-### 4. Text selection or browser context menu appeared on the playfield
-- Evidence: publish smoke report in \`${reviewEvidence.publishSmoke.reportPath || "review_evidence/yandex_publish_smoke/report.md"}\`
-- Supporting automation: synthetic \`contextmenu\` and \`selectstart\` prevention checks on the Yandex preview build
+### 4. На игровом поле появлялось выделение текста или контекстное меню браузера
+- Доказательство: отчёт публикационной проверки.
+- Автоматическая проверка: синтетическая проверка блокировки контекстного меню и выделения текста.
 
-### 5. Startup or runtime error appeared in the game
-- Evidence: publish smoke report plus screenshots in \`${reviewEvidence.publishSmoke.path || "review_evidence/yandex_publish_smoke"}\`
-- Supporting automation: boot without fatal overlay, zero runtime page errors during Yandex preview smoke
+### 5. В игре появлялась стартовая или игровая ошибка
+- Доказательство: отчёт публикационной проверки и снимки экрана.
+- Автоматическая проверка: успешный запуск без аварийного слоя и без ошибок страницы во время проверки.
 
-### 6. The game looked unfinished or in-development
-- Evidence: current promo captures in \`media/\`, localized loading screen, staged menu, and polished overlays in the UI audit matrix
-- Supporting automation: build and visual audit artifacts included in this publishing kit
+### 6. Игра выглядела незавершённой
+- Доказательство: актуальные витринные изображения, локализованный загрузочный экран, оформленное меню и доведённые служебные слои.
+- Автоматическая проверка: в пакет вложены материалы визуальной проверки и результаты сборки.
 
-### 7. Text was too small
-- Evidence: compact/mobile screenshots in \`${reviewEvidence.uiAudit.path || "review_evidence/ui_audit_matrix"}\`
-- Supporting automation: narrow viewport visual matrix and compact moderation smoke
+### 7. Текст был слишком мелким
+- Доказательство: снимки на компактных и телефонных размерах окна.
+- Автоматическая проверка: визуальная матрица для узких экранов и компактная модерационная проверка.
 
-## Recommended Workflow
-1. Run \`npm run audit:ui\`.
-2. Run \`npm run audit:yandex\`.
-3. Run \`npm run package:yandex\`.
-4. Review this file and the bundled evidence before uploading the draft.
+## Рекомендованный Порядок Действий
+1. Запустите проверку интерфейса.
+2. Запустите публикационную проверку.
+3. Пересоберите пакет для загрузки.
+4. Перед отправкой просмотрите этот файл и приложенные материалы.
 `;
 }
 

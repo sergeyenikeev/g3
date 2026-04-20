@@ -585,7 +585,8 @@ export class VfxManager {
       this.spawnUiText(uiOrigin.x, uiOrigin.y - 26, `+${formatResource(locale, "bolts", bolts)}`, "#ffd166", 0.9);
     }
     if (uiOrigin && hpHealed > 0) {
-      this.spawnUiText(uiOrigin.x, uiOrigin.y + 2, `+${formatNumber(locale, hpHealed)} HP`, "#57c27d", 0.72);
+      const healedLabel = locale === "ru" ? `+${formatNumber(locale, hpHealed)} прочн.` : `+${formatNumber(locale, hpHealed)} HP`;
+      this.spawnUiText(uiOrigin.x, uiOrigin.y + 2, healedLabel, "#57c27d", 0.72);
     }
 
     const uiTarget = this.getUiBoltsTarget();
