@@ -1,6 +1,6 @@
-import type { PlatformAdapter } from "../platformAdapter";
+import type { PlatformAdapter, PlatformLoadOptions } from "../platformAdapter";
 import { LOCAL_SAVE_BACKUP_KEY, LOCAL_SAVE_MIRROR_KEY } from "../storageKeys";
-import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "../utils/localStorage";
+import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageRemove, safeLocalStorageSet } from "../utils/localStorage";
 import type { LanguageSetting } from "../../i18n/localization";
 import { normalizeLanguageSetting } from "../../i18n/localization";
 
@@ -191,9 +191,9 @@ export class SaveManager {
     return this.cache ?? makeDefaultSave();
   }
 
-  async load(): Promise<SaveData> {
+  async load(options?: PlatformLoadOptions): Promise<SaveData> {
     const storageScope = this.getStorageScope();
-    const raw = await this.adapter.load();
+    const raw = await this.adapter.load(options);
     const parsed = sanitize(raw);
     if (parsed) {
       this.cache = parsed;
@@ -205,7 +205,7 @@ export class SaveManager {
     if (mirror) {
       this.cache = mirror;
       writeMirror(mirror, storageScope);
-      void this.adapter.save(mirror).catch(() => {});
+      if (!options?.ignorePlatformData) void this.adapter.save(mirror).catch(() => {});
       return this.cache;
     }
 
@@ -213,7 +213,7 @@ export class SaveManager {
     if (backup) {
       this.cache = backup;
       writeMirror(backup, storageScope);
-      void this.adapter.save(backup).catch(() => {});
+      if (!options?.ignorePlatformData) void this.adapter.save(backup).catch(() => {});
       return this.cache;
     }
 
@@ -221,12 +221,19 @@ export class SaveManager {
     return this.cache;
   }
 
-  async save(next: SaveData): Promise<void> {
+  async save(next: SaveData, options?: { persistToPlatform?: boolean }): Promise<void> {
     const storageScope = this.getStorageScope();
     rotateBackup(storageScope);
     writeMirror(next, storageScope);
     this.cache = next;
+    if (options?.persistToPlatform === false) return;
     await this.adapter.save(next);
+  }
+
+  clearLocalCopies(): void {
+    const storageScope = this.getStorageScope();
+    clearScopedStorageKey(LOCAL_SAVE_MIRROR_KEY, storageScope);
+    clearScopedStorageKey(LOCAL_SAVE_BACKUP_KEY, storageScope);
   }
 
   private getStorageScope(): string | null {
@@ -595,4 +602,9 @@ function writeMirror(data: unknown, scope: string | null): void {
 
 function getScopedStorageKey(baseKey: string, scope: string | null): string {
   return scope ? `${baseKey}:${scope}` : baseKey;
+}
+
+function clearScopedStorageKey(baseKey: string, scope: string | null): void {
+  safeLocalStorageRemove(baseKey);
+  if (scope) safeLocalStorageRemove(getScopedStorageKey(baseKey, scope));
 }

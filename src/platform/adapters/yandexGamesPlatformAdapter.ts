@@ -1,4 +1,4 @@
-import type { PlatformAdapter, PlatformLifecycleListener, PlatformLeaderboardSnapshot, RewardedResult } from "../platformAdapter";
+import type { PlatformAdapter, PlatformLifecycleListener, PlatformLeaderboardSnapshot, PlatformLoadOptions, RewardedResult } from "../platformAdapter";
 import { getPreinitializedYandexSdk } from "../sdk/loadPlatformSdk";
 import { PLATFORM_SAVE_KEY } from "../storageKeys";
 import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "../utils/localStorage";
@@ -91,6 +91,7 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
     | null = null;
   private gameplayActive = false;
   private gameReadySent = false;
+  private bootCompleted = false;
   private playerStorageScope: string | null = null;
   private accountSelectionOpen = false;
   private leaderboardCache = new Map<
@@ -204,7 +205,7 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
       const previousScope = this.getStorageScope();
       await this.refreshPlayerContext();
       this.accountSelectionOpen = false;
-      if (previousScope !== this.getStorageScope()) {
+      if (previousScope !== this.getStorageScope() && this.bootCompleted) {
         try {
           window.location.reload();
           return;
@@ -280,10 +281,11 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
     safeLocalStorageSet(this.getSaveFallbackKey(), raw);
   }
 
-  async load(): Promise<unknown | null> {
-    if (this.player?.getData) {
+  async load(options?: PlatformLoadOptions): Promise<unknown | null> {
+    if (!options?.ignorePlatformData && this.player?.getData) {
       try {
         const data = await this.player.getData();
+        options?.captureRawPlatformData?.(data);
         if (data && typeof data === "object") return data;
       } catch {
         // fallback
@@ -438,6 +440,10 @@ export class YandexGamesPlatformAdapter implements PlatformAdapter {
 
   private getLeaderboardCacheKey(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): string {
     return `${scope}:${boardId}`;
+  }
+
+  markBootCompleted(): void {
+    this.bootCompleted = true;
   }
 }
 

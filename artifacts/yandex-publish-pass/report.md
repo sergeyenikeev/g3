@@ -1,20 +1,26 @@
 # Yandex Publish Smoke
 
-Generated: 2026-04-19T07:48:07.443Z
+Generated: 2026-04-20T17:16:05.791Z
 
 ## Build Targets
 - Release zip: D:\p\g3\dist\releases\magnet-caravan_yandex.zip
 - Release index: D:\p\g3\dist\platform_builds\yandex\index.html
-- Smoke preview dir: D:\p\g3\dist\platform_builds\yandex_smoke
-- Local preview URL: http://127.0.0.1:4310
+- AUTO smoke preview dir: D:\p\g3\dist\platform_builds\yandex_smoke
+- Release preview URL: http://127.0.0.1:4310
+- AUTO smoke preview URL: http://127.0.0.1:4312
 
 ## Automated Checks
 - PASS: SDK script injected into release index.html - D:\p\g3\dist\platform_builds\yandex\index.html
-- PASS: Yandex build boots without fatal overlay - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
-- PASS: Platform locale hint overrides browser locale on auto language - document.lang=ru, menuLocale=ru
-- PASS: LoadingAPI.ready is called on startup - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
+- PASS: Release Yandex bundle boots without fatal overlay - D:\p\g3\artifacts\yandex-publish-pass\00_release_menu_boot.png
+- PASS: Release bundle sends LoadingAPI.ready on startup - D:\p\g3\artifacts\yandex-publish-pass\00_release_menu_boot.png
+- PASS: Release bundle honors the platform language hint during boot - document.lang=ru, title=Magnet Caravan
+- FAIL: Release bundle recovers from a failing platform save by bypassing cloud data once - missing boot report
+- PASS: AUTO smoke build boots without fatal overlay - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
+- PASS: Platform locale hint overrides browser locale on the AUTO smoke build - document.lang=ru, menuLocale=ru
+- PASS: LoadingAPI.ready is called on the AUTO smoke build - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
 - PASS: Browser context menu is prevented on the playfield - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
 - PASS: Browser text selection is prevented on the playfield - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
+- PASS: Yandex stub pause/resume events can be emitted against the AUTO smoke build - {"fatalOverlay":false,"pauseEvents":1,"resumeEvents":1}
 - PASS: GameplayAPI.start is called during a run - D:\p\g3\artifacts\yandex-publish-pass\02_runtime_ui.png
 - PASS: GameplayAPI.stop is called for pauses/results - D:\p\g3\artifacts\yandex-publish-pass\04_results_before_rewarded.png
 - PASS: Rewarded flow can be completed from the results screen - D:\p\g3\artifacts\yandex-publish-pass\05_results_after_rewarded.png
@@ -23,6 +29,8 @@ Generated: 2026-04-19T07:48:07.443Z
 - PASS: No runtime page errors were captured during smoke - none
 
 ## Evidence
+- D:\p\g3\artifacts\yandex-publish-pass\00_release_menu_boot.png
+- D:\p\g3\artifacts\yandex-publish-pass\00b_release_recovery.png
 - D:\p\g3\artifacts\yandex-publish-pass\01_starter_menu.png
 - D:\p\g3\artifacts\yandex-publish-pass\02_runtime_ui.png
 - D:\p\g3\artifacts\yandex-publish-pass\03_upgrade.png
@@ -33,8 +41,8 @@ Generated: 2026-04-19T07:48:07.443Z
 - none
 
 ## Moderation Mapping
-- Localization and readable staged UI: covered by the existing visual matrix in artifacts/ui-audit/matrix and the RU/EN smoke suite.
-- Resize / overlap regressions: covered by the compact viewport e2e suite plus the visual matrix.
-- Browser interaction guards: verified here through synthetic contextmenu/selectstart prevention checks.
-- Startup/runtime stability: verified here through Yandex-adapter boot and zero page errors during smoke.
-- Rewarded clarity and SDK flow: verified here through a rewarded results interaction on the Yandex preview build.
+- Release startup stability: verified on the production Yandex bundle with routed SDK stubs.
+- Cloud-save recovery: verified on the production Yandex bundle through a failing platform save followed by automatic safe recovery.
+- Runtime interaction coverage: verified on the AUTO smoke build with exposed automation hooks and routed SDK stubs.
+- Browser interaction guards: verified through synthetic contextmenu/selectstart prevention checks.
+- Rewarded and interstitial flows: verified through results-screen interaction on the AUTO smoke build.

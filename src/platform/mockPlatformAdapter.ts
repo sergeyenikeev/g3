@@ -1,5 +1,4 @@
-import type { PlatformAdapter, RewardedResult } from "./platformAdapter";
-import type { PlatformLeaderboardSnapshot } from "./platformAdapter";
+import type { PlatformAdapter, PlatformLeaderboardSnapshot, PlatformLoadOptions, RewardedResult } from "./platformAdapter";
 import { PLATFORM_LEADERBOARD_KEY, PLATFORM_SAVE_KEY } from "./storageKeys";
 import { safeJsonParse, safeJsonStringify, safeLocalStorageGet, safeLocalStorageSet } from "./utils/localStorage";
 
@@ -26,7 +25,7 @@ export class MockPlatformAdapter implements PlatformAdapter {
     safeLocalStorageSet(PLATFORM_SAVE_KEY, raw);
   }
 
-  async load(): Promise<unknown | null> {
+  async load(_options?: PlatformLoadOptions): Promise<unknown | null> {
     return safeJsonParse(safeLocalStorageGet(PLATFORM_SAVE_KEY));
   }
 

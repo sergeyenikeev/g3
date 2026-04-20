@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { PlatformAdapter, RewardedResult } from "../../src/platform/platformAdapter";
+import type { PlatformAdapter, PlatformLoadOptions, RewardedResult } from "../../src/platform/platformAdapter";
 import { SaveManager } from "../../src/platform/save/saveManager";
+import { LOCAL_SAVE_MIRROR_KEY } from "../../src/platform/storageKeys";
 
 const originalLocalStorage = (globalThis as any).localStorage;
 
@@ -27,7 +28,7 @@ class MemoryAdapter implements PlatformAdapter {
     this.store = data;
   }
 
-  async load(): Promise<unknown | null> {
+  async load(_options?: PlatformLoadOptions): Promise<unknown | null> {
     return this.store;
   }
 }
@@ -155,6 +156,176 @@ describe("SaveManager (integration)", () => {
     const sm = new SaveManager(adapter);
     const s = await sm.load();
     expect(s.v).toBe(1);
+  });
+
+  it("captures raw platform payloads before sanitizing them", async () => {
+    const captured: unknown[] = [];
+    const rawSave = {
+      v: 1,
+      settings: {
+        sfxVolume: 0.8,
+        musicVolume: 0.6,
+        visualQuality: "auto",
+        language: "ru",
+        pilotName: "Nova",
+      },
+      tutorial: { completed: true, skipped: false },
+      meta: { nodeLevels: {}, wallet: { bolts: 42, cores: 1 } },
+      stats: { bestWave: 7, bestBolts: 100, runsCompleted: 3 },
+      ads: {
+        lastInterstitialAtMs: 0,
+        lastRewardedAtMs: 0,
+        rewardedChainCount: 0,
+        lastFrustrationAtMs: 0,
+        lastRunStartedAtMs: 0,
+        lastRunDurationSec: 0,
+        interstitialDateUtc: null,
+        interstitialsShownToday: 0,
+      },
+      loginRewards: { lastClaimDateUtc: null, day: 0 },
+      liveops: {
+        firstSeenDateUtc: null,
+        lastSeenDateUtc: null,
+        sessionsStarted: 0,
+        lastReturnGapDays: 0,
+        activation: { firstScrapTracked: false, firstBankTracked: false, firstUpgradeTracked: false },
+        onboarding: { freeBoostsUsed: 0 },
+        streak: { day: 0, claimedDateUtc: null },
+        comeback: { lastClaimDateUtc: null, lastEligibleGapDays: 0 },
+        missions: {
+          daily: { dateUtc: null, progress: {}, claimedIds: [] },
+          weekly: { weekKey: null, progress: {}, claimedIds: [] },
+        },
+        claimedEventRewardIds: [],
+        weeklyLeaderboard: {
+          weekKey: null,
+          entries: [],
+          highestDivision: "scrapper",
+          claimedRewardDivisions: [],
+          claimedRewardWeekKeys: [],
+        },
+      },
+      daily: { lastDateUtc: null, attemptsUsed: 0, bestWave: 0, bestBolts: 0 },
+      leaderboard: { entries: [], highestDivision: "scrapper", claimedRewardDivisions: [], claimedMilestones: [] },
+      legacyDraftMeta: { tutorialVersion: 0 },
+    };
+
+    class RawCaptureAdapter extends MemoryAdapter {
+      async load(options?: PlatformLoadOptions): Promise<unknown | null> {
+        options?.captureRawPlatformData?.(rawSave);
+        return rawSave;
+      }
+    }
+
+    const sm = new SaveManager(new RawCaptureAdapter());
+    const save = await sm.load({
+      captureRawPlatformData: (value) => captured.push(value),
+    });
+
+    expect(captured).toEqual([rawSave]);
+    expect(save.settings.pilotName).toBe("Nova");
+    expect(save.meta.wallet.bolts).toBe(42);
+  });
+
+  it("does not rewrite platform data when recovery loads from the local mirror", async () => {
+    (globalThis as any).localStorage = new MemoryStorage();
+
+    const mirrorSave = {
+      v: 1,
+      settings: {
+        sfxVolume: 0.8,
+        musicVolume: 0.6,
+        visualQuality: "auto",
+        language: "ru",
+        pilotName: "Mirror",
+      },
+      tutorial: { completed: false, skipped: false },
+      meta: { nodeLevels: {}, wallet: { bolts: 5, cores: 0 } },
+      stats: { bestWave: 1, bestBolts: 5, runsCompleted: 1 },
+      ads: {
+        lastInterstitialAtMs: 0,
+        lastRewardedAtMs: 0,
+        rewardedChainCount: 0,
+        lastFrustrationAtMs: 0,
+        lastRunStartedAtMs: 0,
+        lastRunDurationSec: 0,
+        interstitialDateUtc: null,
+        interstitialsShownToday: 0,
+      },
+      loginRewards: { lastClaimDateUtc: null, day: 0 },
+      liveops: {
+        firstSeenDateUtc: null,
+        lastSeenDateUtc: null,
+        sessionsStarted: 0,
+        lastReturnGapDays: 0,
+        activation: { firstScrapTracked: false, firstBankTracked: false, firstUpgradeTracked: false },
+        onboarding: { freeBoostsUsed: 0 },
+        streak: { day: 0, claimedDateUtc: null },
+        comeback: { lastClaimDateUtc: null, lastEligibleGapDays: 0 },
+        missions: {
+          daily: { dateUtc: null, progress: {}, claimedIds: [] },
+          weekly: { weekKey: null, progress: {}, claimedIds: [] },
+        },
+        claimedEventRewardIds: [],
+        weeklyLeaderboard: {
+          weekKey: null,
+          entries: [],
+          highestDivision: "scrapper",
+          claimedRewardDivisions: [],
+          claimedRewardWeekKeys: [],
+        },
+      },
+      daily: { lastDateUtc: null, attemptsUsed: 0, bestWave: 0, bestBolts: 0 },
+      leaderboard: { entries: [], highestDivision: "scrapper", claimedRewardDivisions: [], claimedMilestones: [] },
+    };
+
+    class MirrorRecoveryAdapter extends ScopedMemoryAdapter {
+      loadCalls: Array<PlatformLoadOptions | null> = [];
+      saveCalls: unknown[] = [];
+
+      async load(options?: PlatformLoadOptions): Promise<unknown | null> {
+        this.loadCalls.push(options ?? null);
+        return null;
+      }
+
+      async save(data: unknown): Promise<void> {
+        this.saveCalls.push(data);
+        await super.save(data);
+      }
+    }
+
+    const adapter = new MirrorRecoveryAdapter("yandex:player-a");
+    globalThis.localStorage.setItem(`${LOCAL_SAVE_MIRROR_KEY}:yandex:player-a`, JSON.stringify(mirrorSave));
+
+    const sm = new SaveManager(adapter);
+    const save = await sm.load({ ignorePlatformData: true });
+
+    expect(save.settings.pilotName).toBe("Mirror");
+    expect(adapter.saveCalls).toEqual([]);
+    expect(adapter.loadCalls).toHaveLength(1);
+  });
+
+  it("can save to the local mirror without writing back to the platform", async () => {
+    (globalThis as any).localStorage = new MemoryStorage();
+
+    class LocalOnlySaveAdapter extends ScopedMemoryAdapter {
+      saveCalls: unknown[] = [];
+
+      async save(data: unknown): Promise<void> {
+        this.saveCalls.push(data);
+        await super.save(data);
+      }
+    }
+
+    const adapter = new LocalOnlySaveAdapter("yandex:player-a");
+    const sm = new SaveManager(adapter);
+    const save = await sm.load();
+    save.settings.pilotName = "Recovery";
+
+    await sm.save(save, { persistToPlatform: false });
+
+    expect(adapter.saveCalls).toEqual([]);
+    expect(globalThis.localStorage.getItem(`${LOCAL_SAVE_MIRROR_KEY}:yandex:player-a`)).toContain('"pilotName":"Recovery"');
   });
 
   it("isolates local mirrors by storage scope", async () => {

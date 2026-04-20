@@ -275,7 +275,7 @@ export class GameScene extends Phaser.Scene {
       this.state.daily = { dateUtc: sel.dateUtc, variantId: sel.variantId, specialRule: sel.specialRule };
     }
 
-    if (import.meta.env.VITE_E2E === "1") {
+    if (isAutomationSmokeEnabled()) {
       this.state.config.recycler.bankTimeSec = Math.min(this.state.config.recycler.bankTimeSec, 0.15);
     }
 
@@ -306,7 +306,7 @@ export class GameScene extends Phaser.Scene {
       },
     };
 
-    if (import.meta.env.VITE_E2E === "1") {
+    if (isAutomationSmokeEnabled()) {
       this.e2eKillKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.K);
       this.bindE2eWindowApi();
     }
@@ -363,7 +363,7 @@ export class GameScene extends Phaser.Scene {
     if (dt <= 0) return;
     if (this.revivePending) return;
 
-    if (import.meta.env.VITE_E2E === "1" && this.e2eKillKey && Phaser.Input.Keyboard.JustDown(this.e2eKillKey)) {
+    if (isAutomationSmokeEnabled() && this.e2eKillKey && Phaser.Input.Keyboard.JustDown(this.e2eKillKey)) {
       this.endRun("e2e");
       return;
     }
@@ -921,7 +921,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (import.meta.env.VITE_E2E === "1") {
+    if (isAutomationSmokeEnabled()) {
       this.waveHudLabel = t(this.locale, "wave.quickTest");
       this.registry.set("uiStatusPrimary", this.waveHudLabel);
       this.wavePlan.durationSec = Math.min(this.wavePlan.durationSec, 6);
@@ -1155,7 +1155,7 @@ export class GameScene extends Phaser.Scene {
     this.player.body.setAllowGravity(false);
     this.createPlayerGlow();
 
-    if (import.meta.env.VITE_E2E === "1") {
+    if (isAutomationSmokeEnabled()) {
       for (let i = 0; i < 3; i++) this.tail.addSegment("common", this.player.x, this.player.y);
       this.time.delayedCall(250, () => {
         if (!this.scene.isActive()) return;
@@ -2203,7 +2203,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (import.meta.env.VITE_E2E === "1") {
+    if (isAutomationSmokeEnabled()) {
       this.waveHudLabel = t(this.locale, "wave.quickTest");
       return;
     }
@@ -2857,4 +2857,8 @@ function describeWavePlan(plan: WavePlan, locale: Locale): string {
     return details.length > 0 ? `${t(locale, "wave.event")}: ${title} | ${details.join(", ")}` : `${t(locale, "wave.event")}: ${title}`;
   }
   return details.length > 0 ? `${title} | ${details.join(", ")}` : title;
+}
+
+function isAutomationSmokeEnabled(): boolean {
+  return import.meta.env.VITE_E2E === "1" || import.meta.env.VITE_SMOKE_TEST === "1";
 }

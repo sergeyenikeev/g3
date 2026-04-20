@@ -1,4 +1,5 @@
 import { type Locale, resolveLocale, t } from "../i18n/localization";
+import { buildBootReport, getBootQueryFlags, persistBootReport, readBootReport, type BootReport } from "./bootDiagnostics";
 import { getPlatformBootstrapLocaleHint, getPreinitializedYandexSdk } from "../platform/sdk/loadPlatformSdk";
 
 type BootstrapLocale = Locale;
@@ -27,10 +28,20 @@ export function installBrowserInteractionGuards(target: Window = window): void {
 }
 
 export function reportFatalStartupError(error: unknown): void {
-  console.error("[Magnet Caravan] fatal bootstrap/runtime error", error);
+  const report = buildBootReport(error);
+  reportFatalStartupErrorWithReport(error, report);
+}
+
+export function reportFatalStartupErrorWithReport(error: unknown, report: BootReport | null): void {
+  if (report) {
+    persistBootReport(report);
+    console.error("[Magnet Caravan] fatal bootstrap/runtime error", report, error);
+  } else {
+    console.error("[Magnet Caravan] fatal bootstrap/runtime error", error);
+  }
   const locale = getBootstrapLocale();
   syncDocumentLocale(locale);
-  renderFatalOverlay(locale);
+  renderFatalOverlay(locale, report ?? readBootReport());
   void refreshFatalOverlayLocaleHint(locale);
 }
 
@@ -47,7 +58,7 @@ export function syncDocumentLocale(locale: BootstrapLocale): void {
   document.title = t(locale, "app.title");
 }
 
-function renderFatalOverlay(locale: BootstrapLocale): void {
+function renderFatalOverlay(locale: BootstrapLocale, report: BootReport | null = null): void {
   if (typeof document === "undefined") return;
 
   const host = document.getElementById("app") ?? document.body;
@@ -60,6 +71,7 @@ function renderFatalOverlay(locale: BootstrapLocale): void {
   const title = overlay.querySelector<HTMLElement>("[data-role='title']");
   const body = overlay.querySelector<HTMLElement>("[data-role='body']");
   const action = overlay.querySelector<HTMLButtonElement>("[data-role='action']");
+  const details = overlay.querySelector<HTMLElement>("[data-role='details']");
 
   if (title) title.textContent = copy.title;
   if (body) body.textContent = copy.body;
@@ -73,6 +85,11 @@ function renderFatalOverlay(locale: BootstrapLocale): void {
       }
     };
   }
+  if (details) {
+    const showDetails = getBootQueryFlags().bootDiag && report;
+    details.style.display = showDetails ? "block" : "none";
+    details.textContent = showDetails && report ? formatBootReportDetails(report) : "";
+  }
 }
 
 async function refreshFatalOverlayLocaleHint(currentLocale: BootstrapLocale): Promise<void> {
@@ -85,7 +102,7 @@ async function refreshFatalOverlayLocaleHint(currentLocale: BootstrapLocale): Pr
   const nextLocale = getBootstrapLocale();
   if (nextLocale === currentLocale) return;
   syncDocumentLocale(nextLocale);
-  renderFatalOverlay(nextLocale);
+  renderFatalOverlay(nextLocale, readBootReport());
 }
 
 function ensureOverlay(host: HTMLElement): HTMLElement {
@@ -145,7 +162,23 @@ function ensureOverlay(host: HTMLElement): HTMLElement {
   action.style.fontWeight = "800";
   action.style.cursor = "pointer";
 
-  panel.append(title, body, action);
+  const details = document.createElement("pre");
+  details.dataset.role = "details";
+  details.style.display = "none";
+  details.style.margin = "16px 0 0";
+  details.style.padding = "14px 16px";
+  details.style.borderRadius = "16px";
+  details.style.background = "rgba(2, 8, 14, 0.7)";
+  details.style.border = "1px solid rgba(92, 200, 255, 0.22)";
+  details.style.color = "#8fc7df";
+  details.style.fontSize = "13px";
+  details.style.lineHeight = "1.45";
+  details.style.fontFamily = "Consolas, 'Courier New', monospace";
+  details.style.textAlign = "left";
+  details.style.whiteSpace = "pre-wrap";
+  details.style.wordBreak = "break-word";
+
+  panel.append(title, body, details, action);
   overlay.append(panel);
   host.append(overlay);
   return overlay;
@@ -173,4 +206,21 @@ function getNavigatorLanguages(): readonly string[] {
   }
 
   return ["en"];
+}
+
+function formatBootReportDetails(report: BootReport): string {
+  const lines = [
+    `status: ${report.status}`,
+    `stage: ${report.stage}`,
+    `platform: ${report.platform}`,
+    `documentLang: ${report.documentLang ?? "-"}`,
+    `hasYaGames: ${report.hasYaGames ? "yes" : "no"}`,
+    `storageScope: ${report.storageScope ?? "-"}`,
+    `recoveryAttempted: ${report.recoveryAttempted ? "yes" : "no"}`,
+    `recoveredFromPlatformSave: ${report.recoveredFromPlatformSave ? "yes" : "no"}`,
+    `timestamp: ${report.timestampIso}`,
+    `message: ${report.message}`,
+  ];
+  if (report.stack) lines.push(`stack:\n${report.stack}`);
+  return lines.join("\n");
 }

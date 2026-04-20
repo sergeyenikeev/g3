@@ -56,6 +56,35 @@ describe("YandexGamesPlatformAdapter", () => {
     expect(setData).toHaveBeenCalledWith({ progress: 1 }, true);
   });
 
+  it("can ignore platform save reads and capture raw platform payloads", async () => {
+    const getData = vi.fn(async () => ({ v: 1, stats: { bestWave: 7 } }));
+
+    (globalThis as any).window = {
+      YaGames: {
+        init: vi.fn(async () => ({
+          getPlayer: vi.fn(async () => ({
+            getUniqueID: () => "player-a",
+            getData,
+          })),
+        })),
+      },
+    };
+
+    const adapter = new YandexGamesPlatformAdapter();
+    await adapter.init();
+
+    const captured: unknown[] = [];
+    await expect(
+      adapter.load({
+        captureRawPlatformData: (value) => captured.push(value),
+      })
+    ).resolves.toEqual({ v: 1, stats: { bestWave: 7 } });
+    await expect(adapter.load({ ignorePlatformData: true })).resolves.toBeNull();
+
+    expect(getData).toHaveBeenCalledTimes(1);
+    expect(captured).toEqual([{ v: 1, stats: { bestWave: 7 } }]);
+  });
+
   it("subscribes and unsubscribes SDK lifecycle events", async () => {
     const handlers = new Map<string, () => void>();
     const off = vi.fn();
@@ -89,7 +118,7 @@ describe("YandexGamesPlatformAdapter", () => {
     expect(off).toHaveBeenCalledWith("game_api_resume", handlers.get("game_api_resume"));
   });
 
-  it("reloads the page after account selection changes the active player", async () => {
+  it("does not reload before the first successful boot when account selection changes the active player", async () => {
     const handlers = new Map<string, () => void | Promise<void>>();
     const off = vi.fn();
     const reload = vi.fn();
@@ -117,6 +146,49 @@ describe("YandexGamesPlatformAdapter", () => {
 
     const adapter = new YandexGamesPlatformAdapter();
     await adapter.init();
+
+    const pause = vi.fn();
+    const resume = vi.fn();
+    adapter.addLifecycleListener({ pause, resume });
+
+    await handlers.get("ACCOUNT_SELECTION_DIALOG_OPENED")?.();
+    await handlers.get("ACCOUNT_SELECTION_DIALOG_CLOSED")?.();
+
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(reload).not.toHaveBeenCalled();
+    expect(adapter.getStorageScope()).toBe("yandex:player-b");
+  });
+
+  it("reloads the page after account selection changes the active player once boot completed", async () => {
+    const handlers = new Map<string, () => void | Promise<void>>();
+    const off = vi.fn();
+    const reload = vi.fn();
+    const getPlayer = vi
+      .fn()
+      .mockResolvedValueOnce({ getUniqueID: () => "player-a" })
+      .mockResolvedValueOnce({ getUniqueID: () => "player-b" });
+
+    (globalThis as any).window = {
+      location: { reload },
+      YaGames: {
+        init: vi.fn(async () => ({
+          EVENTS: {
+            ACCOUNT_SELECTION_DIALOG_OPENED: "ACCOUNT_SELECTION_DIALOG_OPENED",
+            ACCOUNT_SELECTION_DIALOG_CLOSED: "ACCOUNT_SELECTION_DIALOG_CLOSED",
+          },
+          on: vi.fn((eventName: string, callback: () => void | Promise<void>) => {
+            handlers.set(eventName, callback);
+          }),
+          off,
+          getPlayer,
+        })),
+      },
+    };
+
+    const adapter = new YandexGamesPlatformAdapter();
+    await adapter.init();
+    adapter.markBootCompleted();
 
     const pause = vi.fn();
     const resume = vi.fn();

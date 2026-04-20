@@ -24,6 +24,11 @@ export type PlatformLeaderboardSnapshot = {
   currentPlayerScore: number | null;
 };
 
+export type PlatformLoadOptions = {
+  ignorePlatformData?: boolean;
+  captureRawPlatformData?: (value: unknown) => void;
+};
+
 export interface PlatformAdapter {
   readonly name: string;
   init(): Promise<void>;
@@ -33,11 +38,12 @@ export interface PlatformAdapter {
   signalGameReady?(): Promise<void>;
   signalGameplayStart?(): Promise<void>;
   signalGameplayStop?(): Promise<void>;
+  markBootCompleted?(): void;
   addLifecycleListener?(listener: PlatformLifecycleListener): (() => void) | void;
   showInterstitial(): Promise<boolean>;
   showRewarded(placement: string): Promise<RewardedResult>;
   save(data: unknown): Promise<void>;
-  load(): Promise<unknown | null>;
+  load(options?: PlatformLoadOptions): Promise<unknown | null>;
   submitScore?(boardId: string, score: number): Promise<void>;
   getLeaderboard?(boardId: string, scope: PlatformLeaderboardSnapshot["scope"]): Promise<PlatformLeaderboardSnapshot | null>;
 }

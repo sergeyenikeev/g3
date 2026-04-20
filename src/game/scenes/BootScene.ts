@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { getBootstrapLocale, syncDocumentLocale } from "../../app/bootstrapShell";
+import { buildBootReport, clearBootReport, clearRawPlatformSave, getBootQueryFlags, persistBootReport, persistRawPlatformSave, setCurrentBootStage, type BootReport } from "../../app/bootDiagnostics";
+import { getBootstrapLocale, reportFatalStartupErrorWithReport, syncDocumentLocale } from "../../app/bootstrapShell";
 import type { StaticGameData } from "../../data/staticGameData";
 import { createAnalyticsAdapter } from "../../analytics/analyticsFactory";
 import { ANALYTICS_EVENTS } from "../../analytics/eventNames";
@@ -14,6 +15,8 @@ import { getUtcYyyymmdd } from "../daily/daily";
 import { normalizeLiveopsSave } from "../liveops/liveops";
 
 export class BootScene extends Phaser.Scene {
+  private beforeUnloadTracked = false;
+
   constructor() {
     super("boot");
   }
@@ -143,7 +146,11 @@ export class BootScene extends Phaser.Scene {
     };
     this.registry.set("staticGameData", data);
 
-    void this.bootstrap();
+    void this.bootstrap().catch((error) => {
+      const report = this.createBootReport(error, "unknown", null, false, false);
+      persistBootReport(report);
+      reportFatalStartupErrorWithReport(error, report);
+    });
   }
 
   private async refreshBootLocaleHint(
@@ -173,11 +180,85 @@ export class BootScene extends Phaser.Scene {
 
   private async bootstrap(): Promise<void> {
     const adapter = createPlatformAdapter();
+    const saveManager = new SaveManager(adapter);
+    const bootFlags = getBootQueryFlags();
+    const shouldIgnorePlatformData = bootFlags.resetYandexSave && adapter.name === "yandex";
+
+    if (shouldIgnorePlatformData) clearRawPlatformSave();
+
+    try {
+      await this.runBootstrapAttempt(adapter, saveManager, {
+        ignorePlatformData: shouldIgnorePlatformData,
+        clearLocalCopies: shouldIgnorePlatformData,
+      });
+      adapter.markBootCompleted?.();
+      clearBootReport();
+      clearRawPlatformSave();
+      return;
+    } catch (error) {
+      const firstFailureReport = this.createBootReport(error, adapter.name, adapter.getStorageScope?.() ?? null, false, false);
+      const canRetryWithoutPlatformSave =
+        adapter.name === "yandex" &&
+        !shouldIgnorePlatformData &&
+        isRecoveryStage(firstFailureReport.stage);
+
+      if (!canRetryWithoutPlatformSave) {
+        persistBootReport(firstFailureReport);
+        reportFatalStartupErrorWithReport(error, firstFailureReport);
+        return;
+      }
+
+      console.error("[Magnet Caravan] boot attempt failed, retrying without platform save", firstFailureReport, error);
+
+      try {
+        await this.runBootstrapAttempt(adapter, saveManager, {
+          ignorePlatformData: true,
+          clearLocalCopies: false,
+        });
+        adapter.markBootCompleted?.();
+        const recoveredReport = this.createBootReport(
+          error,
+          adapter.name,
+          adapter.getStorageScope?.() ?? null,
+          true,
+          true,
+          "recovered",
+          firstFailureReport.stage
+        );
+        persistBootReport(recoveredReport);
+      } catch (retryError) {
+        const finalReport = this.createBootReport(
+          retryError,
+          adapter.name,
+          adapter.getStorageScope?.() ?? null,
+          true,
+          false
+        );
+        persistBootReport(finalReport);
+        reportFatalStartupErrorWithReport(retryError, finalReport);
+      }
+    }
+  }
+
+  private async runBootstrapAttempt(
+    adapter: ReturnType<typeof createPlatformAdapter>,
+    saveManager: SaveManager,
+    options: { ignorePlatformData: boolean; clearLocalCopies: boolean }
+  ): Promise<void> {
+    setCurrentBootStage("adapter-init");
     await adapter.init();
+    if (options.clearLocalCopies) saveManager.clearLocalCopies();
+
     const platformLanguageHint = getPlatformLanguageHint(adapter);
     const platformTimeOffsetMs = await resolvePlatformTimeOffsetMs(adapter);
-    const saveManager = new SaveManager(adapter);
-    let save = await saveManager.load();
+
+    setCurrentBootStage("save-load");
+    let save = await saveManager.load({
+      ignorePlatformData: options.ignorePlatformData,
+      captureRawPlatformData: options.ignorePlatformData ? undefined : persistRawPlatformSave,
+    });
+
+    setCurrentBootStage("liveops-normalize");
     const dateUtc = getUtcYyyymmdd(new Date(Date.now() + platformTimeOffsetMs));
     const liveopsInit = normalizeLiveopsSave(
       save,
@@ -197,9 +278,10 @@ export class BootScene extends Phaser.Scene {
     }
     if (nextSave !== save) {
       save = nextSave;
-      await saveManager.save(save);
+      await saveManager.save(save, { persistToPlatform: !options.ignorePlatformData });
     }
 
+    setCurrentBootStage("analytics-init");
     const analytics = createAnalyticsAdapter();
     await analytics.init();
     const adsManager = new AdsManager(adapter, analytics, saveManager, this.game.events);
@@ -230,13 +312,39 @@ export class BootScene extends Phaser.Scene {
         daysAway: liveopsInit.summary.returnedAfterDays,
       });
     }
+    this.bindSessionEndTracking(analytics, adapter.name);
+
+    setCurrentBootStage("menu-start");
+    this.scene.start("menu");
+  }
+
+  private createBootReport(
+    error: unknown,
+    platform: string,
+    storageScope: string | null,
+    recoveryAttempted: boolean,
+    recoveredFromPlatformSave: boolean,
+    status: BootReport["status"] = "fatal",
+    stageOverride?: BootReport["stage"]
+  ): BootReport {
+    return buildBootReport(error, {
+      status,
+      stage: stageOverride,
+      platform,
+      storageScope,
+      recoveryAttempted,
+      recoveredFromPlatformSave,
+    });
+  }
+
+  private bindSessionEndTracking(analytics: AnalyticsAdapter, platform: string): void {
+    if (this.beforeUnloadTracked) return;
+    this.beforeUnloadTracked = true;
     try {
-      window.addEventListener("beforeunload", () => trackSessionEnd(analytics, adapter.name));
+      window.addEventListener("beforeunload", () => trackSessionEnd(analytics, platform));
     } catch {
       // ignore
     }
-
-    this.scene.start("menu");
   }
 }
 
@@ -246,4 +354,8 @@ function trackSessionStart(analytics: AnalyticsAdapter, platform: string, payloa
 
 function trackSessionEnd(analytics: AnalyticsAdapter, platform: string): void {
   analytics.track(ANALYTICS_EVENTS.SESSION_END, { platform, t: Date.now() });
+}
+
+function isRecoveryStage(stage: BootReport["stage"]): boolean {
+  return stage === "save-load" || stage === "liveops-normalize" || stage === "analytics-init" || stage === "menu-start";
 }

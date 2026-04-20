@@ -24,11 +24,15 @@ const actualIndexHtml = await readFile(actualIndexPath, "utf8");
 const sdkTagInjected = actualIndexHtml.includes('src="/sdk.js"');
 
 const host = "127.0.0.1";
-const port = await findAvailablePort(host, 4310, 4360);
-const baseUrl = `http://${host}:${port}`;
+const releasePort = await findAvailablePort(host, 4310, 4360);
+const smokePort = await findAvailablePort(host, releasePort + 1, 4385);
+const releaseUrl = `http://${host}:${releasePort}`;
+const smokeUrl = `http://${host}:${smokePort}`;
 
-const server = createStaticPreviewServer(smokeOutDir);
-await new Promise((resolve) => server.listen(port, host, resolve));
+const releaseServer = createStaticPreviewServer(release.outDir);
+const smokeServer = createStaticPreviewServer(smokeOutDir);
+await new Promise((resolve) => releaseServer.listen(releasePort, host, resolve));
+await new Promise((resolve) => smokeServer.listen(smokePort, host, resolve));
 
 const pageErrors = [];
 const checks = [];
@@ -42,26 +46,70 @@ try {
       viewport: { width: 1600, height: 900 },
       deviceScaleFactor: 1,
     });
-    const page = await context.newPage();
-    page.on("pageerror", (error) => pageErrors.push(String(error?.message ?? error)));
 
-    await page.addInitScript(() => {
-      if (!globalThis.sessionStorage.getItem("__mc_yandex_publish_smoke_boot")) {
-        globalThis.localStorage.clear();
-        globalThis.sessionStorage.setItem("__mc_yandex_publish_smoke_boot", "1");
+    const releasePage = await context.newPage();
+    wirePageDiagnostics(releasePage, "release", pageErrors);
+    await installOneTimeStorageReset(releasePage, "__mc_yandex_publish_release_boot");
+    await installYandexSdkRoute(releasePage);
+
+    await releasePage.goto(releaseUrl, { waitUntil: "domcontentloaded" });
+    await waitForCanvas(releasePage);
+    await releasePage.waitForFunction(() => Number(globalThis.window.__YA_STUB_STATE__?.loadingReadyCalls ?? 0) >= 1);
+    await releasePage.waitForTimeout(400);
+
+    const releaseShot = join(reportDir, "00_release_menu_boot.png");
+    await releasePage.screenshot({ path: releaseShot });
+    evidence.push(releaseShot);
+
+    const releaseStartupState = await releasePage.evaluate(() => ({
+      fatalOverlay: Boolean(globalThis.document.getElementById("mc-fatal-overlay")),
+      documentLang: globalThis.document.documentElement.lang || null,
+      loadingReadyCalls: Number(globalThis.window.__YA_STUB_STATE__?.loadingReadyCalls ?? 0),
+      hasCanvas: Boolean(globalThis.document.querySelector("canvas")),
+      title: globalThis.document.title || null,
+    }));
+
+    await seedStubSaveAndReload(releasePage, makeLegacyBrokenSave("ru"), `${releaseUrl}?mc_bootdiag=1`);
+    await waitForCanvas(releasePage);
+    await releasePage.waitForTimeout(500);
+
+    const recoveryShot = join(reportDir, "00b_release_recovery.png");
+    await releasePage.screenshot({ path: recoveryShot });
+    evidence.push(recoveryShot);
+
+    const recoveryState = await releasePage.evaluate(() => {
+      const rawReport = globalThis.localStorage.getItem("magnet_caravan.boot_report");
+      let report = null;
+      try {
+        report = rawReport ? JSON.parse(rawReport) : null;
+      } catch {
+        report = null;
       }
+      return {
+        fatalOverlay: Boolean(globalThis.document.getElementById("mc-fatal-overlay")),
+        documentLang: globalThis.document.documentElement.lang || null,
+        loadingReadyCalls: Number(globalThis.window.__YA_STUB_STATE__?.loadingReadyCalls ?? 0),
+        playerDataReads: Number(globalThis.window.__YA_STUB_STATE__?.playerDataReads ?? 0),
+        hasCanvas: Boolean(globalThis.document.querySelector("canvas")),
+        report,
+      };
     });
 
-    await page.goto(baseUrl);
-    await page.waitForSelector("canvas");
-    await waitForScene(page, "menu");
-    await page.waitForTimeout(500);
+    const smokePage = await context.newPage();
+    wirePageDiagnostics(smokePage, "smoke", pageErrors);
+    await installOneTimeStorageReset(smokePage, "__mc_yandex_publish_smoke_boot");
+    await installYandexSdkRoute(smokePage);
+
+    await smokePage.goto(smokeUrl, { waitUntil: "domcontentloaded" });
+    await waitForCanvas(smokePage);
+    await waitForScene(smokePage, "menu");
+    await smokePage.waitForTimeout(500);
 
     const starterShot = join(reportDir, "01_starter_menu.png");
-    await page.screenshot({ path: starterShot });
+    await smokePage.screenshot({ path: starterShot });
     evidence.push(starterShot);
 
-    const startupState = await page.evaluate(() => {
+    const startupState = await smokePage.evaluate(() => {
       const fatalOverlay = Boolean(globalThis.document.getElementById("mc-fatal-overlay"));
       const stub = globalThis.window.__YA_STUB_STATE__;
       return {
@@ -74,7 +122,7 @@ try {
       };
     });
 
-    const browserGuards = await page.evaluate(() => {
+    const browserGuards = await smokePage.evaluate(() => {
       const canvas = globalThis.document.querySelector("canvas");
       const contextEvent = new globalThis.MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 });
       const selectionEvent = new globalThis.Event("selectstart", { bubbles: true, cancelable: true });
@@ -86,78 +134,93 @@ try {
       };
     });
 
-    await seedStubSaveAndReload(page, makeGrowingSave("ru"));
-    await waitForScene(page, "menu");
-    await page.waitForTimeout(350);
+    await smokePage.evaluate(() => {
+      globalThis.window.__YA_STUB_API__?.emit?.("game_api_pause");
+      globalThis.window.__YA_STUB_API__?.emit?.("game_api_resume");
+    });
+    await smokePage.waitForTimeout(150);
 
-    await page.evaluate(() => {
+    const lifecycleState = await smokePage.evaluate(() => {
+      const stub = globalThis.window.__YA_STUB_STATE__;
+      return {
+        fatalOverlay: Boolean(globalThis.document.getElementById("mc-fatal-overlay")),
+        pauseEvents: Number(stub?.pauseEvents ?? 0),
+        resumeEvents: Number(stub?.resumeEvents ?? 0),
+      };
+    });
+
+    await seedStubSaveAndReload(smokePage, makeGrowingSave("ru"));
+    await waitForScene(smokePage, "menu");
+    await smokePage.waitForTimeout(350);
+
+    await smokePage.evaluate(() => {
       const menu = globalThis.window.__MC_GAME__?.scene?.keys?.menu;
       void menu?.startDaily?.(false);
     });
-    await waitForScene(page, "ui");
-    await page.waitForTimeout(350);
+    await waitForScene(smokePage, "ui");
+    await smokePage.waitForTimeout(350);
 
     const gameplayShot = join(reportDir, "02_runtime_ui.png");
-    await page.screenshot({ path: gameplayShot });
+    await smokePage.screenshot({ path: gameplayShot });
     evidence.push(gameplayShot);
 
-    await page.evaluate(() => {
+    await smokePage.evaluate(() => {
       const gameScene = globalThis.window.__MC_GAME__?.scene?.keys?.game;
       gameScene?.onWaveComplete?.();
     });
-    await waitForScene(page, "upgrade");
-    await page.waitForTimeout(300);
+    await waitForScene(smokePage, "upgrade");
+    await smokePage.waitForTimeout(300);
 
     const upgradeShot = join(reportDir, "03_upgrade.png");
-    await page.screenshot({ path: upgradeShot });
+    await smokePage.screenshot({ path: upgradeShot });
     evidence.push(upgradeShot);
 
-    await chooseUpgrade(page, 1600, 900);
-    await page.waitForFunction(() => typeof globalThis.window.__MC_E2E__?.endRun === "function");
-    await page.evaluate(() => globalThis.window.__MC_E2E__.endRun());
-    await waitForScene(page, "results");
-    await page.waitForTimeout(350);
+    await chooseUpgrade(smokePage, 1600, 900);
+    await smokePage.waitForFunction(() => typeof globalThis.window.__MC_E2E__?.endRun === "function");
+    await smokePage.evaluate(() => globalThis.window.__MC_E2E__.endRun());
+    await waitForScene(smokePage, "results");
+    await smokePage.waitForTimeout(350);
 
     const resultsBeforeAd = join(reportDir, "04_results_before_rewarded.png");
-    await page.screenshot({ path: resultsBeforeAd });
+    await smokePage.screenshot({ path: resultsBeforeAd });
     evidence.push(resultsBeforeAd);
 
-    const rewardedVisible = await page.evaluate(() => {
+    const rewardedVisible = await smokePage.evaluate(() => {
       const results = globalThis.window.__MC_GAME__?.scene?.keys?.results;
       return Boolean(results?.x2Btn?.visible);
     });
 
     if (rewardedVisible) {
-      await page.evaluate(() => {
+      await smokePage.evaluate(() => {
         const results = globalThis.window.__MC_GAME__?.scene?.keys?.results;
         void results?.handleX2?.();
       });
-      await page.waitForFunction(() => Number(globalThis.window.__YA_STUB_STATE__?.rewardedCalls ?? 0) >= 1);
-      await page.waitForTimeout(250);
+      await smokePage.waitForFunction(() => Number(globalThis.window.__YA_STUB_STATE__?.rewardedCalls ?? 0) >= 1);
+      await smokePage.waitForTimeout(250);
     }
 
     const resultsAfterAd = join(reportDir, "05_results_after_rewarded.png");
-    await page.screenshot({ path: resultsAfterAd });
+    await smokePage.screenshot({ path: resultsAfterAd });
     evidence.push(resultsAfterAd);
 
-    const interstitialBeforeExit = await page.evaluate(() => Number(globalThis.window.__YA_STUB_STATE__?.interstitialCalls ?? 0));
+    const interstitialBeforeExit = await smokePage.evaluate(() => Number(globalThis.window.__YA_STUB_STATE__?.interstitialCalls ?? 0));
 
-    await page.evaluate(() => {
+    await smokePage.evaluate(() => {
       const results = globalThis.window.__MC_GAME__?.scene?.keys?.results;
       void results?.exitTo?.("menu");
     });
-    await waitForScene(page, "menu");
-    await page.waitForTimeout(250);
+    await waitForScene(smokePage, "menu");
+    await smokePage.waitForTimeout(250);
 
-    const interstitialBeforeManual = await page.evaluate(() => Number(globalThis.window.__YA_STUB_STATE__?.interstitialCalls ?? 0));
-    await page.evaluate(async () => {
+    const interstitialBeforeManual = await smokePage.evaluate(() => Number(globalThis.window.__YA_STUB_STATE__?.interstitialCalls ?? 0));
+    await smokePage.evaluate(async () => {
       const adapter = globalThis.window.__MC_GAME__?.registry?.get("platformAdapter");
       return await adapter?.showInterstitial?.();
     });
-    await page.waitForFunction((before) => Number(globalThis.window.__YA_STUB_STATE__?.interstitialCalls ?? 0) > before, interstitialBeforeManual);
-    await page.waitForTimeout(100);
+    await smokePage.waitForFunction((before) => Number(globalThis.window.__YA_STUB_STATE__?.interstitialCalls ?? 0) > before, interstitialBeforeManual);
+    await smokePage.waitForTimeout(100);
 
-    const finalState = await page.evaluate(() => {
+    const finalState = await smokePage.evaluate(() => {
       const stub = globalThis.window.__YA_STUB_STATE__;
       return {
         loadingReadyCalls: Number(stub?.loadingReadyCalls ?? 0),
@@ -169,17 +232,46 @@ try {
     });
 
     checks.push(check("SDK script injected into release index.html", sdkTagInjected, actualIndexPath));
-    checks.push(check("Yandex build boots without fatal overlay", !startupState.fatalOverlay, starterShot));
+    checks.push(check("Release Yandex bundle boots without fatal overlay", !releaseStartupState.fatalOverlay && releaseStartupState.hasCanvas, releaseShot));
+    checks.push(check("Release bundle sends LoadingAPI.ready on startup", releaseStartupState.loadingReadyCalls >= 1, releaseShot));
     checks.push(
       check(
-        "Platform locale hint overrides browser locale on auto language",
+        "Release bundle honors the platform language hint during boot",
+        releaseStartupState.documentLang === "ru" && releaseStartupState.title === "Magnet Caravan",
+        `document.lang=${releaseStartupState.documentLang}, title=${releaseStartupState.title}`
+      )
+    );
+    checks.push(
+      check(
+        "Release bundle recovers from a failing platform save by bypassing cloud data once",
+        !recoveryState.fatalOverlay &&
+          recoveryState.hasCanvas &&
+          recoveryState.playerDataReads >= 1 &&
+          recoveryState.report?.status === "recovered" &&
+          recoveryState.report?.recoveredFromPlatformSave === true &&
+          recoveryState.report?.recoveryAttempted === true &&
+          recoveryState.report?.stage === "save-load",
+        recoveryState.report ? JSON.stringify(recoveryState.report) : "missing boot report"
+      )
+    );
+    checks.push(check("AUTO smoke build boots without fatal overlay", !startupState.fatalOverlay, starterShot));
+    checks.push(
+      check(
+        "Platform locale hint overrides browser locale on the AUTO smoke build",
         startupState.documentLang === "ru" && startupState.menuLocale === "ru",
         `document.lang=${startupState.documentLang}, menuLocale=${startupState.menuLocale}`
       )
     );
-    checks.push(check("LoadingAPI.ready is called on startup", startupState.loadingReadyCalls >= 1, starterShot));
+    checks.push(check("LoadingAPI.ready is called on the AUTO smoke build", startupState.loadingReadyCalls >= 1, starterShot));
     checks.push(check("Browser context menu is prevented on the playfield", browserGuards.contextMenuPrevented, starterShot));
     checks.push(check("Browser text selection is prevented on the playfield", browserGuards.selectStartPrevented, starterShot));
+    checks.push(
+      check(
+        "Yandex stub pause/resume events can be emitted against the AUTO smoke build",
+        !lifecycleState.fatalOverlay && lifecycleState.pauseEvents >= 1 && lifecycleState.resumeEvents >= 1,
+        JSON.stringify(lifecycleState)
+      )
+    );
     checks.push(check("GameplayAPI.start is called during a run", finalState.gameplayStartCalls >= 1, gameplayShot));
     checks.push(check("GameplayAPI.stop is called for pauses/results", finalState.gameplayStopCalls >= 1, resultsBeforeAd));
     checks.push(check("Rewarded flow can be completed from the results screen", finalState.rewardedCalls >= (rewardedVisible ? 1 : 0), resultsAfterAd));
@@ -198,7 +290,8 @@ try {
     await browser.close();
   }
 } finally {
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise((resolve) => releaseServer.close(resolve));
+  await new Promise((resolve) => smokeServer.close(resolve));
 }
 
 const reportPath = join(reportDir, "report.md");
@@ -208,7 +301,8 @@ await writeFile(
     releaseZip: release.zipPath,
     releaseIndexPath: actualIndexPath,
     smokeDir: smokeOutDir,
-    baseUrl,
+    releaseUrl,
+    smokeUrl,
     checks,
     evidence,
     pageErrors,
@@ -222,12 +316,6 @@ function createStaticPreviewServer(root) {
   return createHttpServer(async (req, res) => {
     try {
       const pathname = decodeURIComponent(new globalThis.URL(req.url ?? "/", "http://localhost").pathname);
-      if (pathname === "/sdk.js") {
-        res.writeHead(200, { "content-type": "application/javascript; charset=utf-8" });
-        res.end(buildYandexSdkStub());
-        return;
-      }
-
       let relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
       relativePath = normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, "");
       const filePath = join(root, relativePath);
@@ -247,41 +335,131 @@ function createStaticPreviewServer(root) {
   });
 }
 
+async function installOneTimeStorageReset(page, sessionKey) {
+  await page.addInitScript((key) => {
+    try {
+      if (!globalThis.sessionStorage.getItem(key)) {
+        globalThis.localStorage.clear();
+        globalThis.sessionStorage.setItem(key, "1");
+      }
+    } catch {
+      // ignore
+    }
+  }, sessionKey);
+}
+
+async function installYandexSdkRoute(page) {
+  await page.route("**/sdk.js", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/javascript; charset=utf-8",
+      body: buildYandexSdkStub(),
+    });
+  });
+}
+
+function wirePageDiagnostics(page, label, pageErrors) {
+  page.on("pageerror", (error) => pageErrors.push(`${label}: ${String(error?.message ?? error)}`));
+}
+
 function buildYandexSdkStub() {
   return `
 (function () {
   const storage = window.localStorage;
-  const playerDataKey = "__mc_ya_stub_player_data";
+  const playerIdKey = "__mc_ya_stub_player_id";
+  const playerDataPrefix = "__mc_ya_stub_player_data:";
   const leaderboardsPrefix = "__mc_ya_stub_leaderboard:";
   const languageKey = "__mc_ya_stub_lang";
+  const listeners = new Map();
+
+  function getCurrentPlayerId() {
+    const value = storage.getItem(playerIdKey);
+    return value && value.length > 0 ? value : "stub-player";
+  }
+
+  function getPlayerDataKey(playerId) {
+    return playerDataPrefix + playerId;
+  }
+
+  function readJson(key) {
+    try {
+      const raw = storage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
   const state = (window.__YA_STUB_STATE__ = window.__YA_STUB_STATE__ || {
     loadingReadyCalls: 0,
     gameplayStartCalls: 0,
     gameplayStopCalls: 0,
     rewardedCalls: 0,
     interstitialCalls: 0,
+    pauseEvents: 0,
+    resumeEvents: 0,
+    playerDataReads: 0,
+    playerId: getCurrentPlayerId(),
   });
-  const listeners = new Map();
+
+  const api = (window.__YA_STUB_API__ = window.__YA_STUB_API__ || {});
+  api.emit = (eventName) => {
+    if (eventName === "game_api_pause") state.pauseEvents += 1;
+    if (eventName === "game_api_resume") state.resumeEvents += 1;
+    const handlers = listeners.get(eventName);
+    if (!handlers) return;
+    for (const listener of Array.from(handlers)) {
+      try {
+        listener();
+      } catch {
+        // ignore
+      }
+    }
+  };
+  api.setLanguage = (lang) => {
+    storage.setItem(languageKey, String(lang || "ru"));
+  };
+  api.setPlayerId = (playerId) => {
+    storage.setItem(playerIdKey, String(playerId || "stub-player"));
+    state.playerId = getCurrentPlayerId();
+    return state.playerId;
+  };
+  api.setPlayerData = (data, playerId) => {
+    const targetId = String(playerId || getCurrentPlayerId());
+    storage.setItem(getPlayerDataKey(targetId), JSON.stringify(data));
+  };
+  api.getPlayerData = (playerId) => readJson(getPlayerDataKey(String(playerId || getCurrentPlayerId())));
+  api.clearPlayerData = (playerId) => {
+    const targetId = String(playerId || getCurrentPlayerId());
+    storage.removeItem(getPlayerDataKey(targetId));
+  };
+  api.openAccountSelection = (nextPlayerId) => {
+    api.emit("account_open");
+    if (nextPlayerId) api.setPlayerId(nextPlayerId);
+    api.emit("account_close");
+  };
+
   const player = {
     async getData() {
-      try {
-        const raw = storage.getItem(playerDataKey);
-        return raw ? JSON.parse(raw) : null;
-      } catch {
-        return null;
+      state.playerDataReads += 1;
+      const data = api.getPlayerData();
+      if (data && data.__smokeThrowOnRead) {
+        throw new Error("Legacy platform save failed to deserialize");
       }
+      return data;
     },
     async setData(data) {
-      storage.setItem(playerDataKey, JSON.stringify(data));
+      api.setPlayerData(data);
       return null;
     },
     getUniqueID() {
-      return "stub-player";
+      return getCurrentPlayerId();
     },
     getID() {
-      return "stub-player";
+      return getCurrentPlayerId();
     },
   };
+
   const ysdk = {
     adv: {
       showFullscreenAdv(opts) {
@@ -320,6 +498,7 @@ function buildYandexSdkStub() {
       },
     },
     async getPlayer() {
+      state.playerId = getCurrentPlayerId();
       return player;
     },
     async getLeaderboards() {
@@ -357,6 +536,7 @@ function buildYandexSdkStub() {
       ACCOUNT_SELECTION_DIALOG_CLOSED: "account_close",
     },
   };
+
   window.YaGames = {
     async init() {
       return ysdk;
@@ -373,7 +553,7 @@ async function buildSmokeBundle(outDir, cwd) {
     {
       ...process.env,
       VITE_PLATFORM_ADAPTER: "yandex",
-      VITE_E2E: "1",
+      VITE_SMOKE_TEST: "1",
     },
     cwd
   );
@@ -387,13 +567,23 @@ async function injectSdkMarkup(outDir) {
   await writeFile(indexPath, html, "utf8");
 }
 
-async function seedStubSaveAndReload(page, save) {
-  await page.evaluate((payload) => {
-    globalThis.localStorage.setItem("__mc_ya_stub_player_data", JSON.stringify(payload));
-    globalThis.localStorage.setItem("__mc_ya_stub_lang", String(payload?.settings?.language ?? "ru"));
-    globalThis.window.location.reload();
-  }, save);
-  await page.waitForSelector("canvas");
+async function seedStubSaveAndReload(page, save, nextUrl = null) {
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+    page.evaluate(
+      ({ payload, url }) => {
+        globalThis.window.__YA_STUB_API__?.setPlayerData?.(payload);
+        globalThis.window.__YA_STUB_API__?.setLanguage?.(String(payload?.settings?.language ?? "ru"));
+        if (url) globalThis.window.location.href = url;
+        else globalThis.window.location.reload();
+      },
+      { payload: save, url: nextUrl }
+    ),
+  ]);
+}
+
+async function waitForCanvas(page) {
+  await page.waitForSelector("canvas", { timeout: 15_000 });
 }
 
 async function waitForScene(page, sceneKey) {
@@ -423,8 +613,7 @@ function check(label, ok, details) {
   return { label, ok, details };
 }
 
-function buildReport({ releaseZip, releaseIndexPath, smokeDir, baseUrl, checks, evidence, pageErrors }) {
-  const summary = checks.map((item) => `- ${item.ok ? "PASS" : "FAIL"}: ${item.label}${item.details ? ` — ${item.details}` : ""}`).join("\n");
+function buildReport({ releaseZip, releaseIndexPath, smokeDir, releaseUrl, smokeUrl, checks, evidence, pageErrors }) {
   const evidenceList = evidence.map((item) => `- ${item}`).join("\n");
   const summaryLines = checks
     .map((item) => {
@@ -432,9 +621,6 @@ function buildReport({ releaseZip, releaseIndexPath, smokeDir, baseUrl, checks, 
       return item.details ? `${prefix} - ${item.details}` : prefix;
     })
     .join("\n");
-  const normalizedSummary = summary.replace(/\s+вЂ”\s+/g, " - ");
-  void summary;
-  void normalizedSummary;
   const errorsSection = pageErrors.length > 0 ? pageErrors.map((item) => `- ${item}`).join("\n") : "- none";
 
   return `# Yandex Publish Smoke
@@ -444,8 +630,9 @@ Generated: ${new Date().toISOString()}
 ## Build Targets
 - Release zip: ${releaseZip}
 - Release index: ${releaseIndexPath}
-- Smoke preview dir: ${smokeDir}
-- Local preview URL: ${baseUrl}
+- AUTO smoke preview dir: ${smokeDir}
+- Release preview URL: ${releaseUrl}
+- AUTO smoke preview URL: ${smokeUrl}
 
 ## Automated Checks
 ${summaryLines}
@@ -457,11 +644,11 @@ ${evidenceList}
 ${errorsSection}
 
 ## Moderation Mapping
-- Localization and readable staged UI: covered by the existing visual matrix in artifacts/ui-audit/matrix and the RU/EN smoke suite.
-- Resize / overlap regressions: covered by the compact viewport e2e suite plus the visual matrix.
-- Browser interaction guards: verified here through synthetic contextmenu/selectstart prevention checks.
-- Startup/runtime stability: verified here through Yandex-adapter boot and zero page errors during smoke.
-- Rewarded clarity and SDK flow: verified here through a rewarded results interaction on the Yandex preview build.
+- Release startup stability: verified on the production Yandex bundle with routed SDK stubs.
+- Cloud-save recovery: verified on the production Yandex bundle through a failing platform save followed by automatic safe recovery.
+- Runtime interaction coverage: verified on the AUTO smoke build with exposed automation hooks and routed SDK stubs.
+- Browser interaction guards: verified through synthetic contextmenu/selectstart prevention checks.
+- Rewarded and interstitial flows: verified through results-screen interaction on the AUTO smoke build.
 `;
 }
 
@@ -562,6 +749,22 @@ function makeGrowingSave(language = "ru") {
       highestDivision: "raider",
       claimedRewardDivisions: [],
       claimedMilestones: [],
+    },
+  };
+}
+
+function makeLegacyBrokenSave(language = "ru") {
+  return {
+    ...makeGrowingSave(language),
+    __smokeThrowOnRead: true,
+    legacyProfileVersion: 0,
+    legacyDailyStats: {
+      bestStreak: 2,
+      totalAttempts: 5,
+    },
+    legacyInventory: {
+      scrap: 999,
+      magnets: 3,
     },
   };
 }

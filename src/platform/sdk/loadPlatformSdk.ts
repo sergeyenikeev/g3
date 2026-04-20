@@ -1,5 +1,6 @@
 import type { Locale } from "../../i18n/localization";
 import { resolveLocaleFromLanguageTag } from "../../i18n/localization";
+import { setCurrentBootStage } from "../../app/bootDiagnostics";
 
 type PlatformMode = "auto" | "mock" | "local" | "web" | "generic" | "yandex" | "vk";
 
@@ -37,6 +38,7 @@ export async function ensurePlatformSdkLoaded(): Promise<void> {
   if (script.isPresent()) return;
 
   try {
+    if (mode === "yandex") setCurrentBootStage("sdk-script");
     await withTimeout(loadScriptOnce(script.getUrl()), 7000);
   } catch {
     // ignore: safe degradation if SDK isn't reachable
@@ -44,6 +46,7 @@ export async function ensurePlatformSdkLoaded(): Promise<void> {
 
   if (mode === "yandex") {
     try {
+      setCurrentBootStage("ysdk-init");
       await withTimeout(getPreinitializedYandexSdk(), 400);
     } catch {
       // ignore: the game can continue booting while the SDK finishes initialization
@@ -65,6 +68,7 @@ export async function getPreinitializedYandexSdk(): Promise<unknown | null> {
   }
   if (yandexSdkInitPromise) return yandexSdkInitPromise;
 
+  setCurrentBootStage("ysdk-init");
   yandexSdkInitPromise = Promise.resolve(api.init())
     .then((sdk: any) => {
       bootstrapLocaleHint = resolveLocaleFromLanguageTag(sdk?.environment?.i18n?.lang) ?? bootstrapLocaleHint;
