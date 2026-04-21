@@ -359,29 +359,31 @@ export class ResultsScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const compactLayout = height <= 520 || width <= 720;
     const ultraCompactLayout = height <= 430 || width <= 680;
-    const panelWidth = Math.min(720, width - (ultraCompactLayout ? 16 : 28));
-    const panelHeight = Math.min(820, height - (ultraCompactLayout ? 16 : 28));
+    const desktopScale = compactLayout ? 1 : getResponsiveResultsScale(width, height, 1440, 900, 1);
+    const insetScale = compactLayout ? 1 : desktopScale;
+    const panelWidth = Math.min(Math.round(720 * desktopScale), width - (ultraCompactLayout ? 16 : 28));
+    const panelHeight = Math.min(Math.round(820 * desktopScale), height - (ultraCompactLayout ? 16 : 28));
     const panelTop = height / 2 - panelHeight / 2;
     const panelBottom = panelTop + panelHeight;
-    const contentWidth = panelWidth - 56;
-    const titleFont = ultraCompactLayout ? 24 : compactLayout ? 32 : height < 680 ? 34 : height < 760 ? 38 : 44;
+    const contentWidth = panelWidth - Math.round(56 * insetScale);
+    const titleFont = Math.round((ultraCompactLayout ? 24 : compactLayout ? 32 : height < 680 ? 34 : height < 760 ? 38 : 44) * desktopScale);
     const x2Visible = Boolean(this.x2Btn?.visible && this.x2Label?.visible);
-    const x2Height = x2Visible ? (ultraCompactLayout ? 40 : compactLayout ? 48 : height < 700 ? 50 : 54) : 0;
-    const restartHeight = ultraCompactLayout ? 40 : compactLayout ? 50 : height < 700 ? 56 : 64;
-    const menuHeight = ultraCompactLayout ? 34 : compactLayout ? 44 : height < 700 ? 48 : 52;
-    const buttonGap = ultraCompactLayout ? 6 : compactLayout ? 10 : height < 700 ? 14 : 20;
-    const sectionGap = ultraCompactLayout ? 6 : compactLayout ? 8 : height < 700 ? 10 : 14;
-    const titleGap = ultraCompactLayout ? 6 : compactLayout ? 10 : height < 700 ? 14 : 18;
+    const x2Height = x2Visible ? Math.round((ultraCompactLayout ? 40 : compactLayout ? 48 : height < 700 ? 50 : 54) * desktopScale) : 0;
+    const restartHeight = Math.round((ultraCompactLayout ? 40 : compactLayout ? 50 : height < 700 ? 56 : 64) * desktopScale);
+    const menuHeight = Math.round((ultraCompactLayout ? 34 : compactLayout ? 44 : height < 700 ? 48 : 52) * desktopScale);
+    const buttonGap = Math.round((ultraCompactLayout ? 6 : compactLayout ? 10 : height < 700 ? 14 : 20) * insetScale);
+    const sectionGap = Math.round((ultraCompactLayout ? 6 : compactLayout ? 8 : height < 700 ? 10 : 14) * insetScale);
+    const titleGap = Math.round((ultraCompactLayout ? 6 : compactLayout ? 10 : height < 700 ? 14 : 18) * insetScale);
     const reservedButtonsHeight = (x2Visible ? x2Height + buttonGap : 0) + restartHeight + buttonGap + menuHeight;
 
     this.resultsPanel.setPosition(width / 2, height / 2).setSize(panelWidth, panelHeight);
-    this.titleText.setStyle({ fontSize: `${titleFont}px` }).setPosition(width / 2, panelTop + (ultraCompactLayout ? 30 : 42));
-    const contentLeft = width / 2 - panelWidth / 2 + 28;
-    const textLeft = contentLeft + 16;
-    const textWrapWidth = Math.max(240, contentWidth - 32);
+    this.titleText.setStyle({ fontSize: `${titleFont}px` }).setPosition(width / 2, panelTop + Math.round((ultraCompactLayout ? 30 : 42) * insetScale));
+    const contentLeft = width / 2 - panelWidth / 2 + Math.round(28 * insetScale);
+    const textLeft = contentLeft + Math.round(16 * insetScale);
+    const textWrapWidth = Math.max(Math.round(240 * insetScale), contentWidth - Math.round(32 * insetScale));
     const sectionsTop = this.titleText.y + this.titleText.displayHeight / 2 + titleGap;
-    const availableSectionHeight = Math.max(140, panelBottom - 20 - reservedButtonsHeight - sectionGap - sectionsTop);
-    const fontPresets = ultraCompactLayout
+    const availableSectionHeight = Math.max(Math.round(140 * insetScale), panelBottom - Math.round(20 * insetScale) - reservedButtonsHeight - sectionGap - sectionsTop);
+    const fontPresets = (ultraCompactLayout
       ? [
           { summary: 14, progress: 12, leaderboard: 11 },
           { summary: 13, progress: 11, leaderboard: 10 },
@@ -395,7 +397,11 @@ export class ResultsScene extends Phaser.Scene {
             { summary: 16, progress: 14, leaderboard: 14 },
             { summary: 15, progress: 13, leaderboard: 13 },
             { summary: 14, progress: 12, leaderboard: 12 },
-          ];
+          ]).map((preset) => ({
+      summary: Math.round(preset.summary * desktopScale),
+      progress: Math.round(preset.progress * desktopScale),
+      leaderboard: Math.round(preset.leaderboard * desktopScale),
+    }));
     let summaryHeight = 0;
     let progressHeight = 0;
     let leaderboardHeight = 0;
@@ -408,62 +414,62 @@ export class ResultsScene extends Phaser.Scene {
       this.leaderboardText.setStyle({ fontSize: `${preset.leaderboard}px`, wordWrap: { width: textWrapWidth }, align: "left" });
       this.leaderboardText.setLineSpacing(preset.leaderboard <= 11 ? 3 : 4);
 
-      summaryHeight = this.summaryText.height + (ultraCompactLayout ? 18 : compactLayout ? 18 : 28);
-      progressHeight = this.progressText.height + (ultraCompactLayout ? 16 : compactLayout ? 18 : 24);
-      leaderboardHeight = this.leaderboardText.height + (ultraCompactLayout ? 18 : compactLayout ? 18 : 24);
+      summaryHeight = this.summaryText.height + Math.round((ultraCompactLayout ? 18 : compactLayout ? 18 : 28) * insetScale);
+      progressHeight = this.progressText.height + Math.round((ultraCompactLayout ? 16 : compactLayout ? 18 : 24) * insetScale);
+      leaderboardHeight = this.leaderboardText.height + Math.round((ultraCompactLayout ? 18 : compactLayout ? 18 : 24) * insetScale);
       const totalHeight = summaryHeight + progressHeight + leaderboardHeight + sectionGap * 2;
       if (totalHeight <= availableSectionHeight || preset === fontPresets[fontPresets.length - 1]) break;
     }
 
     let cursorTop = sectionsTop;
     this.summaryPanel.setPosition(width / 2, cursorTop + summaryHeight / 2).setSize(contentWidth, summaryHeight);
-    this.summaryText.setPosition(textLeft, cursorTop + (ultraCompactLayout ? 10 : 14));
+    this.summaryText.setPosition(textLeft, cursorTop + Math.round((ultraCompactLayout ? 10 : 14) * insetScale));
     cursorTop += summaryHeight + sectionGap;
 
     this.progressPanel.setPosition(width / 2, cursorTop + progressHeight / 2).setSize(contentWidth, progressHeight);
-    this.progressText.setPosition(textLeft, cursorTop + (ultraCompactLayout ? 9 : 12));
+    this.progressText.setPosition(textLeft, cursorTop + Math.round((ultraCompactLayout ? 9 : 12) * insetScale));
     cursorTop += progressHeight + sectionGap;
 
     this.leaderboardPanel.setPosition(width / 2, cursorTop + leaderboardHeight / 2).setSize(contentWidth, leaderboardHeight);
-    this.leaderboardText.setPosition(textLeft, cursorTop + (ultraCompactLayout ? 9 : 12));
+    this.leaderboardText.setPosition(textLeft, cursorTop + Math.round((ultraCompactLayout ? 9 : 12) * insetScale));
 
     const statsBottom = cursorTop + leaderboardHeight;
-    const buttonWidth = Math.min(336, panelWidth - (ultraCompactLayout ? 40 : 140));
-    let nextTop = Math.max(statsBottom + sectionGap, panelBottom - 24 - reservedButtonsHeight);
+    const buttonWidth = Math.min(Math.round(336 * desktopScale), panelWidth - Math.round((ultraCompactLayout ? 40 : 140) * insetScale));
+    let nextTop = Math.max(statsBottom + sectionGap, panelBottom - Math.round(24 * insetScale) - reservedButtonsHeight);
 
     if (x2Visible && this.x2Btn && this.x2Label) {
       this.x2Btn.setSize(buttonWidth, x2Height).setPosition(width / 2, nextTop + x2Height / 2);
       this.x2Label
         .setStyle({
-          fontSize: ultraCompactLayout ? "14px" : height < 700 ? "15px" : "16px",
+          fontSize: `${Math.round((ultraCompactLayout ? 14 : height < 700 ? 15 : 16) * desktopScale)}px`,
           align: "center",
-          wordWrap: { width: buttonWidth - 24 },
+          wordWrap: { width: buttonWidth - Math.round(24 * insetScale) },
         })
         .setPosition(this.x2Btn.x, this.x2Btn.y);
-      fitTextScaleToWidth(this.x2Label, buttonWidth - 24, 0.88);
+      fitTextScaleToWidth(this.x2Label, buttonWidth - Math.round(24 * insetScale), 0.88);
       nextTop += x2Height + buttonGap;
     }
 
     this.restartBtn.setSize(buttonWidth, restartHeight).setPosition(width / 2, nextTop + restartHeight / 2);
     this.restartLabel
       .setStyle({
-        fontSize: ultraCompactLayout ? "18px" : height < 700 ? "22px" : "24px",
+        fontSize: `${Math.round((ultraCompactLayout ? 18 : height < 700 ? 22 : 24) * desktopScale)}px`,
         align: "center",
-        wordWrap: { width: buttonWidth - 20 },
+        wordWrap: { width: buttonWidth - Math.round(20 * insetScale) },
       })
       .setPosition(this.restartBtn.x, this.restartBtn.y);
-    fitTextScaleToWidth(this.restartLabel, buttonWidth - 20, 0.88);
+    fitTextScaleToWidth(this.restartLabel, buttonWidth - Math.round(20 * insetScale), 0.88);
     nextTop += restartHeight + buttonGap;
 
     this.menuBtn.setSize(buttonWidth, menuHeight).setPosition(width / 2, nextTop + menuHeight / 2);
     this.menuLabel
       .setStyle({
-        fontSize: ultraCompactLayout ? "15px" : height < 700 ? "18px" : "20px",
+        fontSize: `${Math.round((ultraCompactLayout ? 15 : height < 700 ? 18 : 20) * desktopScale)}px`,
         align: "center",
-        wordWrap: { width: buttonWidth - 20 },
+        wordWrap: { width: buttonWidth - Math.round(20 * insetScale) },
       })
       .setPosition(this.menuBtn.x, this.menuBtn.y);
-    fitTextScaleToWidth(this.menuLabel, buttonWidth - 20, 0.88);
+    fitTextScaleToWidth(this.menuLabel, buttonWidth - Math.round(20 * insetScale), 0.88);
   }
 
   private async handleX2(): Promise<void> {
@@ -750,6 +756,20 @@ function fitTextScaleToWidth(text: Phaser.GameObjects.Text, maxWidth: number, mi
   text.setScale(1);
   if (text.width <= 0 || text.width <= maxWidth) return;
   text.setScale(Phaser.Math.Clamp(maxWidth / text.width, minScale, 1));
+}
+
+function getResponsiveResultsScale(
+  width: number,
+  height: number,
+  baseWidth: number,
+  baseHeight: number,
+  factor: number,
+  maxScale = Number.POSITIVE_INFINITY
+): number {
+  const ratio = Math.min(width / baseWidth, height / baseHeight);
+  if (!Number.isFinite(ratio) || ratio <= 1) return 1;
+  const scale = 1 + (ratio - 1) * factor;
+  return Number.isFinite(maxScale) ? Phaser.Math.Clamp(scale, 1, maxScale) : Math.max(1, scale);
 }
 
 function formatLeaderboardReward(locale: Locale, reward: { bolts: number; cores: number }): string {

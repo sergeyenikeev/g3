@@ -740,24 +740,27 @@ export class UIScene extends Phaser.Scene {
   private layoutTutorialOverlay(): void {
     if (!this.tutorialBg?.scene || !this.tutorialText?.scene || !this.tutorialActionButton?.scene) return;
 
-    const compactLayout = this.scale.width <= 720 || this.scale.height <= 430;
-    const boxWidth = Math.max(320, Math.min(520, this.scale.width - (compactLayout ? 24 : 84)));
-    const buttonWidth = compactLayout ? 96 : 80;
-    const buttonHeight = compactLayout ? 36 : 34;
-    const textWidth = Math.max(190, boxWidth - buttonWidth - 44);
+    const { width, height } = this.scale;
+    const compactLayout = width <= 720 || height <= 430;
+    const desktopScale = compactLayout ? 1 : getResponsiveOverlayScale(width, height, 1280, 800, 0.55);
+    const insetScale = compactLayout ? 1 : desktopScale;
+    const boxWidth = Math.max(320, Math.min(Math.round(520 * desktopScale), width - (compactLayout ? 24 : Math.round(84 * insetScale))));
+    const buttonWidth = Math.round((compactLayout ? 96 : 80) * desktopScale);
+    const buttonHeight = Math.round((compactLayout ? 36 : 34) * desktopScale);
+    const textWidth = Math.max(Math.round(190 * insetScale), boxWidth - buttonWidth - Math.round(44 * insetScale));
 
     this.tutorialText.setStyle({
-      fontSize: compactLayout ? "14px" : "15px",
+      fontSize: `${Math.round((compactLayout ? 14 : 15) * desktopScale)}px`,
       wordWrap: { width: textWidth },
     });
-    this.tutorialActionLabel.setStyle({ fontSize: compactLayout ? "13px" : "14px" });
+    this.tutorialActionLabel.setStyle({ fontSize: `${Math.round((compactLayout ? 13 : 14) * desktopScale)}px` });
 
-    const boxHeight = Math.max(compactLayout ? 78 : 64, this.tutorialText.height + 24);
+    const boxHeight = Math.max(Math.round((compactLayout ? 78 : 64) * desktopScale), this.tutorialText.height + Math.round(24 * insetScale));
     this.tutorialBg.setSize(boxWidth, boxHeight);
-    this.tutorialText.setPosition(-boxWidth / 2 + 14, -boxHeight / 2 + 10);
-    this.tutorialActionButton.setSize(buttonWidth, buttonHeight).setPosition(boxWidth / 2 - buttonWidth / 2 - 12, 0);
+    this.tutorialText.setPosition(-boxWidth / 2 + Math.round(14 * insetScale), -boxHeight / 2 + Math.round(10 * insetScale));
+    this.tutorialActionButton.setSize(buttonWidth, buttonHeight).setPosition(boxWidth / 2 - buttonWidth / 2 - Math.round(12 * insetScale), 0);
     this.tutorialActionLabel.setPosition(this.tutorialActionButton.x, this.tutorialActionButton.y);
-    fitTextScaleToWidth(this.tutorialActionLabel, buttonWidth - 16, 0.9);
+    fitTextScaleToWidth(this.tutorialActionLabel, buttonWidth - Math.round(16 * insetScale), 0.9);
   }
 
   private layoutReviveOverlay(): void {
@@ -776,38 +779,43 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const compactLayout = width <= 760 || height <= 460;
     const shortLayout = width <= 540 || height <= 380;
-    const panelWidth = Math.max(300, Math.min(420, width - (shortLayout ? 20 : 32)));
-    const panelHeight = Math.max(212, Math.min(shortLayout ? 228 : compactLayout ? 244 : 260, height - (shortLayout ? 20 : 32)));
-    const titleY = -panelHeight / 2 + (shortLayout ? 34 : compactLayout ? 38 : 42);
-    const hintY = titleY + (shortLayout ? 34 : 40);
-    const primaryY = hintY + (shortLayout ? 56 : compactLayout ? 62 : 70);
-    const secondaryY = primaryY + (shortLayout ? 52 : 60);
-    const buttonWidth = Math.max(220, Math.min(panelWidth - 40, shortLayout ? 252 : 280));
+    const desktopScale = compactLayout ? 1 : getResponsiveOverlayScale(width, height, 1280, 800, 1.7);
+    const insetScale = compactLayout ? 1 : desktopScale;
+    const panelWidth = Math.max(300, Math.min(Math.round(420 * desktopScale), width - (shortLayout ? 20 : 32)));
+    const panelHeight = Math.max(
+      212,
+      Math.min(Math.round((shortLayout ? 228 : compactLayout ? 244 : 260) * desktopScale), height - (shortLayout ? 20 : 32))
+    );
+    const titleY = -panelHeight / 2 + Math.round((shortLayout ? 34 : compactLayout ? 38 : 42) * insetScale);
+    const hintY = titleY + Math.round((shortLayout ? 34 : 40) * insetScale);
+    const primaryY = hintY + Math.round((shortLayout ? 56 : compactLayout ? 62 : 70) * insetScale);
+    const secondaryY = primaryY + Math.round((shortLayout ? 52 : 60) * insetScale);
+    const buttonWidth = Math.max(220, Math.min(panelWidth - Math.round(40 * insetScale), Math.round((shortLayout ? 252 : 280) * desktopScale)));
 
     this.revivePanel.setSize(panelWidth, panelHeight);
     this.reviveTitle
-      .setStyle({ fontSize: shortLayout ? "24px" : compactLayout ? "26px" : "28px" })
+      .setStyle({ fontSize: `${Math.round((shortLayout ? 24 : compactLayout ? 26 : 28) * desktopScale)}px` })
       .setPosition(0, titleY)
-      .setWordWrapWidth(panelWidth - 36, true);
+      .setWordWrapWidth(panelWidth - Math.round(36 * insetScale), true);
     this.reviveHint
       .setStyle({
-        fontSize: shortLayout ? "14px" : compactLayout ? "15px" : "16px",
+        fontSize: `${Math.round((shortLayout ? 14 : compactLayout ? 15 : 16) * desktopScale)}px`,
         align: "center",
-        wordWrap: { width: panelWidth - 44 },
+        wordWrap: { width: panelWidth - Math.round(44 * insetScale) },
       })
       .setPosition(0, hintY);
-    this.reviveAcceptButton.setSize(buttonWidth, shortLayout ? 46 : compactLayout ? 50 : 54).setPosition(0, primaryY);
+    this.reviveAcceptButton.setSize(buttonWidth, Math.round((shortLayout ? 46 : compactLayout ? 50 : 54) * desktopScale)).setPosition(0, primaryY);
     this.reviveAcceptLabel
-      .setStyle({ fontSize: shortLayout ? "16px" : compactLayout ? "17px" : "18px" })
+      .setStyle({ fontSize: `${Math.round((shortLayout ? 16 : compactLayout ? 17 : 18) * desktopScale)}px` })
       .setPosition(this.reviveAcceptButton.x, this.reviveAcceptButton.y)
-      .setWordWrapWidth(buttonWidth - 24, true);
-    fitTextScaleToWidth(this.reviveAcceptLabel, buttonWidth - 24, 0.88);
-    this.reviveDeclineButton.setSize(buttonWidth, shortLayout ? 40 : compactLayout ? 42 : 46).setPosition(0, secondaryY);
+      .setWordWrapWidth(buttonWidth - Math.round(24 * insetScale), true);
+    fitTextScaleToWidth(this.reviveAcceptLabel, buttonWidth - Math.round(24 * insetScale), 0.88);
+    this.reviveDeclineButton.setSize(buttonWidth, Math.round((shortLayout ? 40 : compactLayout ? 42 : 46) * desktopScale)).setPosition(0, secondaryY);
     this.reviveDeclineLabel
-      .setStyle({ fontSize: shortLayout ? "15px" : compactLayout ? "15px" : "16px" })
+      .setStyle({ fontSize: `${Math.round((shortLayout ? 15 : compactLayout ? 15 : 16) * desktopScale)}px` })
       .setPosition(this.reviveDeclineButton.x, this.reviveDeclineButton.y)
-      .setWordWrapWidth(buttonWidth - 24, true);
-    fitTextScaleToWidth(this.reviveDeclineLabel, buttonWidth - 24, 0.88);
+      .setWordWrapWidth(buttonWidth - Math.round(24 * insetScale), true);
+    fitTextScaleToWidth(this.reviveDeclineLabel, buttonWidth - Math.round(24 * insetScale), 0.88);
   }
 
   private layoutSettingsOverlay(): void {
@@ -816,7 +824,7 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const compactLayout = width <= 720 || height <= 520;
     const shortLayout = width <= 680 || height <= 400;
-    const desktopScale = compactLayout ? 1 : getResponsiveOverlayScale(width, height, 1280, 800, 0.75);
+    const desktopScale = compactLayout ? 1 : getResponsiveOverlayScale(width, height, 1280, 800, 2.05);
     const showHint = !compactLayout;
     const insetScale = compactLayout ? 1 : desktopScale;
     const panelWidth = Math.max(320, Math.min(Math.round(468 * desktopScale), width - (shortLayout ? 20 : 32)));

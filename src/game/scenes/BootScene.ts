@@ -38,21 +38,23 @@ export class BootScene extends Phaser.Scene {
     let loadingProgress = 0;
     const w = this.scale.width;
     const h = this.scale.height;
-    const panelWidth = Math.min(620, w * 0.84);
-    const panelHeight = Math.min(210, h * 0.34);
-    const titleSize = Math.max(28, Math.min(42, w * 0.05));
-    const bodySize = Math.max(14, Math.min(20, w * 0.022));
-    const progressSize = Math.max(14, Math.min(18, w * 0.02));
+    const desktopScale = getResponsiveBootScale(w, h, 1280, 800, 0.85);
+    const insetScale = desktopScale;
+    const panelWidth = Math.min(Math.round(620 * desktopScale), Math.round(w * 0.84));
+    const panelHeight = Math.min(Math.round(210 * desktopScale), Math.round(h * 0.34));
+    const titleSize = Math.round(Math.max(28, Math.min(42, w * 0.05)) * desktopScale);
+    const bodySize = Math.round(Math.max(14, Math.min(20, w * 0.022)) * desktopScale);
+    const progressSize = Math.round(Math.max(14, Math.min(18, w * 0.02)) * desktopScale);
 
     this.cameras.main.setBackgroundColor(0x07111b);
     this.add.ellipse(w / 2, h / 2 - panelHeight * 0.35, panelWidth * 0.92, panelHeight * 0.95, 0x123048, 0.24);
 
     const panel = this.add.rectangle(w / 2, h / 2, panelWidth, panelHeight, 0x102030, 0.96);
     panel.setStrokeStyle(2, 0x29445f, 0.9);
-    this.add.rectangle(w / 2, panel.y - panelHeight / 2 + 18, panelWidth - 32, 4, 0x5cc8ff, 0.92);
+    this.add.rectangle(w / 2, panel.y - panelHeight / 2 + Math.round(18 * insetScale), panelWidth - Math.round(32 * insetScale), Math.round(4 * insetScale), 0x5cc8ff, 0.92);
 
     const titleText = this.add
-      .text(w / 2, panel.y - 48, t(bootLocale, "bootstrap.loading.title"), {
+      .text(w / 2, panel.y - Math.round(48 * insetScale), t(bootLocale, "bootstrap.loading.title"), {
         fontSize: `${titleSize}px`,
         color: "#f5fbff",
         fontStyle: "700",
@@ -61,16 +63,16 @@ export class BootScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const bodyText = this.add
-      .text(w / 2, panel.y - 8, t(bootLocale, "bootstrap.loading.body"), {
+      .text(w / 2, panel.y - Math.round(8 * insetScale), t(bootLocale, "bootstrap.loading.body"), {
         fontSize: `${bodySize}px`,
         color: "#b8d3e8",
         align: "center",
-        wordWrap: { width: panelWidth - 56, useAdvancedWrap: true },
+        wordWrap: { width: panelWidth - Math.round(56 * insetScale), useAdvancedWrap: true },
       })
       .setOrigin(0.5);
 
     const progressText = this.add
-      .text(w / 2, panel.y + 44, t(bootLocale, "bootstrap.loading.progress", { value: 0 }), {
+      .text(w / 2, panel.y + Math.round(44 * insetScale), t(bootLocale, "bootstrap.loading.progress", { value: 0 }), {
         fontSize: `${progressSize}px`,
         color: "#d7ecff",
         fontStyle: "600",
@@ -123,10 +125,17 @@ export class BootScene extends Phaser.Scene {
     this.load.image("rarity_frame_rare", "generated/rarity_frame_rare.png");
     this.load.image("rarity_frame_epic", "generated/rarity_frame_epic.png");
 
-    const barBg = this.add.rectangle(w / 2, panel.y + 76, Math.min(520, panelWidth - 40), 18, 0x1b2635, 1);
+    const barBg = this.add.rectangle(
+      w / 2,
+      panel.y + Math.round(76 * insetScale),
+      Math.min(Math.round(520 * desktopScale), panelWidth - Math.round(40 * insetScale)),
+      Math.round(18 * desktopScale),
+      0x1b2635,
+      1
+    );
     barBg.setOrigin(0.5);
     barBg.setStrokeStyle(1, 0x34516e, 0.9);
-    const bar = this.add.rectangle(barBg.x - barBg.width / 2 + 3, barBg.y, 0, 12, 0x5cc8ff, 1);
+    const bar = this.add.rectangle(barBg.x - barBg.width / 2 + Math.round(3 * insetScale), barBg.y, 0, Math.round(12 * desktopScale), 0x5cc8ff, 1);
     bar.setOrigin(0, 0.5);
 
     this.load.on("progress", (p: number) => {
@@ -365,6 +374,20 @@ function trackSessionStart(analytics: AnalyticsAdapter, platform: string, payloa
 
 function trackSessionEnd(analytics: AnalyticsAdapter, platform: string): void {
   analytics.track(ANALYTICS_EVENTS.SESSION_END, { platform, t: Date.now() });
+}
+
+function getResponsiveBootScale(
+  width: number,
+  height: number,
+  baseWidth: number,
+  baseHeight: number,
+  factor: number,
+  maxScale = Number.POSITIVE_INFINITY
+): number {
+  const ratio = Math.min(width / baseWidth, height / baseHeight);
+  if (!Number.isFinite(ratio) || ratio <= 1) return 1;
+  const scale = 1 + (ratio - 1) * factor;
+  return Number.isFinite(maxScale) ? Phaser.Math.Clamp(scale, 1, maxScale) : Math.max(1, scale);
 }
 
 function isRecoveryStage(stage: BootReport["stage"]): boolean {
