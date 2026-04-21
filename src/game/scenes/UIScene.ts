@@ -816,13 +816,14 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const compactLayout = width <= 720 || height <= 520;
     const shortLayout = width <= 680 || height <= 400;
-    const desktopScale = compactLayout ? 1 : getResponsiveOverlayScale(width, height, 1280, 800, 0.45, 1.45);
+    const desktopScale = compactLayout ? 1 : getResponsiveOverlayScale(width, height, 1280, 800, 0.75);
     const showHint = !compactLayout;
+    const insetScale = compactLayout ? 1 : desktopScale;
     const panelWidth = Math.max(320, Math.min(Math.round(468 * desktopScale), width - (shortLayout ? 20 : 32)));
     const panelHeight = Math.max(324, Math.min(Math.round((shortLayout ? 372 : 420) * desktopScale), height - (shortLayout ? 16 : 24)));
-    const titleY = -panelHeight / 2 + (shortLayout ? 28 : compactLayout ? 34 : 42);
-    const accentY = titleY + (shortLayout ? 24 : 28);
-    const hintY = accentY + (shortLayout ? 16 : 20);
+    const titleY = -panelHeight / 2 + Math.round((shortLayout ? 28 : compactLayout ? 34 : 42) * insetScale);
+    const accentY = titleY + Math.round((shortLayout ? 24 : 28) * insetScale);
+    const hintY = accentY + Math.round((shortLayout ? 16 : 20) * insetScale);
     const fieldWidth = Math.max(240, panelWidth - Math.round((shortLayout ? 46 : 108) * desktopScale));
     const fieldHeight = Math.round((shortLayout ? 40 : 46) * desktopScale);
     const rowGap = Math.round((shortLayout ? 12 : 14) * desktopScale);
@@ -832,19 +833,19 @@ export class UIScene extends Phaser.Scene {
     this.settingsTitle
       .setStyle({ fontSize: `${Math.round((shortLayout ? 24 : compactLayout ? 26 : 28) * desktopScale)}px` })
       .setPosition(0, titleY)
-      .setWordWrapWidth(panelWidth - 36, true);
+      .setWordWrapWidth(panelWidth - Math.round(36 * insetScale), true);
     this.settingsHint
       .setStyle({
         fontSize: `${Math.round((shortLayout ? 13 : compactLayout ? 14 : 15) * desktopScale)}px`,
-        wordWrap: { width: panelWidth - 48 },
+        wordWrap: { width: panelWidth - Math.round(48 * insetScale) },
         align: "center",
       })
       .setPosition(0, hintY)
       .setVisible(showHint);
 
     let cursorY = showHint
-      ? hintY + this.settingsHint.height / 2 + Math.round((shortLayout ? 22 : 28) * desktopScale)
-      : accentY + Math.round((shortLayout ? 28 : 34) * desktopScale);
+      ? hintY + this.settingsHint.height / 2 + Math.round((shortLayout ? 22 : 28) * insetScale)
+      : accentY + Math.round((shortLayout ? 28 : 34) * insetScale);
     const controls = [
       { button: this.settingsQualityButton, label: this.settingsQualityLabel },
       { button: this.settingsSfxButton, label: this.settingsSfxLabel },
@@ -862,7 +863,7 @@ export class UIScene extends Phaser.Scene {
     const actionGap = Math.round(12 * desktopScale);
     const actionWidth = Math.max(Math.round(120 * desktopScale), Math.min(Math.round(172 * desktopScale), Math.floor((fieldWidth - actionGap) / 2)));
     const actionHeight = Math.round((shortLayout ? 42 : 46) * desktopScale);
-    const actionY = panelHeight / 2 - actionHeight / 2 - Math.round((shortLayout ? 12 : 18) * desktopScale);
+    const actionY = panelHeight / 2 - actionHeight / 2 - Math.round((shortLayout ? 12 : 18) * insetScale);
 
     this.settingsResumeButton.setSize(actionWidth, actionHeight).setPosition(-(actionWidth / 2 + actionGap / 2), actionY);
     this.settingsResumeLabel
@@ -1622,11 +1623,12 @@ function getResponsiveOverlayScale(
   baseWidth: number,
   baseHeight: number,
   factor: number,
-  maxScale = 1.45
+  maxScale = Number.POSITIVE_INFINITY
 ): number {
   const ratio = Math.min(width / baseWidth, height / baseHeight);
   if (!Number.isFinite(ratio) || ratio <= 1) return 1;
-  return Phaser.Math.Clamp(1 + (ratio - 1) * factor, 1, maxScale);
+  const scale = 1 + (ratio - 1) * factor;
+  return Number.isFinite(maxScale) ? Phaser.Math.Clamp(scale, 1, maxScale) : Math.max(1, scale);
 }
 
 function formatCooldown(locale: Locale, seconds: number): string {

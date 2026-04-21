@@ -1633,9 +1633,18 @@ export class MenuScene extends Phaser.Scene {
       const hideSummaryPanel = starterUi || missionsExpanded;
       const topInset = minimal ? 14 : 18;
       const fullDesktopGrowth = mode === "full" ? getFullDesktopGrowth(s.width, s.height) : 0;
-      const largePanelScale = mode === "full" ? getViewportUiScale(s.width, s.height, MENU_LAYOUT_BREAKPOINTS.fullWidth, MENU_LAYOUT_BREAKPOINTS.fullHeight, 0.5) : 1;
       const wideDesktop = fullDesktopGrowth > 0.05;
       const wideStarterDesktop = wideDesktop && starterUi;
+      const showPreview = !missionsExpanded && mode === "full" && (starterUi || wideDesktop);
+      const utilityPanelScale =
+        mode === "full"
+          ? getViewportUiScale(s.width, s.height, MENU_LAYOUT_BREAKPOINTS.fullWidth, MENU_LAYOUT_BREAKPOINTS.fullHeight, 0.75)
+          : 1;
+      const summaryPanelScale =
+        mode === "full"
+          ? getViewportUiScale(s.width, s.height, MENU_LAYOUT_BREAKPOINTS.fullWidth, MENU_LAYOUT_BREAKPOINTS.fullHeight, 1)
+          : 1;
+      const largePanelScale = utilityPanelScale;
       const walletFontSize = minimal ? 14 : compact ? 15 : mode === "full" ? Math.round(16 + fullDesktopGrowth * 6) : 14;
       const topButtonFontSize = mode === "full" ? Math.round(15 + fullDesktopGrowth * 5) : 14;
       const topButtonSecondaryFontSize = mode === "full" ? Math.round(14 + fullDesktopGrowth * 4) : 13;
@@ -1648,7 +1657,6 @@ export class MenuScene extends Phaser.Scene {
         .setPosition(s.width / 2, s.height / 2)
         .setSize(s.width, s.height)
         .setFillStyle(0x02060a, minimal ? 0.58 : compact ? 0.52 : 0.44);
-      const showPreview = !missionsExpanded && mode === "full" && (starterUi || wideDesktop);
       const previewX = showPreview ? Math.round(s.width * (starterUi ? 0.775 : 0.74)) : 0;
       const heroPanelHeight = mode === "full" ? Math.round(590 + fullDesktopGrowth * 170) : 460;
       const leftX = showPreview ? Math.round(s.width * (starterUi ? 0.28 : 0.305)) : s.width / 2;
@@ -1902,10 +1910,10 @@ export class MenuScene extends Phaser.Scene {
       const liveopsPanel = getLiveopsPanelMetrics(s.width, compact, s.height);
       const stackedMissions = liveopsPanel.stacked;
       const summaryWidth = Math.min(
-        Math.round((minimal ? s.width - 24 : showPreview ? 560 : liveopsPanel.width) * largePanelScale),
+        Math.round((minimal ? s.width - 24 : showPreview ? 560 : liveopsPanel.width) * summaryPanelScale),
         s.width - 24
       );
-      const summaryHeight = hideSummaryPanel ? 0 : Math.round((ultraTightMenu ? 118 : minimal ? 168 : compact ? 144 : 140) * largePanelScale);
+      const summaryHeight = hideSummaryPanel ? 0 : Math.round((ultraTightMenu ? 118 : minimal ? 168 : compact ? 144 : 140) * summaryPanelScale);
       const summaryBottom = s.height - (hideSummaryPanel ? 14 : minimal ? 12 : showPreview ? 72 : 18);
       const summaryTop = summaryBottom - summaryHeight;
       const summaryCenterY = summaryTop + summaryHeight / 2;
@@ -2197,12 +2205,12 @@ export class MenuScene extends Phaser.Scene {
 
         this.dailyPanel.setPosition(leftX, summaryCenterY).setSize(summaryWidth, summaryHeight);
 
-        const summaryInset = Math.round(16 * largePanelScale);
-        const summaryCardInset = Math.round(12 * largePanelScale);
-        const summaryQuickGap = Math.round(8 * largePanelScale);
-        const summaryHeaderTitleFontSize = `${Math.round(14 * largePanelScale)}px`;
-        const summaryBadgeFontSize = `${Math.round(11 * largePanelScale)}px`;
-        liveopsTitle.setStyle({ fontSize: summaryHeaderTitleFontSize }).setPosition(summaryLeft + summaryInset, summaryTop + Math.round(18 * largePanelScale)).setVisible(true);
+        const summaryInset = Math.round(16 * summaryPanelScale);
+        const summaryCardInset = Math.round(12 * summaryPanelScale);
+        const summaryQuickGap = Math.round(8 * summaryPanelScale);
+        const summaryHeaderTitleFontSize = `${Math.round(14 * summaryPanelScale)}px`;
+        const summaryBadgeFontSize = `${Math.round(11 * summaryPanelScale)}px`;
+        liveopsTitle.setStyle({ fontSize: summaryHeaderTitleFontSize }).setPosition(summaryLeft + summaryInset, summaryTop + Math.round(18 * summaryPanelScale)).setVisible(true);
         liveopsReadyBadgeText.setStyle({ fontSize: summaryBadgeFontSize });
         btnCloseMissions.setVisible(false);
         labelCloseMissions.setVisible(false);
@@ -2211,28 +2219,28 @@ export class MenuScene extends Phaser.Scene {
 
         btnClaimOps
           .setSize(
-            Math.round((ultraTightMenu ? 84 : minimal ? 96 : 116) * largePanelScale),
-            Math.round((ultraTightMenu ? 24 : minimal ? 28 : 30) * largePanelScale)
+            Math.round((ultraTightMenu ? 84 : minimal ? 96 : 116) * summaryPanelScale),
+            Math.round((ultraTightMenu ? 24 : minimal ? 28 : 30) * summaryPanelScale)
           )
-          .setPosition(summaryLeft + summaryWidth - Math.round(14 * largePanelScale), summaryTop + Math.round((ultraTightMenu ? 8 : minimal ? 10 : 12) * largePanelScale))
+          .setPosition(summaryLeft + summaryWidth - Math.round(14 * summaryPanelScale), summaryTop + Math.round((ultraTightMenu ? 8 : minimal ? 10 : 12) * summaryPanelScale))
           .setOrigin(1, 0);
-        labelClaimOps.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 10 : minimal ? 11 : 13) * largePanelScale)}px` });
+        labelClaimOps.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 10 : minimal ? 11 : 13) * summaryPanelScale)}px` });
         labelClaimOps.setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2);
         fitTextScaleToWidth(labelClaimOps, Math.max(88, btnClaimOps.width - 16), 0.72);
         claimOpsHalo
           .setPosition(btnClaimOps.x - btnClaimOps.width / 2, btnClaimOps.y + btnClaimOps.height / 2)
-          .setSize(btnClaimOps.width + Math.round(12 * largePanelScale), btnClaimOps.height + Math.round(10 * largePanelScale));
+          .setSize(btnClaimOps.width + Math.round(12 * summaryPanelScale), btnClaimOps.height + Math.round(10 * summaryPanelScale));
         updateReadyBadge(liveopsReadyCount);
         liveopsReadyBadgeBg.setPosition(
-          btnClaimOps.x - btnClaimOps.width - Math.round(12 * largePanelScale) - liveopsReadyBadgeBg.width / 2,
+          btnClaimOps.x - btnClaimOps.width - Math.round(12 * summaryPanelScale) - liveopsReadyBadgeBg.width / 2,
           btnClaimOps.y + btnClaimOps.height / 2
         );
         liveopsReadyBadgeText.setPosition(liveopsReadyBadgeBg.x, liveopsReadyBadgeBg.y);
 
         const quickActionsRight = liveopsReadyCount > 0
-          ? liveopsReadyBadgeBg.x - liveopsReadyBadgeBg.width / 2 - Math.round(12 * largePanelScale)
-          : btnClaimOps.x - btnClaimOps.width - Math.round(12 * largePanelScale);
-        const quickActionsLeft = summaryLeft + Math.max(Math.round(148 * largePanelScale), liveopsTitle.width + Math.round(32 * largePanelScale));
+          ? liveopsReadyBadgeBg.x - liveopsReadyBadgeBg.width / 2 - Math.round(12 * summaryPanelScale)
+          : btnClaimOps.x - btnClaimOps.width - Math.round(12 * summaryPanelScale);
+        const quickActionsLeft = summaryLeft + Math.max(Math.round(148 * summaryPanelScale), liveopsTitle.width + Math.round(32 * summaryPanelScale));
         const quickActionsAvailableWidth = quickActionsRight - quickActionsLeft;
         const showSummaryQuickActions = !minimal && !utilityVisible && quickActionsAvailableWidth >= 184;
 
@@ -2244,8 +2252,8 @@ export class MenuScene extends Phaser.Scene {
         }
         if (showSummaryQuickActions) {
           const quickButtonWidth = Math.floor((quickActionsAvailableWidth - summaryQuickGap) / 2);
-          const quickButtonY = summaryTop + Math.round(12 * largePanelScale);
-          const quickButtonHeight = Math.round(30 * largePanelScale);
+          const quickButtonY = summaryTop + Math.round(12 * summaryPanelScale);
+          const quickButtonHeight = Math.round(30 * summaryPanelScale);
           btnWorkshop.setFillStyle(0x0d131b, 0.86).setStrokeStyle(1, 0xffd166, 0.52);
           btnLeaderboard
             .setFillStyle(0x0d131b, 0.86)
@@ -2258,20 +2266,20 @@ export class MenuScene extends Phaser.Scene {
             .setPosition(quickActionsLeft + quickButtonWidth + summaryQuickGap, quickButtonY)
             .setSize(quickButtonWidth, quickButtonHeight);
           labelLeaderboard.setPosition(btnLeaderboard.x + btnLeaderboard.width / 2, btnLeaderboard.y + btnLeaderboard.height / 2);
-          labelWorkshop.setStyle({ fontSize: `${Math.round(11 * largePanelScale)}px` });
-          labelLeaderboard.setStyle({ fontSize: `${Math.round(11 * largePanelScale)}px` });
+          labelWorkshop.setStyle({ fontSize: `${Math.round(11 * summaryPanelScale)}px` });
+          labelLeaderboard.setStyle({ fontSize: `${Math.round(11 * summaryPanelScale)}px` });
           fitTextScaleToWidth(labelWorkshop, btnWorkshop.width - 14, 0.72);
           fitTextScaleToWidth(labelLeaderboard, btnLeaderboard.width - 14, 0.72);
         }
 
         liveopsCardBg.setVisible(false);
         liveopsInfo.setVisible(false);
-        summaryRewardsTitle.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 11 : minimal ? 12 : 12) * largePanelScale)}px` });
-        summaryDailyTitle.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 11 : minimal ? 12 : 12) * largePanelScale)}px` });
-        summaryWeeklyTitle.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 11 : minimal ? 12 : 12) * largePanelScale)}px` });
-        summaryRewardsValue.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 13 : minimal ? 15 : 14) * largePanelScale)}px` });
-        summaryDailyValue.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 13 : minimal ? 15 : 14) * largePanelScale)}px` });
-        summaryWeeklyValue.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 13 : minimal ? 15 : 14) * largePanelScale)}px` });
+        summaryRewardsTitle.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 11 : minimal ? 12 : 12) * summaryPanelScale)}px` });
+        summaryDailyTitle.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 11 : minimal ? 12 : 12) * summaryPanelScale)}px` });
+        summaryWeeklyTitle.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 11 : minimal ? 12 : 12) * summaryPanelScale)}px` });
+        summaryRewardsValue.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 13 : minimal ? 15 : 14) * summaryPanelScale)}px` });
+        summaryDailyValue.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 13 : minimal ? 15 : 14) * summaryPanelScale)}px` });
+        summaryWeeklyValue.setStyle({ fontSize: `${Math.round((ultraTightMenu ? 13 : minimal ? 15 : 14) * summaryPanelScale)}px` });
 
         summaryRewardsCardBg.setVisible(true);
         summaryDailyCardBg.setVisible(true);
@@ -2285,32 +2293,32 @@ export class MenuScene extends Phaser.Scene {
 
         if (minimal) {
           const cardWidth = summaryWidth - summaryCardInset * 2;
-          const cardHeight = Math.round((ultraTightMenu ? 24 : 36) * largePanelScale);
+          const cardHeight = Math.round((ultraTightMenu ? 24 : 36) * summaryPanelScale);
           const rows = [
-            { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, y: summaryTop + Math.round((ultraTightMenu ? 44 : 66) * largePanelScale) },
-            { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, y: summaryTop + Math.round((ultraTightMenu ? 72 : 106) * largePanelScale) },
-            { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, y: summaryTop + Math.round((ultraTightMenu ? 100 : 146) * largePanelScale) },
+            { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, y: summaryTop + Math.round((ultraTightMenu ? 44 : 66) * summaryPanelScale) },
+            { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, y: summaryTop + Math.round((ultraTightMenu ? 72 : 106) * summaryPanelScale) },
+            { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, y: summaryTop + Math.round((ultraTightMenu ? 100 : 146) * summaryPanelScale) },
           ];
           for (const entry of rows) {
             entry.bg.setPosition(leftX, entry.y).setSize(cardWidth, cardHeight);
-            entry.title.setPosition(summaryLeft + Math.round(14 * largePanelScale), entry.y - Math.round((ultraTightMenu ? 6 : 9) * largePanelScale));
-            entry.value.setPosition(summaryLeft + Math.round(14 * largePanelScale), entry.y + Math.round((ultraTightMenu ? 6 : 9) * largePanelScale));
+            entry.title.setPosition(summaryLeft + Math.round(14 * summaryPanelScale), entry.y - Math.round((ultraTightMenu ? 6 : 9) * summaryPanelScale));
+            entry.value.setPosition(summaryLeft + Math.round(14 * summaryPanelScale), entry.y + Math.round((ultraTightMenu ? 6 : 9) * summaryPanelScale));
             fitTextScaleToWidth(entry.title, cardWidth - 18, 0.78);
             fitTextScaleToWidth(entry.value, cardWidth - 18, 0.78);
           }
         } else {
-          const cardGap = Math.round(10 * largePanelScale);
+          const cardGap = Math.round(10 * summaryPanelScale);
           const cardWidth = Math.floor((summaryWidth - summaryCardInset * 2 - cardGap * 2) / 3);
-          const cardY = summaryTop + Math.round(94 * largePanelScale);
+          const cardY = summaryTop + Math.round(94 * summaryPanelScale);
           const cards = [
             { bg: summaryRewardsCardBg, title: summaryRewardsTitle, value: summaryRewardsValue, x: summaryLeft + summaryCardInset + cardWidth / 2 },
             { bg: summaryDailyCardBg, title: summaryDailyTitle, value: summaryDailyValue, x: summaryLeft + summaryCardInset + cardWidth * 1.5 + cardGap },
             { bg: summaryWeeklyCardBg, title: summaryWeeklyTitle, value: summaryWeeklyValue, x: summaryLeft + summaryCardInset + cardWidth * 2.5 + cardGap * 2 },
           ];
           for (const entry of cards) {
-            entry.bg.setPosition(entry.x, cardY).setSize(cardWidth, Math.round(60 * largePanelScale));
-            entry.title.setPosition(entry.x - cardWidth / 2 + Math.round(12 * largePanelScale), cardY - Math.round(15 * largePanelScale));
-            entry.value.setPosition(entry.x - cardWidth / 2 + Math.round(12 * largePanelScale), cardY + Math.round(11 * largePanelScale));
+            entry.bg.setPosition(entry.x, cardY).setSize(cardWidth, Math.round(60 * summaryPanelScale));
+            entry.title.setPosition(entry.x - cardWidth / 2 + Math.round(12 * summaryPanelScale), cardY - Math.round(15 * summaryPanelScale));
+            entry.value.setPosition(entry.x - cardWidth / 2 + Math.round(12 * summaryPanelScale), cardY + Math.round(11 * summaryPanelScale));
             fitTextScaleToWidth(entry.title, cardWidth - 18, 0.78);
             fitTextScaleToWidth(entry.value, cardWidth - 16, 0.78);
           }
@@ -3293,7 +3301,7 @@ export class MenuScene extends Phaser.Scene {
     fitTextScaleToWidth(this.workshopFooterText, metrics.width - (ultraCompact ? 48 : 96), 0.78);
     fitTextScaleToWidth(this.workshopPageLabel, 96, 0.8);
     const scale = Math.min(
-      getViewportUiScale(width, height, MENU_LAYOUT_BREAKPOINTS.fullWidth, MENU_LAYOUT_BREAKPOINTS.fullHeight, 0.55, 1.45),
+      getViewportUiScale(width, height, MENU_LAYOUT_BREAKPOINTS.fullWidth, MENU_LAYOUT_BREAKPOINTS.fullHeight, 0.78),
       (width - 24) / metrics.width,
       (height - 24) / metrics.height
     );
@@ -3437,7 +3445,7 @@ export class MenuScene extends Phaser.Scene {
       });
 
     const scale = Math.min(
-      getViewportUiScale(width, height, MENU_LAYOUT_BREAKPOINTS.fullWidth, MENU_LAYOUT_BREAKPOINTS.fullHeight, 0.55, 1.45),
+      getViewportUiScale(width, height, MENU_LAYOUT_BREAKPOINTS.fullWidth, MENU_LAYOUT_BREAKPOINTS.fullHeight, 0.78),
       (width - 28) / metrics.width,
       (height - 28) / metrics.height
     );
@@ -4811,11 +4819,12 @@ function getViewportUiScale(
   baseWidth: number,
   baseHeight: number,
   factor: number,
-  maxScale = 1.5
+  maxScale = Number.POSITIVE_INFINITY
 ): number {
   const ratio = Math.min(width / baseWidth, height / baseHeight);
   if (!Number.isFinite(ratio) || ratio <= 1) return 1;
-  return Phaser.Math.Clamp(1 + (ratio - 1) * factor, 1, maxScale);
+  const scale = 1 + (ratio - 1) * factor;
+  return Number.isFinite(maxScale) ? Phaser.Math.Clamp(scale, 1, maxScale) : Math.max(1, scale);
 }
 
 function getMenuWeeklyRaceTopLine(locale: Locale): string {
