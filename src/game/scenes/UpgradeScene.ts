@@ -67,7 +67,7 @@ export class UpgradeScene extends Phaser.Scene {
     let headerCursor = ultraCompactLayout
       ? 22
       : compactLayout
-        ? 34
+        ? 28
         : shortLayout
           ? Math.round(height * 0.13)
           : Math.round(height * 0.16 * insetScale);
@@ -80,12 +80,12 @@ export class UpgradeScene extends Phaser.Scene {
     addHeaderLine(
       t(this.locale, "upgrade.title", { wave: this.state.waveIndex }),
       {
-        fontSize: `${Math.round((ultraCompactLayout ? 17 : compactLayout ? 20 : shortLayout ? 22 : 24) * desktopScale)}px`,
+        fontSize: `${Math.round((ultraCompactLayout ? 17 : compactLayout ? 18 : shortLayout ? 22 : 24) * desktopScale)}px`,
         color: "#d9f2ff",
         fontStyle: "700",
         align: "center",
       },
-      Math.round((ultraCompactLayout ? 6 : compactLayout ? 10 : 14) * insetScale)
+      Math.round((ultraCompactLayout ? 6 : compactLayout ? 8 : 14) * insetScale)
     );
 
     const lastCleared = this.state.endless.lastCleared;
@@ -127,12 +127,12 @@ export class UpgradeScene extends Phaser.Scene {
             .filter(Boolean)
             .join(" | "),
           {
-            fontSize: "13px",
+            fontSize: "12px",
             color: lastCleared.objectiveCompleted ? "#98ffb9" : "#ffb084",
             align: "center",
             wordWrap: { width: Math.min(Math.round(420 * desktopScale), width * 0.84) },
           },
-          8
+          6
         );
       } else {
         addHeaderLine(
@@ -189,12 +189,12 @@ export class UpgradeScene extends Phaser.Scene {
         addHeaderLine(
           t(this.locale, "upgrade.nextLevel", { level: pendingLevel.index, modifier: modifierCopy.title }),
           {
-            fontSize: `${Math.round((compactLayout ? 13 : shortLayout ? 14 : 15) * desktopScale)}px`,
+            fontSize: `${Math.round((compactLayout ? 12 : shortLayout ? 14 : 15) * desktopScale)}px`,
             color: "#98b7c7",
             align: "center",
             wordWrap: { width: Math.min(Math.round(460 * desktopScale), width * 0.84) },
           },
-          Math.round((compactLayout ? 6 : 8) * insetScale)
+          Math.round((compactLayout ? 4 : 8) * insetScale)
         );
         if (!compactLayout) {
           addHeaderLine(
@@ -217,10 +217,10 @@ export class UpgradeScene extends Phaser.Scene {
     }
 
     const rerollEnabled = uiStage !== "starter" && Boolean(this.state.config.ads?.rewarded?.reroll?.enabled);
-    const rerollHeight = Math.round((ultraCompactLayout ? 30 : compactLayout ? 40 : shortLayout ? 44 : 48) * desktopScale);
-    const rerollWidth = Math.round((ultraCompactLayout ? 188 : compactLayout ? 220 : shortLayout ? 232 : 244) * desktopScale);
+    const rerollHeight = Math.round((ultraCompactLayout ? 30 : compactLayout ? 34 : shortLayout ? 44 : 48) * desktopScale);
+    const rerollWidth = Math.round((ultraCompactLayout ? 188 : compactLayout ? 208 : shortLayout ? 232 : 244) * desktopScale);
     const rerollY = rerollEnabled
-      ? headerCursor + Math.round((ultraCompactLayout ? 10 : compactLayout ? 18 : shortLayout ? 20 : 22) * insetScale)
+      ? headerCursor + Math.round((ultraCompactLayout ? 10 : compactLayout ? 12 : shortLayout ? 20 : 22) * insetScale)
       : headerCursor;
     const reroll = this.add
       .rectangle(width / 2, rerollY, rerollWidth, rerollHeight, 0x1b2635, 0.95)
@@ -229,7 +229,7 @@ export class UpgradeScene extends Phaser.Scene {
       .setDepth(1001);
     const rerollLabel = this.add
       .text(reroll.x, reroll.y, t(this.locale, "upgrade.reroll"), {
-        fontSize: `${Math.round((ultraCompactLayout ? 12 : compactLayout ? 14 : shortLayout ? 15 : 16) * desktopScale)}px`,
+        fontSize: `${Math.round((ultraCompactLayout ? 12 : compactLayout ? 13 : shortLayout ? 15 : 16) * desktopScale)}px`,
         color: "#d9f2ff",
         fontStyle: "700",
         align: "center",
@@ -246,7 +246,7 @@ export class UpgradeScene extends Phaser.Scene {
     reroll.on("pointerdown", () => void this.handleReroll());
     this.offerTopY =
       (rerollEnabled ? reroll.y + reroll.height / 2 : headerCursor) +
-      Math.round((ultraCompactLayout ? 8 : compactLayout ? 10 : shortLayout ? 12 : 16) * insetScale);
+      Math.round((ultraCompactLayout ? 8 : compactLayout ? 6 : shortLayout ? 12 : 16) * insetScale);
 
     this.renderOffer();
     this.game.events.emit(GAME_EVENTS.UPGRADE_OFFER_SHOWN, { waveIndex: this.state.waveIndex });
@@ -299,11 +299,17 @@ export class UpgradeScene extends Phaser.Scene {
     });
 
     const w = Math.min(Math.round((ultraCompactLayout ? 330 : compactLayout ? 336 : shortLayout ? 352 : 364) * desktopScale), width * 0.88);
-    const gap = Math.round((ultraCompactLayout ? 4 : compactLayout ? 6 : shortLayout ? 10 : 16) * insetScale);
-    const availableHeight = Math.max(Math.round(120 * insetScale), height - Math.round((ultraCompactLayout ? 10 : 16) * insetScale) - this.offerTopY);
+    const gap = Math.round((ultraCompactLayout ? 4 : compactLayout ? 4 : shortLayout ? 10 : 16) * insetScale);
+    const availableHeight = Math.max(
+      Math.round((ultraCompactLayout ? 84 : compactLayout ? 96 : 120) * insetScale),
+      height - Math.round((ultraCompactLayout ? 10 : compactLayout ? 10 : 16) * insetScale) - this.offerTopY
+    );
     const h = Math.min(
-      Math.round((ultraCompactLayout ? 72 : shortLayout ? 128 : 156) * desktopScale),
-      Math.max(Math.round((ultraCompactLayout ? 48 : compactLayout ? 72 : 96) * desktopScale), (availableHeight - (offer.length - 1) * gap) / offer.length)
+      Math.round((ultraCompactLayout ? 72 : compactLayout ? 102 : shortLayout ? 128 : 156) * desktopScale),
+      Math.max(
+        Math.round((ultraCompactLayout ? 48 : compactLayout ? 56 : 96) * desktopScale),
+        (availableHeight - (offer.length - 1) * gap) / offer.length
+      )
     );
     const stackHeight = offer.length * h + (offer.length - 1) * gap;
     const entryStartY = this.offerTopY + h / 2 + Math.max(0, (availableHeight - stackHeight) / 2);

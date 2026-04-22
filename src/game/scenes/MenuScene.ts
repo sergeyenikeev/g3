@@ -110,6 +110,7 @@ export class MenuScene extends Phaser.Scene {
   private workshopPageLabel!: Phaser.GameObjects.Text;
   private workshopPageIndex = 0;
   private workshopPageCount = 1;
+  private workshopLayoutSignature = "";
   private leaderboardDim!: Phaser.GameObjects.Rectangle;
   private leaderboardBox!: Phaser.GameObjects.Container;
   private leaderboardHintText!: Phaser.GameObjects.Text;
@@ -1750,9 +1751,10 @@ export class MenuScene extends Phaser.Scene {
         const panelWidth = Math.min(Math.round(UTILITY_PANEL_WIDTH * largePanelScale), s.width - 28);
         const panelHeight = Math.min(Math.round(UTILITY_PANEL_HEIGHT * largePanelScale), s.height - 28);
         const panelCenterX = s.width - topInset - panelWidth / 2;
-        const panelCenterY = topInset + topButtonHeight + Math.round(16 * largePanelScale) + panelHeight / 2;
+        const desiredPanelTop = topInset + topButtonHeight + Math.round(16 * largePanelScale);
+        const panelTop = Phaser.Math.Clamp(desiredPanelTop, 12, Math.max(12, s.height - panelHeight - 12));
+        const panelCenterY = panelTop + panelHeight / 2;
         const panelLeft = panelCenterX - panelWidth / 2;
-        const panelTop = panelCenterY - panelHeight / 2;
         const settingsButtonWidth = Math.floor((panelWidth - utilityInset * 2 - utilityColumnGap) / 2);
         const utilityFeatureRowVisible = !starterUi;
         const utilityPilotVisible = advancedUi;
@@ -2746,33 +2748,40 @@ export class MenuScene extends Phaser.Scene {
         };
         positionWeeklyRaceBody();
       } else {
-        const weeklyCardTop = detailPanelTop + m(denseDesktop ? 115 : 122);
+        const summaryRowTop = detailPanelTop + m(denseDesktop ? 112 : 120);
+        const dailySummaryHeight = m(denseDesktop ? 86 : 98);
+        const weeklySummaryHeight = m(denseDesktop ? 138 : 152);
+        const summaryTitleY = summaryRowTop + m(denseDesktop ? 9 : 12);
+        const dailyInfoY = summaryRowTop + m(denseDesktop ? 23 : 28);
+        const weeklyInfoY = summaryRowTop + m(denseDesktop ? 46 : 54);
+        const weeklyMetaBadgeY = summaryRowTop + m(denseDesktop ? 32 : 42);
+        const weeklyCardTop = summaryRowTop;
         dailyInfoCardBg
-          .setPosition(leftColumnCenter, detailPanelTop + m(denseDesktop ? 152 : 164))
-          .setSize(columnWidth, m(denseDesktop ? 86 : 98))
+          .setPosition(leftColumnCenter, summaryRowTop + dailySummaryHeight / 2)
+          .setSize(columnWidth, dailySummaryHeight)
           .setFillStyle(0x14222d, 0.98);
-        dailyInfoTitle.setPosition(panelLeft + m(16), detailPanelTop + m(denseDesktop ? 116 : 124)).setStyle({ fontSize: `${m(14)}px` });
-        dailyInfo.setPosition(panelLeft + m(16), detailPanelTop + m(denseDesktop ? 130 : 140));
+        dailyInfoTitle.setPosition(panelLeft + m(16), summaryTitleY).setStyle({ fontSize: `${m(14)}px` });
+        dailyInfo.setPosition(panelLeft + m(16), dailyInfoY);
         dailyInfo.setStyle({ fontSize: `${m(13)}px` });
         dailyInfo.setWordWrapWidth(columnWidth - m(24), true);
         dailyInfo.setColor("#d6e6ef");
 
-        weeklyRaceCardBg.setPosition(rightColumnCenter, detailPanelTop + m(denseDesktop ? 176 : 188)).setSize(columnWidth, m(denseDesktop ? 138 : 152));
-        weeklyRaceTitle.setPosition(rightColumnLeft + m(4), detailPanelTop + m(126)).setStyle({ fontSize: `${m(14)}px` });
-        weeklyRaceInfo.setPosition(rightColumnLeft + m(4), detailPanelTop + m(denseDesktop ? 158 : 166));
+        weeklyRaceCardBg.setPosition(rightColumnCenter, summaryRowTop + weeklySummaryHeight / 2).setSize(columnWidth, weeklySummaryHeight);
+        weeklyRaceTitle.setPosition(rightColumnLeft + m(4), summaryTitleY).setStyle({ fontSize: `${m(14)}px` });
+        weeklyRaceInfo.setPosition(rightColumnLeft + m(4), weeklyInfoY);
         weeklyRaceInfo.setStyle({ fontSize: `${m(13)}px` });
         weeklyRaceInfo.setWordWrapWidth(columnWidth - m(24), true);
-        weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - m(12) - weeklyRaceBadgeBg.width / 2, detailPanelTop + m(126));
+        weeklyRaceBadgeBg.setPosition(rightColumnLeft + columnWidth - m(12) - weeklyRaceBadgeBg.width / 2, summaryTitleY);
         weeklyRaceBadgeText.setPosition(weeklyRaceBadgeBg.x, weeklyRaceBadgeBg.y);
         positionWeeklyRaceResetBadge = () => {
-          weeklyRaceResetBadgeBg.setPosition(rightColumnLeft + m(4) + weeklyRaceResetBadgeBg.width / 2, detailPanelTop + m(144));
+          weeklyRaceResetBadgeBg.setPosition(rightColumnLeft + m(4) + weeklyRaceResetBadgeBg.width / 2, weeklyMetaBadgeY);
           weeklyRaceResetBadgeText.setPosition(weeklyRaceResetBadgeBg.x, weeklyRaceResetBadgeBg.y);
         };
         positionWeeklyRaceResetBadge();
-        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, detailPanelTop + m(144));
+        weeklyRaceJumpBadgeBg.setPosition(weeklyRaceBadgeBg.x, weeklyMetaBadgeY);
         weeklyRaceJumpBadgeText.setPosition(weeklyRaceJumpBadgeBg.x, weeklyRaceJumpBadgeBg.y);
         positionWeeklyRaceSignalBadges = () => {
-          const rowY = Math.max(detailPanelTop + m(denseDesktop ? 194 : 206), weeklyRaceInfo.y + weeklyRaceInfo.displayHeight + m(14));
+          const rowY = Math.max(summaryRowTop + m(denseDesktop ? 82 : 94), weeklyRaceInfo.y + weeklyRaceInfo.displayHeight + m(14));
           weeklyRaceRewardBadgeBg.setPosition(rightColumnLeft + m(4) + weeklyRaceRewardBadgeBg.width / 2, rowY);
           weeklyRaceRewardBadgeText.setPosition(weeklyRaceRewardBadgeBg.x, weeklyRaceRewardBadgeBg.y);
           weeklyRaceRiskBadgeBg.setPosition(rightColumnLeft + columnWidth - m(20) - weeklyRaceRiskBadgeBg.width / 2, rowY);
@@ -3460,6 +3469,20 @@ export class MenuScene extends Phaser.Scene {
     const ultraCompact = this.isUltraCompactWorkshopLayout();
     const tightStack = metrics.compact && this.isTightWorkshopStackLayout();
     const denseDesktop = !metrics.compact && this.isDenseWorkshopDesktopLayout();
+    const layoutSignature = [
+      width,
+      height,
+      metrics.width,
+      metrics.height,
+      metrics.compact ? "compact" : "full",
+      ultraCompact ? "ultra" : "regular",
+      tightStack ? "tight" : "stack",
+      denseDesktop ? "dense" : "normal",
+    ].join(":");
+    if (this.workshopBox.visible && this.workshopCards.length > 0 && this.workshopLayoutSignature !== layoutSignature) {
+      this.refreshWorkshopSummary();
+    }
+    this.workshopLayoutSignature = layoutSignature;
     const halfWidth = metrics.width / 2;
     const halfHeight = metrics.height / 2;
     const panel = this.workshopBox.list[0] as Phaser.GameObjects.Rectangle | undefined;
