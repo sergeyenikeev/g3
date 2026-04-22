@@ -20,6 +20,7 @@ const legacyUploadZip = join(distDir, "upload_ready", "magnet-caravan_yandex_upl
 const legacyUploadZipChecksum = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.sha256.txt");
 const ruDocPath = join(rootDir, "docs", "platform_texts", "yandex_ru.md");
 const enDocPath = join(rootDir, "docs", "platform_texts", "yandex_en.md");
+const assetProvenancePath = join(rootDir, "docs", "ASSET_PROVENANCE.md");
 const uiAuditMatrixDir = join(rootDir, "artifacts", "ui-audit", "matrix");
 const yandexPublishSmokeDir = join(rootDir, "artifacts", "yandex-publish-pass");
 
@@ -92,6 +93,7 @@ await ensureFilesExist([
   gameArchivePath,
   ruDocPath,
   enDocPath,
+  assetProvenancePath,
   join(rootDir, "docs", "promo", "yandex", "card", "icon_512x512.png"),
   join(rootDir, "docs", "promo", "yandex", "card", "cover_800x470.png"),
   join(rootDir, "docs", "promo", "yandex", "desktop", "01_menu_1600x900.png"),
@@ -109,6 +111,7 @@ await copyFile(gameArchivePath, join(uploadRoot, consoleUploadArchiveName));
 await copyFile(ruDocPath, join(uploadRoot, "texts", "source", "yandex_ru.md"));
 await copyFile(enDocPath, join(uploadRoot, "texts", "source", "yandex_en.md"));
 await copyFile(join(rootDir, "docs", "YANDEX_PUBLISH.md"), join(uploadRoot, "instructions", "YANDEX_PUBLISH.md"));
+await copyFile(assetProvenancePath, join(uploadRoot, "instructions", "ASSET_PROVENANCE.md"));
 await cp(join(rootDir, "docs", "promo", "yandex"), join(uploadRoot, "media"), { recursive: true });
 const reviewEvidence = await copyReviewEvidence(uploadRoot);
 
@@ -134,6 +137,7 @@ await writeFile(
       preferredConsoleUploadArchive: consoleUploadArchiveName,
       card,
       primaryMedia,
+      assetProvenance: "instructions/ASSET_PROVENANCE.md",
       reviewEvidence,
     },
     null,

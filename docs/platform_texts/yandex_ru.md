@@ -1,4 +1,4 @@
-﻿# Яндекс Игры — Magnet Caravan
+﻿# Magnet Caravan
 
 ## Название
 Magnet Caravan

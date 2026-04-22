@@ -38,7 +38,10 @@ const server = spawnCommand("npm", ["run", "dev", "--", "--host", host, "--port"
 
 try {
   await waitForHttp(baseURL, 30_000);
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--enable-unsafe-swiftshader"],
+  });
   try {
     for (const locale of locales) {
       for (const profile of profiles) {

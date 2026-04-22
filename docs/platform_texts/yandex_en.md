@@ -1,4 +1,4 @@
-﻿# Yandex Games — Magnet Caravan (EN)
+﻿# Magnet Caravan
 
 ## Title
 Magnet Caravan
@@ -22,4 +22,3 @@ Mobile magnet survival: collect scrap, Flip to survive, bank your tail, choose u
 - Press Flip to pulse and deflect shots.
 - Stay in the Recycler Zone to bank.
 - Choose an upgrade after each wave.
-

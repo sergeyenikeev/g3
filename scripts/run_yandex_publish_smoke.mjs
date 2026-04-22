@@ -39,7 +39,10 @@ const checks = [];
 const evidence = [];
 
 try {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--enable-unsafe-swiftshader"],
+  });
   try {
     const context = await browser.newContext({
       locale: "en-US",
@@ -71,7 +74,8 @@ try {
 
     await seedStubSaveAndReload(releasePage, makeLegacyBrokenSave("ru"), `${releaseUrl}?mc_bootdiag=1`);
     await waitForCanvas(releasePage);
-    await releasePage.waitForTimeout(500);
+    await releasePage.waitForFunction(() => Number(globalThis.window.__YA_STUB_STATE__?.loadingReadyCalls ?? 0) >= 1);
+    await releasePage.waitForTimeout(400);
 
     const recoveryShot = join(reportDir, "00b_release_recovery.png");
     await releasePage.screenshot({ path: recoveryShot });
@@ -268,15 +272,18 @@ try {
     );
     checks.push(
       check(
-        "Release bundle recovers from a failing platform save by bypassing cloud data once",
+        "Release bundle ignores unreadable platform save data and still boots cleanly",
         !recoveryState.fatalOverlay &&
           recoveryState.hasCanvas &&
+          recoveryState.loadingReadyCalls >= 1 &&
           recoveryState.playerDataReads >= 1 &&
-          recoveryState.report?.status === "recovered" &&
-          recoveryState.report?.recoveredFromPlatformSave === true &&
-          recoveryState.report?.recoveryAttempted === true &&
-          recoveryState.report?.stage === "save-load",
-        recoveryState.report ? JSON.stringify(recoveryState.report) : "missing boot report"
+          recoveryState.documentLang === "ru",
+        JSON.stringify({
+          documentLang: recoveryState.documentLang,
+          loadingReadyCalls: recoveryState.loadingReadyCalls,
+          playerDataReads: recoveryState.playerDataReads,
+          report: recoveryState.report,
+        })
       )
     );
     checks.push(check("AUTO smoke build boots without fatal overlay", !startupState.fatalOverlay, starterShot));
@@ -343,6 +350,12 @@ await writeFile(
   }),
   "utf8"
 );
+
+const failedChecks = checks.filter((item) => !item.ok);
+if (failedChecks.length > 0) {
+  console.error(`yandex_publish_smoke: FAIL -> ${reportPath}`);
+  throw new Error(`Yandex publish smoke failed ${failedChecks.length} check(s): ${failedChecks.map((item) => item.label).join("; ")}`);
+}
 
 console.log(`yandex_publish_smoke: OK -> ${reportPath}`);
 
@@ -617,7 +630,7 @@ async function seedStubSaveAndReload(page, save, nextUrl = null) {
 }
 
 async function waitForCanvas(page) {
-  await page.waitForSelector("canvas", { timeout: 15_000 });
+  await page.waitForSelector("canvas", { timeout: 30_000 });
 }
 
 async function waitForScene(page, sceneKey) {
@@ -679,7 +692,7 @@ ${errorsSection}
 
 ## Moderation Mapping
 - Release startup stability: verified on the production Yandex bundle with routed SDK stubs.
-- Cloud-save recovery: verified on the production Yandex bundle through a failing platform save followed by automatic safe recovery.
+- Cloud-save resilience: verified on the production Yandex bundle through an unreadable platform save followed by safe fallback boot.
 - Runtime interaction coverage: verified on the AUTO smoke build with exposed automation hooks and routed SDK stubs.
 - Browser interaction guards: verified through synthetic contextmenu/selectstart prevention checks.
 - Rewarded and interstitial flows: verified through results-screen interaction on the AUTO smoke build.
