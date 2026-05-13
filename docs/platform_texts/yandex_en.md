@@ -1,24 +1,27 @@
 ﻿# Magnet Caravan
 
-## Title
+## Название
 Magnet Caravan
 
-## About (short)
-Collect scrap with a magnet, grow a caravan tail, bank it for bolts and healing, and survive waves with a powerful Flip pulse.
+## Об игре (коротко)
+Собирайте металлолом магнитом, выстраивайте хвост-караван и сдавайте его в переработчик. Импульс помогает оттолкнуть врагов и отразить снаряды.
 
-## Full description
-Magnet Caravan is a landscape-friendly mobile-first top-down arcade. Use the virtual joystick and Flip button to dodge danger, pull scrap into your tail, and bank it at the Recycler Zone.
+## Полное описание
+Magnet Caravan - аркадная игра с видом сверху для горизонтального экрана. Управляйте тягачом виртуальным джойстиком, стрелками или привычными клавишами движения, собирайте металлолом, удлиняйте караван и в нужный момент сдавайте добычу в зону переработки, получая болты и восстановление прочности.
 
-Waves are driven by a fairness-first director: safe spawn distance, spawn telegraph, caps per enemy type, and pressure gating. Between waves you pick upgrades that apply to the run configuration (data-driven).
+Враги приходят волнами, а сложность нарастает постепенно: игра следит за безопасной дистанцией появления, предупреждает о новых угрозах и меняет состав роя по ходу забега. Между волнами вы выбираете улучшения и собираете свой стиль игры.
 
-Daily mode uses a UTC seed with unique modifiers and rules.
+Есть ежедневный режим с особым набором правил и модификаторов дня.
 
-## SEO description
-Mobile magnet survival: collect scrap, Flip to survive, bank your tail, choose upgrades between waves.
+## Описание для поиска
+Аркадное выживание: магнит притягивает металлолом, импульс спасает от врагов, переработчик превращает добычу в награды, а улучшения формируют сборку на забег.
 
-## How to play
-- Move with joystick / WASD.
-- Collect scrap to grow your tail.
-- Press Flip to pulse and deflect shots.
-- Stay in the Recycler Zone to bank.
-- Choose an upgrade after each wave.
+## Описание для поисковой оптимизации
+Magnet Caravan — аркадное выживание: собирайте лом магнитом, улучшайтесь и переживайте волны врагов.
+
+## Как играть
+- Ведите тягач джойстиком, стрелками или клавишами движения.
+- Собирайте металлолом, чтобы увеличить караван.
+- Нажимайте импульс, чтобы отталкивать врагов и отражать снаряды.
+- Заезжайте в зону переработки и оставайтесь в ней, пока добыча не будет сдана.
+- После каждой волны выбирайте улучшение и подстраивайте сборку под текущий забег.

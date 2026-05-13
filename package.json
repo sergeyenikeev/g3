@@ -22,6 +22,7 @@
     "audio:generate": "node scripts/generate_audio_assets.mjs",
     "visual:generate": "node scripts/generate_visual_assets.mjs",
     "media:yandex": "node scripts/capture_yandex_media.mjs",
+    "media:yandex:promo": "node scripts/capture_yandex_promo_media.mjs",
     "audit:ru-texts": "node scripts/check_ru_texts.mjs",
     "audit:ui": "node scripts/capture_ui_audit_matrix.mjs",
     "audit:yandex": "node scripts/run_yandex_publish_smoke.mjs",

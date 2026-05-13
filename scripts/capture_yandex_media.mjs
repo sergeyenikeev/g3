@@ -32,7 +32,7 @@ try {
   await renderCardAssets(cardDir);
   console.log(`capture_yandex_media: OK -> ${outputDir}`);
 } finally {
-  server.kill("SIGTERM");
+  await stopProcessTree(server);
 }
 
 async function captureDesktop(url, desktopDir, cardDir) {
@@ -146,34 +146,21 @@ async function renderCardAssets(cardDir) {
           .copy {
             position: absolute;
             left: 42px;
-            top: 48px;
+            top: 0;
             width: 348px;
+            height: 100%;
+            display: flex;
+            align-items: center;
             color: #e8f6ff;
             z-index: 2;
           }
           h1 {
-            margin: 0 0 12px 0;
-            font-size: 54px;
+            margin: 0;
+            font-size: 56px;
             line-height: 0.94;
             letter-spacing: 1.5px;
             font-weight: 700;
             text-shadow: 0 0 24px rgba(92, 200, 255, 0.18);
-          }
-          .lead {
-            margin: 0 0 22px 0;
-            font-size: 18px;
-            line-height: 1.28;
-            color: #8fe7ff;
-            font-weight: 700;
-          }
-          .badge {
-            display: inline-block;
-            padding: 10px 14px;
-            border: 2px solid rgba(255, 209, 102, 0.9);
-            background: rgba(11, 18, 26, 0.72);
-            color: #f5fbff;
-            font-size: 15px;
-            line-height: 1.2;
           }
           .hero {
             position: absolute;
@@ -383,8 +370,6 @@ async function renderCardAssets(cardDir) {
           <div class="grain"></div>
           <div class="copy">
             <h1>Magnet Caravan</h1>
-            <p class="lead">Переверни поле. Сдай лом. Переживи натиск.</p>
-            <div class="badge">Аркадное выживание с ежедневным режимом</div>
           </div>
           <div class="hero">
             <div class="fog"></div>
@@ -414,7 +399,7 @@ async function renderCardAssets(cardDir) {
   await page.setViewportSize({ width: 512, height: 512 });
   await page.setContent(`
     <!doctype html>
-    <html lang="en">
+    <html lang="ru">
       <head>
         <meta charset="UTF-8" />
         <style>
@@ -653,6 +638,27 @@ async function renderCardAssets(cardDir) {
     </html>
   `);
   await page.screenshot({ path: join(cardDir, "icon_512x512.png") });
+  await page.addStyleTag({
+    content: `
+      .icon.maskable::after {
+        box-shadow: inset 0 0 110px rgba(0, 0, 0, 0.22);
+      }
+      .icon.maskable .ring,
+      .icon.maskable .cross-h,
+      .icon.maskable .cross-v,
+      .icon.maskable .arrow,
+      .icon.maskable .enemy,
+      .icon.maskable .enemy-tip,
+      .icon.maskable .escort,
+      .icon.maskable .shard,
+      .icon.maskable .player,
+      .icon.maskable .wheel {
+        filter: drop-shadow(0 0 8px rgba(143, 231, 255, 0.12));
+      }
+    `,
+  });
+  await page.locator(".icon").evaluate((node) => node.classList.add("maskable"));
+  await page.screenshot({ path: join(cardDir, "maskable_icon_512x512.png") });
 
   await browser.close();
 }
@@ -818,6 +824,21 @@ function spawnCommand(cmd, args, env) {
     env,
     stdio: "inherit",
   });
+}
+
+async function stopProcessTree(child) {
+  if (!child.pid || child.exitCode !== null) return;
+
+  if (process.platform === "win32") {
+    await new Promise((resolve) => {
+      const killer = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
+      killer.on("error", resolve);
+      killer.on("exit", resolve);
+    });
+    return;
+  }
+
+  child.kill("SIGTERM");
 }
 
 function escapeForCmd(arg) {

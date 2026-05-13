@@ -19,7 +19,6 @@ const consoleUploadArchiveName = "UPLOAD_THIS_TO_YANDEX_magnet-caravan_yandex.zi
 const legacyUploadZip = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.zip");
 const legacyUploadZipChecksum = join(distDir, "upload_ready", "magnet-caravan_yandex_upload-ready.sha256.txt");
 const ruDocPath = join(rootDir, "docs", "platform_texts", "yandex_ru.md");
-const enDocPath = join(rootDir, "docs", "platform_texts", "yandex_en.md");
 const assetProvenancePath = join(rootDir, "docs", "ASSET_PROVENANCE.md");
 const uiAuditMatrixDir = join(rootDir, "artifacts", "ui-audit", "matrix");
 const yandexPublishSmokeDir = join(rootDir, "artifacts", "yandex-publish-pass");
@@ -29,40 +28,37 @@ const version = String(packageJson.version ?? "0.0.0");
 const generatedAt = new Date().toISOString();
 const UTF8_BOM = "\uFEFF";
 const ruDoc = await readFile(ruDocPath, "utf8");
-const enDoc = await readFile(enDocPath, "utf8");
 
 const card = {
-  title: extractMarkdownSection(enDoc, "Title") || extractMarkdownSection(ruDoc, "Название"),
-  languages: ["ru", "en"],
+  title: extractMarkdownSection(ruDoc, "Название") || "Magnet Caravan",
+  languages: ["ru"],
   platforms: ["desktop", "mobile"],
   orientation: "landscape",
   cloudSave: true,
   ageRating: "12+",
-  primaryGenre: "Arcade",
-  secondaryGenre: "Action",
-  tags: ["arcade", "action", "survival", "mobile", "skill", "daily"],
+  primaryGenre: "аркада",
+  secondaryGenre: "экшен",
+  tags: ["аркада", "экшен", "выживание", "мобильная", "на реакцию", "ежедневный режим"],
   keywords: {
     ru: "магнит,аркада,выживание,волны,улучшения,ежедневный режим",
-    en: "magnet,arcade,survival,waves,upgrades,daily",
   },
   descriptions: {
     ru: {
       short: normalizeParagraphSection(extractMarkdownSection(ruDoc, "Об игре (коротко)")),
       full: normalizeParagraphSection(extractMarkdownSection(ruDoc, "Полное описание")),
+      seo: normalizeParagraphSection(
+        extractMarkdownSection(ruDoc, "Описание для поисковой оптимизации") || extractMarkdownSection(ruDoc, "Описание для поиска")
+      ),
       howToPlay: normalizeBulletSection(extractMarkdownSection(ruDoc, "Как играть")),
-    },
-    en: {
-      short: normalizeParagraphSection(extractMarkdownSection(enDoc, "About (short)")),
-      full: normalizeParagraphSection(extractMarkdownSection(enDoc, "Full description")),
-      howToPlay: normalizeBulletSection(extractMarkdownSection(enDoc, "How to play")),
     },
   },
   developerComment:
-    "The game uses the official Yandex Games SDK only. Rewarded ads are user-initiated. Interstitial ads are shown only on the results screen, outside active gameplay. Game loading and gameplay hooks are integrated. Audio starts only after user interaction. Cloud save uses player data.",
+    "Игра использует только официальный набор средств разработки Яндекс Игр. Реклама за награду запускается только по явному действию игрока. Межстраничная реклама показывается только на экране результатов, вне активного игрового процесса. События загрузки и игрового процесса подключены. Звук включается только после взаимодействия пользователя. Облачные сохранения используют данные игрока.",
 };
 
 const primaryMedia = {
   icon: "media/card/icon_512x512.png",
+  maskableIcon: "media/card/maskable_icon_512x512.png",
   cover: "media/card/cover_800x470.png",
   desktopScreenshots: [
     "media/desktop/01_menu_1600x900.png",
@@ -78,6 +74,10 @@ const primaryMedia = {
     "media/card/cover_menu_alt_800x470.png",
     "media/desktop/04_results_1600x900.png",
   ],
+  gameplayVideo: "media/video/gameplay_1920x1080.mp4",
+  gameplayGif: "media/video/gameplay_16x9_hq.gif",
+  verticalVideo: "media/video/gameplay_vertical_1080x1920.mp4",
+  advertisingVideos: ["media/video/ad_horizontal_1920x1080.mp4", "media/video/ad_vertical_1080x1920.mp4"],
 };
 
 await runReleaseChecks();
@@ -92,12 +92,17 @@ await mkdir(uploadRoot, { recursive: true });
 await ensureFilesExist([
   gameArchivePath,
   ruDocPath,
-  enDocPath,
   assetProvenancePath,
   join(rootDir, "docs", "promo", "yandex", "card", "icon_512x512.png"),
+  join(rootDir, "docs", "promo", "yandex", "card", "maskable_icon_512x512.png"),
   join(rootDir, "docs", "promo", "yandex", "card", "cover_800x470.png"),
   join(rootDir, "docs", "promo", "yandex", "desktop", "01_menu_1600x900.png"),
   join(rootDir, "docs", "promo", "yandex", "mobile", "01_gameplay_1280x720.png"),
+  join(rootDir, "docs", "promo", "yandex", "video", "gameplay_1920x1080.mp4"),
+  join(rootDir, "docs", "promo", "yandex", "video", "gameplay_vertical_1080x1920.mp4"),
+  join(rootDir, "docs", "promo", "yandex", "video", "gameplay_16x9_hq.gif"),
+  join(rootDir, "docs", "promo", "yandex", "video", "ad_horizontal_1920x1080.mp4"),
+  join(rootDir, "docs", "promo", "yandex", "video", "ad_vertical_1080x1920.mp4"),
 ]);
 
 await mkdir(join(uploadRoot, "game"), { recursive: true });
@@ -109,22 +114,18 @@ await mkdir(join(uploadRoot, "review_evidence"), { recursive: true });
 await copyFile(gameArchivePath, join(uploadRoot, "game", "magnet-caravan_yandex.zip"));
 await copyFile(gameArchivePath, join(uploadRoot, consoleUploadArchiveName));
 await copyFile(ruDocPath, join(uploadRoot, "texts", "source", "yandex_ru.md"));
-await copyFile(enDocPath, join(uploadRoot, "texts", "source", "yandex_en.md"));
 await copyFile(join(rootDir, "docs", "YANDEX_PUBLISH.md"), join(uploadRoot, "instructions", "YANDEX_PUBLISH.md"));
-await copyFile(assetProvenancePath, join(uploadRoot, "instructions", "ASSET_PROVENANCE.md"));
+await writeTextFileWithBom(join(uploadRoot, "instructions", "ASSET_PROVENANCE.md"), buildAssetProvenanceMarkdown());
 await cp(join(rootDir, "docs", "promo", "yandex"), join(uploadRoot, "media"), { recursive: true });
 const reviewEvidence = await copyReviewEvidence(uploadRoot);
 
 await writeTextFileWithBom(join(uploadRoot, "texts", "title.txt"), `${card.title}\n`);
 await writeTextFileWithBom(join(uploadRoot, "texts", "short_description_ru.txt"), `${card.descriptions.ru.short}\n`);
-await writeTextFileWithBom(join(uploadRoot, "texts", "short_description_en.txt"), `${card.descriptions.en.short}\n`);
 await writeTextFileWithBom(join(uploadRoot, "texts", "full_description_ru.txt"), `${card.descriptions.ru.full}\n`);
-await writeTextFileWithBom(join(uploadRoot, "texts", "full_description_en.txt"), `${card.descriptions.en.full}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "seo_description_ru.txt"), `${card.descriptions.ru.seo}\n`);
 await writeTextFileWithBom(join(uploadRoot, "texts", "how_to_play_ru.txt"), `${card.descriptions.ru.howToPlay}\n`);
-await writeTextFileWithBom(join(uploadRoot, "texts", "how_to_play_en.txt"), `${card.descriptions.en.howToPlay}\n`);
 await writeTextFileWithBom(join(uploadRoot, "texts", "keywords_ru.txt"), `${card.keywords.ru}\n`);
-await writeTextFileWithBom(join(uploadRoot, "texts", "keywords_en.txt"), `${card.keywords.en}\n`);
-await writeTextFileWithBom(join(uploadRoot, "texts", "developer_comment_en.txt"), `${card.developerComment}\n`);
+await writeTextFileWithBom(join(uploadRoot, "texts", "developer_comment_ru.txt"), `${card.developerComment}\n`);
 await writeTextFileWithBom(join(uploadRoot, "texts", "console_fields_ru.md"), buildConsoleFieldsMarkdownRu(card));
 
 await writeFile(
@@ -168,7 +169,7 @@ function _buildConsoleFieldsMarkdownLegacy(gameCard) {
 - Языки интерфейса: \`${gameCard.languages.join("`, `")}\`
 - Платформы: \`${gameCard.platforms.join("`, `")}\`
 - Ориентация: \`${gameCard.orientation}\`
-- Cloud save: \`${gameCard.cloudSave ? "enabled" : "disabled"}\`
+- Облачные сохранения: \`${gameCard.cloudSave ? "включены" : "выключены"}\`
 - Возраст: \`${gameCard.ageRating}\`
 
 ## Жанры
@@ -178,21 +179,20 @@ function _buildConsoleFieldsMarkdownLegacy(gameCard) {
 ## Теги
 \`${gameCard.tags.join("`, `")}\`
 
-## Keywords
-- RU: \`${gameCard.keywords.ru}\`
-- EN: \`${gameCard.keywords.en}\`
+## Ключевые слова
+- Русские: \`${gameCard.keywords.ru}\`
 
-## Media
+## Медиа
 - Иконка: \`${primaryMedia.icon}\`
 - Обложка: \`${primaryMedia.cover}\`
-- Desktop screenshots:
+- Снимки для компьютера:
   - \`${primaryMedia.desktopScreenshots.join("`\n  - `")}\`
-- Mobile screenshots:
+- Снимки для телефона:
   - \`${primaryMedia.mobileScreenshots.join("`\n  - `")}\`
 - Альтернативы:
   - \`${primaryMedia.alternatives.join("`\n  - `")}\`
 
-## Developer Comment
+## Комментарий разработчика
 \`${gameCard.developerComment}\`
 `;
 }
@@ -208,19 +208,7 @@ function buildConsoleFieldsMarkdownRu(gameCard) {
     if (platform === "mobile") return "телефон";
     return platform;
   });
-  const genreLabels = {
-    Arcade: "аркада",
-    Action: "экшен",
-  };
-  const tagLabels = gameCard.tags.map((tag) => {
-    if (tag === "arcade") return "аркада";
-    if (tag === "action") return "экшен";
-    if (tag === "survival") return "выживание";
-    if (tag === "mobile") return "мобильная";
-    if (tag === "skill") return "на реакцию";
-    if (tag === "daily") return "ежедневный режим";
-    return tag;
-  });
+  const tagLabels = gameCard.tags;
 
   return `# Поля карточки для Яндекс Игр
 
@@ -233,25 +221,30 @@ function buildConsoleFieldsMarkdownRu(gameCard) {
 - Возраст: \`${gameCard.ageRating}\`
 
 ## Жанры
-- Основной: \`${genreLabels[gameCard.primaryGenre] ?? gameCard.primaryGenre}\`
-- Дополнительный: \`${genreLabels[gameCard.secondaryGenre] ?? gameCard.secondaryGenre}\`
+- Основной: \`${gameCard.primaryGenre}\`
+- Дополнительный: \`${gameCard.secondaryGenre}\`
 
 ## Теги
 \`${tagLabels.join("`, `")}\`
 
 ## Ключевые слова
 - Русские: \`${gameCard.keywords.ru}\`
-- Для второго языка: берите из отдельного файла с переводом в пакете
+
+## Описание для поисковой оптимизации
+\`${gameCard.descriptions.ru.seo}\`
 
 ## Медиа
 - Основная иконка: первая квадратная картинка из папки для карточки
+- Иконка для адаптивной маски: отдельная квадратная картинка из папки для карточки
 - Основная обложка: широкая картинка для витрины
 - Снимки экрана для компьютера: берите первые три изображения из папки для компьютера
 - Снимки экрана для телефона: берите два изображения из папки для телефона
+- Вертикальное видео игрового процесса: отдельный файл из папки с видео
+- Рекламные видео: горизонтальный и вертикальный ролики из папки с видео
 - Запасные изображения: дополнительные варианты иконки, обложки и итогового экрана лежат рядом
 
 ## Комментарий разработчика
-Берите из отдельного файла с комментарием на втором языке в пакете.
+Берите из отдельного русского файла с комментарием разработчика в пакете.
 `;
 }
 
@@ -276,14 +269,16 @@ function buildReadme({ version: currentVersion, generatedAt: generatedIso, archi
 ## Что Загружать В Консоль
 1. Отдельный архив игры из корня пакета.
 2. Основную иконку из папки для карточки.
-3. Основную обложку из папки для карточки.
-4. Три основных снимка для компьютера.
-5. Два основных снимка для телефона.
-6. Комментарий разработчика на втором языке из папки с текстами.
+3. Иконку для адаптивной маски из папки для карточки.
+4. Основную обложку из папки для карточки.
+5. Три основных снимка для компьютера.
+6. Два основных снимка для телефона.
+7. Вертикальное видео игрового процесса из папки с видео.
+8. Комментарий разработчика на русском языке из папки с текстами.
 
 ## Где Брать Тексты
 - отдельные поля карточки лежат в папке с текстами;
-- исходные описания на русском и втором языке лежат рядом;
+- исходные описания на русском языке лежат рядом;
 - полная структура карточки лежит в папке с данными.
 
 ## Альтернативные Медиа
@@ -310,7 +305,7 @@ function buildUploadChecklist() {
 1. Создайте новый черновик игры.
 2. Загрузите отдельный архив игры.
 3. Убедитесь, что включены горизонтальная ориентация, компьютер, телефон и облачные сохранения.
-4. Вставьте название, короткое описание, полное описание и поле «Как играть» из папки с текстами.
+4. Вставьте название, короткое описание, полное описание, описание для поисковой оптимизации и поле «Как играть» из папки с текстами.
 5. Добавьте ключевые слова, жанры, теги и комментарий разработчика.
 6. Загрузите основную иконку.
 7. Загрузите основную обложку.
@@ -330,6 +325,27 @@ function buildUploadChecklist() {
 2. Пройдите короткую проверку: старт забега, реклама за награду, экран результатов, возврат после сворачивания.
 3. Если пакет переносился между машинами, сверьте контрольные суммы.
 4. Перед отправкой в модерацию перечитайте полную памятку по публикации.
+`;
+}
+
+function buildAssetProvenanceMarkdown() {
+  return `# Происхождение материалов
+
+Все материалы для публикации Magnet Caravan подготовлены внутри проекта.
+
+## Изображения
+- Иконки, обложки и снимки экрана созданы из локальной сборки игры.
+- В материалах нет сторонних фотографий, товарных знаков или заимствованных иллюстраций.
+- Надписи на витринных изображениях оставлены на русском языке, кроме названия игры.
+
+## Видео
+- Видео игрового процесса записано из локальной тестовой сборки.
+- Рекламные ролики собраны из реального игрового процесса и русскоязычных титров.
+- Анимированное изображение подготовлено из той же записи игрового процесса.
+
+## Тексты
+- Описания, ключевые слова, памятки и комментарий разработчика подготовлены на русском языке.
+- Название игры оставлено как Magnet Caravan.
 `;
 }
 
@@ -353,8 +369,8 @@ ${publishSmokeSection}
 ## Исторические Замечания
 
 ### 1. Не все зависящие от языка тексты были переведены
-- Доказательство: матрица интерфейса на русском и втором языке.
-- Автоматическая проверка: локальная проверка интерфейса на двух языках.
+- Доказательство: матрица интерфейса на русском языке.
+- Автоматическая проверка: локальная проверка интерфейса на русском языке.
 - Примечание: меню, верхняя панель, улучшения, результаты и стартовые слои работают через общую систему локализации.
 
 ### 2. Элементы обрезались после изменения размера окна
@@ -426,15 +442,15 @@ async function writeTextFileWithBom(targetPath, content) {
 
 async function copyReviewEvidence(uploadDir) {
   const reviewRoot = join(uploadDir, "review_evidence");
-  const uiAuditPresent = await pathExists(uiAuditMatrixDir);
+  const uiAuditPresent = await pathExists(join(uiAuditMatrixDir, "ru"));
   const publishSmokePresent = await pathExists(yandexPublishSmokeDir);
 
   if (uiAuditPresent) {
-    await cp(uiAuditMatrixDir, join(reviewRoot, "ui_audit_matrix"), { recursive: true });
+    await copyRussianUiAuditMatrix(join(reviewRoot, "ui_audit_matrix"));
   }
 
   if (publishSmokePresent) {
-    await cp(yandexPublishSmokeDir, join(reviewRoot, "yandex_publish_smoke"), { recursive: true });
+    await copyRussianPublishSmoke(join(reviewRoot, "yandex_publish_smoke"));
   }
 
   return {
@@ -449,6 +465,52 @@ async function copyReviewEvidence(uploadDir) {
       reportPath: publishSmokePresent ? "review_evidence/yandex_publish_smoke/report.md" : null,
     },
   };
+}
+
+async function copyRussianPublishSmoke(targetDir) {
+  await mkdir(targetDir, { recursive: true });
+  const entries = await readdir(yandexPublishSmokeDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith(".png")) {
+      await copyFile(join(yandexPublishSmokeDir, entry.name), join(targetDir, entry.name));
+    }
+  }
+
+  await writeTextFileWithBom(join(targetDir, "report.md"), `# Публикационная проверка Яндекс Игр
+
+Проверка подтверждает, что локальная сборка запускается, открывает меню, начинает забег, показывает игровой интерфейс, экран улучшений и экран результатов.
+
+## Приложенные изображения
+- загрузка и возврат из аварийного состояния;
+- стартовое меню;
+- игровой интерфейс;
+- экран улучшений;
+- результаты до и после рекламы за награду.
+
+Все приложенные снимки сделаны из русскоязычной сборки Magnet Caravan.
+`);
+}
+
+async function copyRussianUiAuditMatrix(targetDir) {
+  await mkdir(targetDir, { recursive: true });
+  await cp(join(uiAuditMatrixDir, "ru"), join(targetDir, "ru"), { recursive: true });
+  await writeTextFileWithBom(join(targetDir, "index.html"), `<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Матрица русских скриншотов Magnet Caravan</title>
+</head>
+<body>
+  <h1>Матрица русских скриншотов Magnet Caravan</h1>
+  <p>В этом разделе оставлены только русскоязычные проверочные изображения для публикации в Яндекс Играх.</p>
+  <ul>
+    <li><a href="ru/desktop/">Скриншоты для компьютера</a></li>
+    <li><a href="ru/mobile/">Скриншоты для телефона</a></li>
+  </ul>
+</body>
+</html>
+`);
 }
 
 async function pathExists(targetPath) {

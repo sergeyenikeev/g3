@@ -1,0 +1,66 @@
+{
+  "generatedAt": "2026-05-07T20:32:51.981Z",
+  "source": {
+    "path": "D:/p/g3/artifacts/yandex-promo-media/gameplay_source_1280x720.mp4",
+    "capture": {
+      "width": 1280,
+      "height": 720,
+      "fps": 15,
+      "durationSec": 18
+    },
+    "note": "Источник записан из реального игрового процесса в локальной тестовой сборке для Яндекс Игр."
+  },
+  "files": {
+    "gameplayVideo": {
+      "path": "docs/promo/yandex/video/gameplay_1920x1080.mp4",
+      "bytes": 10625189,
+      "mib": 10.13,
+      "purpose": "Видео игрового процесса",
+      "format": "MP4/H.264/AAC",
+      "dimensions": "1920x1080",
+      "aspectRatio": "16:9",
+      "durationSec": 18
+    },
+    "gameplayVertical": {
+      "path": "docs/promo/yandex/video/gameplay_vertical_1080x1920.mp4",
+      "bytes": 10020490,
+      "mib": 9.56,
+      "purpose": "Вертикальное видео игрового процесса",
+      "format": "MP4/H.264/AAC",
+      "dimensions": "1080x1920",
+      "aspectRatio": "9:16",
+      "durationSec": 18
+    },
+    "gif": {
+      "path": "docs/promo/yandex/video/gameplay_16x9_hq.gif",
+      "bytes": 11357933,
+      "mib": 10.83,
+      "purpose": "Анимированное изображение для дополнительного поля медиа в Яндекс Играх",
+      "format": "анимированное изображение",
+      "dimensions": "800x450",
+      "aspectRatio": "16:9",
+      "fps": 10,
+      "durationSec": 6
+    },
+    "adHorizontal": {
+      "path": "docs/promo/yandex/video/ad_horizontal_1920x1080.mp4",
+      "bytes": 11182267,
+      "mib": 10.66,
+      "purpose": "Рекламное видео, горизонтальный формат",
+      "format": "MP4/H.264/AAC",
+      "dimensions": "1920x1080",
+      "aspectRatio": "16:9",
+      "durationSec": 18
+    },
+    "adVertical": {
+      "path": "docs/promo/yandex/video/ad_vertical_1080x1920.mp4",
+      "bytes": 4193089,
+      "mib": 4,
+      "purpose": "Рекламное видео, вертикальный формат",
+      "format": "MP4/H.264/AAC",
+      "dimensions": "1080x1920",
+      "aspectRatio": "9:16",
+      "durationSec": 18
+    }
+  }
+}
